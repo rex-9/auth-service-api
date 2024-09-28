@@ -1,18 +1,18 @@
-# creator-alliance-api
+# auth-service-api
 
 <a name="readme-top"></a>
 
 <div align="center">
-  <h3><b>Creator Alliance Api</b></h3>
+  <h3><b>Auth Service Api</b></h3>
 </div>
 
 <!-- TABLE OF CONTENTS -->
 
 # 📗 Table of Contents
 
-- [creator-alliance-api](#creator-alliance-api)
+- [auth-service-api](#auth-service-api)
 - [📗 Table of Contents](#-table-of-contents)
-- [📖 Creator Alliance Api ](#-creator-alliance-api-)
+- [📖 Auth Service Api ](#-auth-service-api-)
   - [🛠 Built With ](#-built-with-)
     - [Tech Stack ](#tech-stack-)
   - [💻 Getting Started ](#-getting-started-)
@@ -23,9 +23,9 @@
 
 <!-- PROJECT DESCRIPTION -->
 
-# 📖 Creator Alliance Api <a name="about-project"></a>
+# 📖 Auth Service Api <a name="about-project"></a>
 
-**Creator Alliance Api** is the server application for [Creator Alliance](https://google.com/) to contribute the Creator-Sponsor society.
+**Auth Service Api** is the server application for [Auth Service](https://google.com/) to contribute the society.
 
 ## 🛠 Built With <a name="built-with"></a>
 
@@ -77,13 +77,13 @@ Clone this repository or download as a zip file to your desired folder:
 
 ```sh
   cd my-folder
-  git clone git@github.com:creator-alliance/creator-alliance-api.git
+  git clone git@github.com:auth-service/auth-service-api.git
 ```
 
 Enter the Root level of the project
 
 ```sh
-  cd creator-alliance-api
+  cd auth-service-api
 ```
 
 Install the dependencies using yarn or npm:

@@ -2,7 +2,7 @@
 require "fileutils"
 
 APP_ROOT = File.expand_path("..", __dir__)
-APP_NAME = "creator-alliance-api"
+APP_NAME = "auth-service-api"
 
 def system!(*args)
   system(*args, exception: true)
