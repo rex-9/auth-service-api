@@ -38,9 +38,19 @@ group :development, :test do
 
   # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
   gem "rubocop-rails-omakase", require: false
+
+  # RSpec is a testing tool for Ruby, created for behavior-driven development (BDD) [https://rspec.info/]
+  gem "rspec-rails", "~> 7.0"
+
+  # FactoryBot is a fixtures replacement with a straightforward definition syntax, support for multiple build strategies (saved instances, unsaved instances, attribute hashes, and stubbed objects), and support for multiple factories for the same class (user, admin_user, and so on), including factory inheritance [
+  gem "factory_bot_rails", "~> 6.4"
+
+  # RSpec- and Minitest-compatible one-liners to test common Rails functionality [https://github.com/thoughtbot/shoulda-matchers]
+  gem "shoulda-matchers", "~> 5.0"
+
+  # Library for generating fake data such as names, addresses, and phone numbers. [https://github.com/faker-ruby/faker]
+  gem "faker", "~> 3.2"
 end
-
-
 
 gem "bcrypt", "~> 3.1"
 
@@ -56,12 +66,8 @@ gem "activesupport", "~> 7.2"
 
 gem "dotenv-rails", "~> 3.1"
 
-group :development, :test do
-  gem "rspec-rails", "~> 7.0"
-  gem "factory_bot_rails", "~> 6.4"
-end
-
 gem "devise", "~> 4.9"
 
 gem "devise-jwt", "~> 0.12.1"
+
 gem "jsonapi-serializer", "~> 2.2"
