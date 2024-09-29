@@ -30,9 +30,9 @@ ActiveRecord::Schema[7.2].define(version: 2024_09_27_121400) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "jti"
-    t.index ["confirmation_token"], name: "index_users_on_confirmation_token", unique: true
-    t.index ["email"], name: "index_users_on_email", unique: true
-    t.index ["jti"], name: "index_users_on_jti"
-    t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
+    t.index [ "confirmation_token" ], name: "index_users_on_confirmation_token", unique: true
+    t.index [ "email" ], name: "index_users_on_email", unique: true
+    t.index [ "jti" ], name: "index_users_on_jti"
+    t.index [ "reset_password_token" ], name: "index_users_on_reset_password_token", unique: true
   end
 end
