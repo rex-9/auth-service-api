@@ -2,11 +2,12 @@ class User < ApplicationRecord
   include Devise::JWT::RevocationStrategies::JTIMatcher
 
   devise :database_authenticatable, :registerable, :validatable, :confirmable,
-         :recoverable, :rememberable, :jwt_authenticatable, jwt_revocation_strategy: self
-
+  :recoverable, :rememberable, :lockable, :trackable, :timeoutable,
+  :jwt_authenticatable, jwt_revocation_strategy: self
   # Include default devise modules. Others available are:
-  #  :lockable, :timeoutable, :trackable and :omniauthable
-  # has_secure_password
+  # :omniauthable
+
+  self.primary_key = "id"
 
   validates :email, presence: true, format: { with: URI::MailTo::EMAIL_REGEXP }, uniqueness: true
   validates :password, presence: true, confirmation: true, length: { minimum: 6 }, if: -> { new_record? || !password.nil? }
