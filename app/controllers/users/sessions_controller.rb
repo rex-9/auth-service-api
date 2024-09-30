@@ -148,6 +148,7 @@ class Users::SessionsController < Devise::SessionsController
 
   def respond_to_on_destroy
     if current_user
+      current_user.update(jti: SecureRandom.uuid)
       render_json_response(
         status_code: 200,
         message: Messages::SIGNED_OUT_SUCCESSFULLY
