@@ -33,5 +33,5 @@
 /config/master.key
 
 /config/credentials.yml.enc
-/config/database.yml
+/config/database.yml 
 /Gemfile.lock
