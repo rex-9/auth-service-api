@@ -28,7 +28,7 @@ class Users::RegistrationsController < Devise::RegistrationsController
       resource.provider = "email"
       resource.save
       render_json_response(
-        status_code: 200,
+        status_code: 201,
         message: Messages::SIGNED_UP_SUCCESSFULLY,
         data: { user: UserSerializer.new(resource).serializable_hash[:data][:attributes] }
       )

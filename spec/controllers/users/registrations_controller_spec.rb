@@ -37,8 +37,8 @@ RSpec.describe Users::RegistrationsController, type: :controller do
     context 'with valid attributes' do
       it 'creates a new user and returns a success response' do
         post :create, params: valid_attributes
-        expect(response).to have_http_status(:ok)
-        expect(json_response['status']['code']).to eq(200)
+        expect(response).to have_http_status(:created)
+        expect(json_response['status']['code']).to eq(201)
         expect(json_response['data']['user']['email']).to eq('test@example.com')
       end
     end

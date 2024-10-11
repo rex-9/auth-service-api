@@ -70,7 +70,8 @@ class Users::SessionsController < Devise::SessionsController
     else
       render_json_response(
         status_code: 401,
-        message: Messages::INVALID_AUTHENTICATION_TOKEN
+        message: Messages::INVALID_AUTHENTICATION_TOKEN,
+        error: Messages::INVALID_AUTHENTICATION_TOKEN
       )
     end
   end
@@ -79,6 +80,13 @@ class Users::SessionsController < Devise::SessionsController
   def google_sign_in
     token = params[:token]
     user_info = get_google_user_info(token)
+    if not user_info
+      return render_json_response(
+        status_code: 401,
+        message: Messages::GOOGLE_AUTHENTICATION_FAILED,
+        error: Messages::GOOGLE_AUTHENTICATION_FAILED
+      )
+    end
     user = User.find_by(email: user_info["email"])
     if user
       if user.provider == "google"
