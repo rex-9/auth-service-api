@@ -76,6 +76,6 @@ gem "rswag", "~> 2.15"
 
 gem "database_cleaner-active_record", "~> 2.2"
 
-gem "rails_performance", "~> 1.3"
+gem "rails_performance", "~> 1.4"
 
 gem "redis", "~> 5.3"
