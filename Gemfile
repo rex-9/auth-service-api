@@ -80,6 +80,6 @@ gem "rails_performance", "~> 1.4"
 
 gem "redis", "~> 5.3"
 
-gem "rails_admin", "~> 3.2"
+gem "rails_admin", "~> 3.3"
 
 gem "sassc-rails", "~> 2.1"
