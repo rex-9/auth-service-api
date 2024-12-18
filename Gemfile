@@ -64,7 +64,7 @@ gem "solargraph", "~> 0.50.0"
 
 gem "activesupport", "~> 7.2.2.1"
 
-gem "dotenv-rails", "~> 3.1.6"
+gem "dotenv-rails", "~> 3.1.7"
 
 gem "devise", "~> 4.9"
 
