@@ -60,7 +60,7 @@ gem "rack-cors", "~> 2.0"
 
 gem "rest-client", "~> 2.1"
 
-gem "solargraph", "~> 0.50.0"
+gem "solargraph", "~> 0.51.0"
 
 gem "activesupport", "~> 7.2.2.1"
 
