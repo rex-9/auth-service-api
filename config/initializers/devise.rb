@@ -24,7 +24,11 @@ Devise.setup do |config|
   # Configure the e-mail address which will be shown in Devise::Mailer,
   # note that it will be overwritten if you use your own mailer class
   # with default "from" parameter.
-  config.mailer_sender = "rex@meritbox.me" # SMTP mailer username
+  config.mailer_sender = begin
+    from_address = ENV.fetch("MAIL_FROM_ADDRESS", "no-reply@example.com")
+    from_name = ENV.fetch("MAIL_FROM_NAME", "").strip
+    from_name.present? ? "#{from_name} <#{from_address}>" : from_address
+  end
 
   # Configure the class responsible to send e-mails.
   # config.mailer = 'Devise::Mailer'

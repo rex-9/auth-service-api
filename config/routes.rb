@@ -38,6 +38,16 @@ Rails.application.routes.draw do
   get  "users/peek",    to: "users/users#peek_user"
   post "media/upload",  to: "assets#upload"
 
+  # Payments (Stripe)
+  post "payments/checkout_sessions", to: "payments#create_checkout_session"
+  post "payments/payment_intents", to: "payments#create_payment_intent"
+  get  "payments/product_details", to: "payments#get_product_details"
+  post "payments/product_details", to: "payments#get_product_details"
+  get  "payments/status", to: "payments#verify_payment_status"
+  get  "payments/details", to: "payments#show_payment_details"
+  get  "payments/customers/:customer_id", to: "payments#list_customer_payments"
+  post "payments/webhooks/stripe", to: "stripe_webhooks#create"
+
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
