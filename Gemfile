@@ -1,6 +1,6 @@
 source "https://rubygems.org"
 
-gem "psych", "~> 5.2.6"
+gem "psych", "~> 5.4.0"
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
 gem "rails", "~> 8.1.3"
 # Use postgresql as the database for Active Record
@@ -31,7 +31,7 @@ gem "kamal", require: false
 gem "thruster", require: false
 
 # Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
-gem "image_processing", "~> 1.2"
+gem "image_processing", "~> 2.0"
 
 # Use Rack CORS for handling Cross-Origin Resource Sharing (CORS), making cross-origin Ajax possible
 # gem "rack-cors"
@@ -56,13 +56,13 @@ group :development, :test do
   gem "factory_bot_rails", "~> 6.5"
 
   # RSpec- and Minitest-compatible one-liners to test common Rails functionality [https://github.com/thoughtbot/shoulda-matchers]
-  gem "shoulda-matchers", "~> 7.0"
+  gem "shoulda-matchers", "~> 8.0"
 
   # Library for generating fake data such as names, addresses, and phone numbers. [https://github.com/faker-ruby/faker]
   gem "faker", "~> 3.8"
 
   gem "database_cleaner-active_record", "~> 2.2"
-  gem "solargraph", "~> 0.59.2"
+  gem "solargraph", "~> 0.60.2"
   gem "dotenv-rails", "~> 3.2"
 end
 
