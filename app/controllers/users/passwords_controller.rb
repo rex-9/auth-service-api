@@ -1,5 +1,6 @@
 class Users::PasswordsController < Devise::PasswordsController
   respond_to :json
+  skip_before_action :enforce_active_platform_session!, only: [ :create, :update, :edit ]
 
   # POST /password/forgot
   def create
