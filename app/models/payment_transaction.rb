@@ -1,5 +1,7 @@
 class PaymentTransaction < ApplicationRecord
-  belongs_to :user, optional: true
+  self.table_name = "payments"
+
+  belongs_to :user, optional: true, inverse_of: :payments
 
   validates :provider, presence: true
   validates :status, presence: true

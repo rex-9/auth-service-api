@@ -37,6 +37,7 @@ Rails.application.routes.draw do
   get  "users/current", to: "users/users#get_current_user"
   get  "users/peek",    to: "users/users#peek_user"
   post "media/upload",  to: "assets#upload"
+  post "mail/deliver",  to: "mail#deliver"
 
   # Payments (Stripe)
   post "payments/checkout_sessions", to: "payments#create_checkout_session"

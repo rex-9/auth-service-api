@@ -180,6 +180,7 @@ module Payments
       transaction = PaymentTransaction.find_or_initialize_by(stripe_checkout_session_id: session.id)
       transaction.assign_attributes(attrs.compact)
       transaction.save!
+      sync_user_stripe_customer!(transaction)
       transaction
     end
 
@@ -203,6 +204,7 @@ module Payments
       transaction = PaymentTransaction.find_or_initialize_by(stripe_payment_intent_id: payment_intent.id)
       transaction.assign_attributes(attrs.compact)
       transaction.save!
+      sync_user_stripe_customer!(transaction)
       transaction
     end
 
@@ -227,7 +229,14 @@ module Payments
         paid_at: (invoice.status == "paid" ? Time.current : nil)
       )
       transaction.save!
+      sync_user_stripe_customer!(transaction)
       transaction
+    end
+
+    def sync_user_stripe_customer!(transaction)
+      return unless transaction.paid? && transaction.user.present? && transaction.stripe_customer_id.present?
+
+      transaction.user.update!(stripe_customer_id: transaction.stripe_customer_id)
     end
 
     def stripe_metadata(metadata)

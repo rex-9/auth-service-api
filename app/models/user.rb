@@ -1,6 +1,7 @@
 class User < ApplicationRecord
   include Devise::JWT::RevocationStrategies::JTIMatcher
   has_many :assets, dependent: :destroy
+  has_many :payments, class_name: "PaymentTransaction", inverse_of: :user, dependent: :nullify
 
   devise :database_authenticatable, :registerable, :validatable, :confirmable,
   :recoverable, :rememberable, :lockable, :trackable, :timeoutable,
