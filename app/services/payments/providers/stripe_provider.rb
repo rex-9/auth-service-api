@@ -1,13 +1,31 @@
 module Payments
   module Providers
     class StripeProvider
+      def create_customer(email:, name:, metadata:)
+        Stripe::Customer.create(
+          { email: email, name: name.presence, metadata: metadata },
+          { idempotency_key: "stripe-customer-user-#{metadata[:user_id] || metadata['user_id']}" }
+        )
+      end
+
+      def create_order_checkout_session(customer_id:, order:, metadata:, success_url:, cancel_url:, idempotency_key:)
+        Stripe::Checkout::Session.create({
+          customer: customer_id, mode: "payment", success_url: success_url, cancel_url: cancel_url,
+          line_items: order.order_items.map { |item| {
+            quantity: item.quantity,
+            price_data: { currency: order.currency, unit_amount: item.unit_price_cents, product_data: { name: item.name } }
+          } },
+          metadata: metadata, payment_intent_data: { metadata: metadata }
+        }, { idempotency_key: idempotency_key })
+      end
+
       def create_checkout_session(dto)
         Stripe::Checkout::Session.create(
           customer: dto.customer_id,
           mode: "payment",
           success_url: dto.success_url,
           cancel_url: dto.cancel_url,
-          payment_method_types: ["card"],
+          payment_method_types: [ "card" ],
           line_items: [
             {
               quantity: 1,

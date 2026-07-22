@@ -40,6 +40,9 @@ Rails.application.routes.draw do
   post "mail/deliver",  to: "mail#deliver"
 
   # Payments (Stripe)
+  resources :orders, only: [ :create, :show ] do
+    post :checkout
+  end
   post "payments/checkout_sessions", to: "payments#create_checkout_session"
   post "payments/payment_intents", to: "payments#create_payment_intent"
   get  "payments/product_details", to: "payments#get_product_details"
@@ -47,7 +50,8 @@ Rails.application.routes.draw do
   get  "payments/status", to: "payments#verify_payment_status"
   get  "payments/details", to: "payments#show_payment_details"
   get  "payments/customers/:customer_id", to: "payments#list_customer_payments"
-  post "payments/webhooks/stripe", to: "stripe_webhooks#create"
+  post "webhooks/stripe", to: "stripe_webhooks#create"
+  post "payments/webhooks/stripe", to: "stripe_webhooks#create" # Backward-compatible alias
 
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 

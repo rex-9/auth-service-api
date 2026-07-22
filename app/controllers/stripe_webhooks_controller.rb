@@ -10,12 +10,14 @@ class StripeWebhooksController < ApplicationController
       message: "Webhook processed successfully.",
       data: result
     )
-  rescue Payments::WebhookEventProcessor::ProcessingError => e
+  rescue Payments::WebhookEventProcessor::InvalidRequest => e
     render_json_response(
-      status_code: 422,
-      message: "Webhook processing failed.",
+      status_code: 400,
+      message: "Invalid Stripe webhook.",
       error: e.message
     )
+  rescue Payments::WebhookEventProcessor::ProcessingError => e
+    render_json_response(status_code: 500, message: "Webhook processing failed.", error: e.message)
   end
 
   private
