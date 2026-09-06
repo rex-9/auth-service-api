@@ -19,14 +19,14 @@ jobs:
       - name: Set up environment
         run: cp .env.example .env
 
-      - name: Start API & dependencies
+      - name: Start Database
         run: |
-          docker compose -f docker-compose.dev.yaml up -d api
+          docker compose -f docker-compose.dev.yaml up -d db
 
       - name: Syntax & Eager Loading Check
         run: |
-          docker compose -f docker-compose.dev.yaml exec -T -e RAILS_ENV=test api bin/rails zeitwerk:check
+          docker compose -f docker-compose.dev.yaml run --rm -T -e RAILS_ENV=test api bin/rails zeitwerk:check
 
       - name: Prepare test database and run RSpec
         run: |
-          docker compose -f docker-compose.dev.yaml exec -T -e RAILS_ENV=test api sh -c "bin/rails db:test:prepare && bundle exec rspec --tag ~type:system --tag ~e2e"
+          docker compose -f docker-compose.dev.yaml run --rm -T -e RAILS_ENV=test api sh -c "bin/rails db:test:prepare && bundle exec rspec --tag ~type:system --tag ~e2e"

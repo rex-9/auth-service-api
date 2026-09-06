@@ -148,6 +148,7 @@ The API and worker run as separate services in Docker, keeping request handling 
 - Devise authentication with JWT issuance and revocation.
 - Email/password registration, confirmation codes, password recovery, locking, tracking, and timeout support.
 - Google sign-in with a challenge flow for completing account creation.
+- Profile management and identity inspection supporting atomic name and username updates with validation.
 - Platform-aware active sessions backed by the application cache.
 - Rack Attack throttling for abusive or excessive requests.
 - Configurable CORS and Rails security defaults.
@@ -234,7 +235,6 @@ Each enabled channel receives its own Solid Queue job. A failed email therefore 
   - Provides an extensible background reconciliation framework (`DataSyncJob` $\rightarrow$ `DataSyncService.sync_all!`) scheduled via `config/recurring.yml` using `DATA_SYNC_SCHEDULE` (defaults to weekly: `"at 3:00am every Sunday"`, configurable via environment) for periodic synchronization of non-lossy resources and caches.
 
 The admin- and permission-protected `POST /v1/admin/notifications/dispatch` contract is ready for the dashboard to send custom content to confirmed users holding selected roles—or to the full confirmed audience—through any combination of socket, push, and email. Users with several selected roles are included only once. Audience fanout runs in the `notifications` queue, while each resulting channel delivery keeps its own retry boundary. Sensitive confirmation or password-reset workflows are never exposed as admin-selectable presets.
-
 
 ### Storage & assets
 
