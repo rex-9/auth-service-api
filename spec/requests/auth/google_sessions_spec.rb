@@ -47,7 +47,7 @@ RSpec.describe "Google authentication", type: :request do
       expect(StorageService::Client).to have_received(:upload).with(
         "https://example.com/avatar.jpg",
         hash_including(
-          storage_key: AssetConstants::AssetName.google_profile(user.id),
+          storage_key: a_string_starting_with("users/#{user.id}/avatar_google_"),
           folder: "user_uploads/#{AssetConstants::AssetType::AVATAR}",
           resource_type: AssetConstants::AssetFormat::IMAGE
         )
@@ -135,7 +135,7 @@ RSpec.describe "Google authentication", type: :request do
       expect(StorageService::Client).to have_received(:upload).with(
         "https://example.com/avatar.jpg",
         hash_including(
-          storage_key: AssetConstants::AssetName.google_profile(user.id),
+          storage_key: a_string_starting_with("users/#{user.id}/avatar_google_"),
           folder: "user_uploads/#{AssetConstants::AssetType::AVATAR}",
           resource_type: AssetConstants::AssetFormat::IMAGE
         )
