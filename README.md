@@ -14,6 +14,7 @@ Built under a simple creed: **clear in thought, exact in structure, simple in us
 [![Rails](https://img.shields.io/badge/Rails-8.1-CC0000?logo=rubyonrails&logoColor=white)](https://rubyonrails.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![CI](https://github.com/rex-9/rexone-core/actions/workflows/test.yml/badge.svg)](https://github.com/rex-9/rexone-core/actions/workflows/test.yml)
 
 **API-first · Modular · Observable · Queue-aware · Built to grow**
 
@@ -459,8 +460,14 @@ Review and replace seeded credentials before using them outside local developmen
 # Generate OpenAPI output
 ./scripts/rswag.sh
 
-# Run the repository test script
+# Run the repository test script (RSpec)
 ./scripts/test.sh
+
+# Continuous Integration (GitHub Actions)
+# Automated PR workflow (.github/workflows/test.yml) executes:
+#   1. Syntax & autoload verification: bin/rails zeitwerk:check
+#   2. Test database preparation: bin/rails db:test:prepare
+#   3. RSpec test suite (excluding system/e2e specs): bundle exec rspec --tag ~type:system --tag ~e2e
 
 # Automated Backups
 ./scripts/backup_all.sh     # Backs up both PostgreSQL and Garage S3 storage
