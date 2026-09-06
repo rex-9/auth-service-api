@@ -194,6 +194,7 @@ RSpec.describe "Google authentication", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response_data.dig("user", "id")).to eq(user.id)
       expect(response_data["token"]).to be_present
+      expect(NotificationService::Center).not_to have_received(:welcome)
     end
 
     it "rejects an account discarded while its challenge was outstanding" do

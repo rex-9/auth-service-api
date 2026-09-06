@@ -92,4 +92,28 @@ RSpec.describe NotificationService::Center do
     described_class.payment_failed(user, product, subscription)
     expect(Notification::DeliverJob).to have_been_enqueued.exactly(:thrice)
   end
+
+  describe ".welcome" do
+    let(:user) { create(:user) }
+
+    it "creates a welcome notification for new users" do
+      expect do
+        described_class.welcome(user_id: user.id, name: user.name)
+      end.to change(user.user_notifications, :count).by(1)
+    end
+
+    it "is strictly idempotent and prevents duplicate welcome notifications" do
+      described_class.welcome(user_id: user.id, name: user.name)
+
+      expect do
+        described_class.welcome(user_id: user.id, name: user.name)
+      end.not_to change(user.user_notifications, :count)
+    end
+
+    it "safely returns if user is nil" do
+      expect do
+        described_class.welcome(user_id: "non-existent-id", name: "Ghost")
+      end.not_to raise_error
+    end
+  end
 end

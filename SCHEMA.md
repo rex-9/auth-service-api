@@ -527,6 +527,9 @@ erDiagram
 - `index_assets_on_type` (`type`)
 - `index_assets_on_discarded_at` (`discarded_at`)
 
+**Environment Isolation**:
+- `scope :for_environment(prefix = nil)` / `scope :for_current_environment`: Restricts asset queries to the partition defined by `S3_FOLDER_PREFIX` (e.g. `dev/%`, `uat/%`, `prod/%`), preventing cross-environment data leakage and ensuring root or foreign stage records are excluded from API listings and stats.
+
 ---
 
 ## 8. User Feedback

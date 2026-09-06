@@ -244,6 +244,7 @@ The storage abstraction defaults to **Garage** (self-hosted S3-compatible distri
   - Admin uploads: `admin/{type}_{name}_{timestamp}.{ext}`
   - User uploads: `users/{user_id}/{type}_{name}_{timestamp}.{ext}`
   - Google avatar imports: `users/{user_id}/avatar_google_{timestamp}.{ext}`
+  - **Environment Scoping (`S3_FOLDER_PREFIX`)**: Automatically prefixes storage keys (e.g. `dev/admin/...`, `dev/users/...`) in development (`S3_FOLDER_PREFIX=dev`), or custom stage folders (`uat/`, `prod/`) to cleanly isolate objects within the bucket. The Admin Asset Panel (`GET /v1/admin/assets`, stats, and batch actions) strictly scopes asset queries to the active environment's prefix via `Asset.for_current_environment`, preventing foreign partition leakage and cross-environment access (returning 404 on out-of-scope assets).
 - **Zero-Footprint Storage In-Place Rename**: When an administrator updates an asset's `type` via the Admin Portal, the backend dynamically moves the storage object (`StorageService::Client.move(old_key, new_key)`) without creating duplicate or orphaned files in Garage.
 - **Storage & VPS Capacity Monitoring**: `GET /v1/admin/assets/storage_stats` polls the Garage Admin API (`S3_ADMIN_ENDPOINT=http://garage:3101`, `S3_ADMIN_TOKEN=...`) to return real-time bucket usage (bytes, object count) and VPS host disk capacity (total/free bytes, used/free percentages), triggering proactive low-disk alerts when free disk space falls below 15%.
 - **Automated Backup Scripts**:
