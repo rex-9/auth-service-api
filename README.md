@@ -588,7 +588,7 @@ A software engineer, full-stack architect, and long-time practitioner of meditat
 I build systems the same way I approach the path itself: **with a clear mind, deliberate steps, and no unnecessary weight.**
 
 - GitHub: [@rex-9](https://github.com/rex-9)
-- Portfolio: [rex9.vercel.app](https://rex9.vercel.app)
+- Portfolio: [rex9.me](https://rex9.me)
 - LinkedIn: [rex9](https://www.linkedin.com/in/rex9/)
 
 _Built with ❤️ by Rex9 on Rexone Ecosystem_
