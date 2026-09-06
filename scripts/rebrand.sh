@@ -152,13 +152,34 @@ WEB_DIR="$WORKSPACE_DIR/rexone-web"
 if [ -d "$WEB_DIR" ]; then
   echo "🌐 Rebranding Web Client & Infrastructure ($WEB_DIR)..."
 
-  # Update index.html
+  # Update index.html (Title, Metadata, Canonical, OpenGraph, Twitter, Schema.org)
   if [ -f "$WEB_DIR/index.html" ]; then
-    sed -i '' -E "s/<title>.*<\/title>/<title>$WEB_TITLE<\/title>/g" "$WEB_DIR/index.html"
+    sed -i '' -E "s|<title>.*</title>|<title>$WEB_TITLE</title>|g" "$WEB_DIR/index.html"
+    sed -i '' -E "s|<meta name=\"title\" content=\"[^\"]*\"|<meta name=\"title\" content=\"$WEB_TITLE\"|g" "$WEB_DIR/index.html"
+    sed -i '' -E "s|<link rel=\"canonical\" href=\"[^\"]*\"|<link rel=\"canonical\" href=\"https://${BRAND_SLUG_FLAT}.me/\"|g" "$WEB_DIR/index.html"
+    sed -i '' -E "s|<meta property=\"og:site_name\" content=\"[^\"]*\"|<meta property=\"og:site_name\" content=\"${BRAND_NAME} Ecosystem\"|g" "$WEB_DIR/index.html"
+    sed -i '' -E "s|<meta property=\"og:title\" content=\"[^\"]*\"|<meta property=\"og:title\" content=\"$WEB_TITLE\"|g" "$WEB_DIR/index.html"
+    sed -i '' -E "s|<meta property=\"og:url\" content=\"[^\"]*\"|<meta property=\"og:url\" content=\"https://${BRAND_SLUG_FLAT}.me/\"|g" "$WEB_DIR/index.html"
+    sed -i '' -E "s|<meta name=\"twitter:title\" content=\"[^\"]*\"|<meta name=\"twitter:title\" content=\"$WEB_TITLE\"|g" "$WEB_DIR/index.html"
+    sed -i '' -E "s|<meta name=\"twitter:url\" content=\"[^\"]*\"|<meta name=\"twitter:url\" content=\"https://${BRAND_SLUG_FLAT}.me/\"|g" "$WEB_DIR/index.html"
     if [ -n "$BRAND_DESC" ]; then
-      sed -i '' -E "s/<meta name=\"description\" content=\"[^\"]*\"/<meta name=\"description\" content=\"$BRAND_DESC\"/g" "$WEB_DIR/index.html"
+      sed -i '' -E "s|<meta name=\"description\" content=\"[^\"]*\"|<meta name=\"description\" content=\"$BRAND_DESC\"|g" "$WEB_DIR/index.html"
+      sed -i '' -E "s|<meta property=\"og:description\" content=\"[^\"]*\"|<meta property=\"og:description\" content=\"$BRAND_DESC\"|g" "$WEB_DIR/index.html"
+      sed -i '' -E "s|<meta name=\"twitter:description\" content=\"[^\"]*\"|<meta name=\"twitter:description\" content=\"$BRAND_DESC\"|g" "$WEB_DIR/index.html"
     fi
-    echo "  ✅ Web: Updated index.html"
+    sed -i '' -E "s|\"name\": \"[^\"]*\"|\"name\": \"$BRAND_NAME\"|g" "$WEB_DIR/index.html"
+    sed -i '' -E "s|\"url\": \"https://[^\"]*\"|\"url\": \"https://${BRAND_SLUG_FLAT}.me\"|g" "$WEB_DIR/index.html"
+    echo "  ✅ Web: Updated index.html (Metadata, OpenGraph, Canonical & Schema.org)"
+  fi
+
+  # Update sitemap.xml and robots.txt
+  if [ -f "$WEB_DIR/public/sitemap.xml" ]; then
+    sed -i '' -E "s|https://[^/]+/|https://${BRAND_SLUG_FLAT}.me/|g" "$WEB_DIR/public/sitemap.xml"
+    echo "  ✅ Web: Updated public/sitemap.xml (https://${BRAND_SLUG_FLAT}.me)"
+  fi
+  if [ -f "$WEB_DIR/public/robots.txt" ]; then
+    sed -i '' -E "s|Sitemap: https://[^/]+/sitemap.xml|Sitemap: https://${BRAND_SLUG_FLAT}.me/sitemap.xml|g" "$WEB_DIR/public/robots.txt"
+    echo "  ✅ Web: Updated public/robots.txt (Sitemap)"
   fi
 
   # Update package.json
