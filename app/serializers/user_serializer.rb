@@ -22,4 +22,20 @@ class UserSerializer < ApplicationSerializer
   attribute :permissions do |user|
     user.permissions.group_by(&:resource).transform_values { |p| p.pluck(:action) }
   end
+
+  attribute :admin_permissions do |user|
+    user.admin_permissions.group_by(&:resource).transform_values { |p| p.pluck(:action) }
+  end
+
+  attribute :non_admin_permissions do |user|
+    user.non_admin_permissions.group_by(&:resource).transform_values { |p| p.pluck(:action) }
+  end
+
+  attribute :is_admin do |user|
+    user.admin?
+  end
+
+  attribute :is_super_admin do |user|
+    user.super_admin?
+  end
 end

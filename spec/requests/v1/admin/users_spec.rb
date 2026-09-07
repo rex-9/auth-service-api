@@ -36,8 +36,24 @@ RSpec.describe "V1 Admin Users API", type: :request do
         name_match.id,
         email_match.id
       )
-    end 
-     
+    end
+
+    it "allows admin users with users read permission to search recipients" do
+      recipient = create(:user, username: "recipient_user", name: "Recipient", email: "recipient@example.com")
+      notification_admin = create(:user)
+      notification_admin_token = jwt_for(notification_admin)
+      role = Iam::Role.find_or_create_by!(name: "notification_admin")
+      permission = Iam::Permission.find_or_create_by!(action: "read", resource: "users")
+      Iam::RolePermission.find_or_create_by!(role: role, permission: permission)
+      Iam::UserRole.find_or_create_by!(user: notification_admin, role: role)
+      allow(CacheService).to receive(:read).and_return(notification_admin_token)
+
+      get "/v1/admin/users", params: { search: "recipient" }, headers: authorization_headers(notification_admin_token)
+
+      expect(response).to have_http_status(:ok)
+      expect(response_data.map { |record| record.dig("attributes", "id") }).to include(recipient.id)
+    end
+
     it "rejects standard admin users" do
       standard_admin = create(:user)
       admin_token = jwt_for(standard_admin)

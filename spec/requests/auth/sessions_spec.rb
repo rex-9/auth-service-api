@@ -59,6 +59,24 @@ RSpec.describe "Authentication sessions", type: :request do
       expect(NotificationService::Center).to have_received(:sign_in_alert).with(user_id: user.id, name: user.name)
     end
 
+    it "includes admin-scoped permissions in the signed-in user payload" do
+      admin_role = create(:role, name: "notification_admin")
+      users_read = create(:permission, action: "read", resource: "users")
+      products_read = create(:permission, action: "read", resource: "products")
+      admin_role.permissions << users_read
+      admin_role.permissions << products_read
+      user.roles << admin_role
+
+      post "/signin", params: { user: { signin_key: user.email, password: "password123" } }
+
+      expect(response).to have_http_status(:ok)
+      expect(response_data.dig("user", "admin_permissions")).to include(
+        "users" => include("read"),
+        "products" => include("read")
+      )
+      expect(response_data.dig("user", "is_admin")).to be(true)
+    end
+
     it "signs in by username and isolates android sessions" do
       post "/signin", params: { user: { signin_key: user.username, password: "password123" } }, headers: { "X-Platform" => "android" }
       expect(response).to have_http_status(:ok)
