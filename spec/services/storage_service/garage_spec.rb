@@ -100,6 +100,8 @@ RSpec.describe StorageService::Garage do
         "uat/" => [ double("Object", size: 300) ],
         "prod/" => [ double("Object", size: 400), double("Object", size: 500) ]
       }
+      create(:asset, storage_key: "dev/images/one.png", size_bytes: 125)
+      create(:asset, storage_key: "prod/images/two.png", size_bytes: 500)
       allow(s3_client).to receive(:list_objects_v2) do |prefix:, **|
         double(
           "ListOutput",
@@ -114,6 +116,11 @@ RSpec.describe StorageService::Garage do
         "dev" => { bytes: 300, objects: 2 },
         "uat" => { bytes: 300, objects: 1 },
         "prod" => { bytes: 900, objects: 2 }
+      )
+      expect(stats[:tracked_partitions]).to eq(
+        "dev" => { bytes: 125, objects: 1 },
+        "uat" => { bytes: 0, objects: 0 },
+        "prod" => { bytes: 500, objects: 1 }
       )
     end
   end

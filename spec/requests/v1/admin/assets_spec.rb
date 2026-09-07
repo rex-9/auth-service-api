@@ -232,6 +232,11 @@ RSpec.describe "V1 Admin Assets API", type: :request do
           uat: { bytes: 1500, objects: 2 },
           prod: { bytes: 2500, objects: 2 }
         },
+        tracked_partitions: {
+          dev: { bytes: 1000, objects: 1 },
+          uat: { bytes: 0, objects: 0 },
+          prod: { bytes: 1000, objects: 1 }
+        },
         disk_available_bytes: 50_000_000_000,
         disk_total_bytes: 60_000_000_000,
         disk_used_percent: 16.7,
@@ -250,6 +255,7 @@ RSpec.describe "V1 Admin Assets API", type: :request do
       expect(stats["bucket_objects"]).to eq(5)
       expect(stats.dig("partitions", "dev", "bytes")).to eq(1000)
       expect(stats.dig("partitions", "prod", "objects")).to eq(2)
+      expect(stats.dig("tracked_partitions", "dev", "objects")).to eq(1)
       expect(stats["db_assets_count"]).to eq(2)
       expect(stats["db_assets_bytes"]).to eq(2000)
     end

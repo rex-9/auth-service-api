@@ -294,6 +294,7 @@ module StorageService
         bucket_bytes: bucket_bytes,
         bucket_objects: bucket_objects,
         partitions: environment_partition_stats,
+        tracked_partitions: database_environment_partition_stats,
         disk_available_bytes: disk_avail,
         disk_total_bytes: disk_total,
         disk_used_percent: disk_used_percent,
@@ -308,6 +309,7 @@ module StorageService
         bucket_bytes: 0,
         bucket_objects: 0,
         partitions: empty_environment_partition_stats,
+        tracked_partitions: empty_environment_partition_stats,
         disk_available_bytes: 0,
         disk_total_bytes: 0,
         disk_used_percent: nil,
@@ -346,6 +348,15 @@ module StorageService
 
     def empty_environment_partition_stats
       ENVIRONMENT_PREFIXES.index_with { { bytes: 0, objects: 0 } }
+    end
+
+    def database_environment_partition_stats
+      return empty_environment_partition_stats unless defined?(Asset)
+
+      ENVIRONMENT_PREFIXES.index_with do |prefix|
+        scope = Asset.kept.where("storage_key LIKE ?", "#{prefix}/%")
+        { bytes: scope.sum(:size_bytes).to_i, objects: scope.count }
+      end
     end
 
     def folder_prefix
