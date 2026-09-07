@@ -1,7 +1,7 @@
 # Database Schema Documentation (`rexone-core`)
 
 > **Database Engine:** PostgreSQL 16  
-> **Schema Version:** `2026_09_05_100002`  
+> **Schema Version:** `2026_09_05_190002`  
 > **Key Conventions:** UUID v4 Primary Keys (`gen_random_uuid()`), Soft Deletion (`discard` gem), Audit Tracking (`Auditable` concern).
 
 > [!IMPORTANT]
@@ -68,6 +68,9 @@ erDiagram
 
   users ||--o{ user_notifications : "receives"
   notification_templates ||--o{ user_notifications : "templated_by"
+
+  users ||--o{ app_installs : "runs"
+  app_versions ||--o{ app_installs : "matches"
 
   users ||--o{ assets : "assetable (polymorphic)"
   payment_products ||--o{ assets : "assetable (polymorphic)"
@@ -167,7 +170,7 @@ erDiagram
 | `id` | `uuid` | ❌ | `gen_random_uuid()` | Primary Key |
 | `name` | `string` | ❌ | — | Unique identifier (e.g. `read_users`, `create_payments`) |
 | `action` | `string` | ❌ | — | Enum: `read`, `create`, `update`, `delete` |
-| `resource` | `string` | ❌ | — | Resource key (e.g. `users`, `roles`, `products`, `assets`, etc.) |
+| `resource` | `string` | ❌ | — | Resource key (`users`, `app_versions`, `app_installs`, `products`, `assets`, …) |
 | `created_by_id` | `uuid` | ✔️ | `NULL` | Auditing: Creator |
 | `updated_by_id` | `uuid` | ✔️ | `NULL` | Auditing: Modifier |
 | `discarded_by_id` | `uuid` | ✔️ | `NULL` | Auditing: Discarder |
@@ -698,7 +701,77 @@ erDiagram
 
 ---
 
-## 11. Summary Matrix of Core Tables
+## 11. App Versions & Installs
+
+### 11.1. `app_versions`
+- **Model**: [`AppVersion`](app/models/app_version.rb)
+- **Description**: Global mobile/web marketing versions. Force-update is stored per row (`is_force_update`). Public check computes `update_required` (client behind latest live) and `must_update` (any live force row greater than the client). Store listing URLs live in env (`AppConfig::IOS_STORE_URL`, `AppConfig::ANDROID_STORE_URL`), not on this table.
+
+| Column | Type | Nullable | Default | Description / Notes |
+| :--- | :--- | :---: | :--- | :--- |
+| `id` | `uuid` | ❌ | `gen_random_uuid()` | Primary Key |
+| `number` | `string` | ❌ | — | Marketing semver `x.y.z`, unique among kept rows |
+| `title` | `string` | ❌ | — | Release title |
+| `description` | `text` | ✔️ | `NULL` | Release notes |
+| `is_force_update` | `boolean` | ❌ | `false` | Version flag; public check exposes computed `must_update`, not this column |
+| `status` | `string` | ❌ | `"draft"` | Frozen enum: `draft`, `published`, `yanked` (`AppVersionConstants::Status`) |
+| `released_at` | `datetime` | ✔️ | `NULL` | Set on first publish if blank; future value = scheduled. UTC. |
+| `ios_build_number` | `integer` | ✔️ | `NULL` | Informational iOS `CFBundleVersion`; unique among kept when present. Not used for `must_update`. |
+| `android_build_number` | `integer` | ✔️ | `NULL` | Informational Android `versionCode`; unique among kept when present. Not used for `must_update`. |
+| `created_by_id` | `uuid` | ✔️ | `NULL` | Auditing: Creator |
+| `updated_by_id` | `uuid` | ✔️ | `NULL` | Auditing: Modifier |
+| `discarded_by_id` | `uuid` | ✔️ | `NULL` | Auditing: Discarder |
+| `undiscarded_by_id` | `uuid` | ✔️ | `NULL` | Auditing: Restorer |
+| `discarded_at` | `datetime` | ✔️ | `NULL` | Soft delete timestamp |
+| `undiscarded_at` | `datetime` | ✔️ | `NULL` | Restore timestamp |
+| `created_at` | `datetime` | ❌ | — | Timestamp (UTC) |
+| `updated_at` | `datetime` | ❌ | — | Timestamp (UTC) |
+
+**Indexes & Foreign Keys**:
+- `index_app_versions_on_number_kept` (unique `number` where `discarded_at IS NULL`)
+- `index_app_versions_on_ios_build_number_kept` (unique `ios_build_number` where kept and not null)
+- `index_app_versions_on_android_build_number_kept` (unique `android_build_number` where kept and not null)
+- `index_app_versions_on_status` (`status`)
+- `index_app_versions_on_released_at` (`released_at`)
+- `index_app_versions_on_discarded_at` (`discarded_at`)
+- FKs: audit columns → `users(id)`.
+
+**Live scope** (public check): kept + `status = published` + (`released_at` is `NULL` or `<= now`). Versions are discard/undiscard only (non-destroyable). `install_count` is computed (kept `app_installs` rows whose `app_version_id` matches); it is not a stored column.
+
+### 11.2. `app_installs`
+- **Model**: [`AppInstall`](app/models/app_install.rb)
+- **Description**: Current client snapshot per user per platform (`web` / `android` / `ios`). One kept row per pair; repeat checks update `number`, `build_number`, and `last_seen_at`. `User#latest_app_install` is the kept row with the newest `last_seen_at` (Administrate user show).
+
+| Column | Type | Nullable | Default | Description / Notes |
+| :--- | :--- | :---: | :--- | :--- |
+| `id` | `uuid` | ❌ | `gen_random_uuid()` | Primary Key |
+| `user_id` | `uuid` | ❌ | — | FK to `users.id` |
+| `platform` | `string` | ❌ | — | Frozen enum: `web`, `android`, `ios` (`AuthConstants::Platform`) |
+| `number` | `string` | ❌ | — | Client marketing semver last reported |
+| `build_number` | `integer` | ✔️ | `NULL` | Client `version_code` snapshot; informational only |
+| `app_version_id` | `uuid` | ✔️ | `NULL` | Matching `AppVersion` if `number` matches a version |
+| `last_seen_at` | `datetime` | ❌ | — | Last successful authenticated check (UTC) |
+| `created_by_id` | `uuid` | ✔️ | `NULL` | Auditing: Creator |
+| `updated_by_id` | `uuid` | ✔️ | `NULL` | Auditing: Modifier |
+| `discarded_by_id` | `uuid` | ✔️ | `NULL` | Auditing: Discarder |
+| `undiscarded_by_id` | `uuid` | ✔️ | `NULL` | Auditing: Restorer |
+| `discarded_at` | `datetime` | ✔️ | `NULL` | Soft delete timestamp |
+| `undiscarded_at` | `datetime` | ✔️ | `NULL` | Restore timestamp |
+| `created_at` | `datetime` | ❌ | — | Timestamp (UTC) |
+| `updated_at` | `datetime` | ❌ | — | Timestamp (UTC) |
+
+**Indexes & Foreign Keys**:
+- `index_app_installs_on_user_id_and_platform_kept` (unique `[user_id, platform]` where `discarded_at IS NULL`)
+- `index_app_installs_on_number` (`number`)
+- `index_app_installs_on_last_seen_at` (`last_seen_at`)
+- `index_app_installs_on_discarded_at` (`discarded_at`)
+- `index_app_installs_on_user_id` (`user_id`)
+- `index_app_installs_on_app_version_id` (`app_version_id`)
+- FK to `users(id)`; FK to `app_versions(id)` `ON DELETE NULL`.
+
+---
+
+## 12. Summary Matrix of Core Tables
 
 | Table Name | Model | Domain | Soft Deletion | Audited | Polymorphic Targets |
 | :--- | :--- | :--- | :---: | :---: | :--- |
@@ -719,10 +792,12 @@ erDiagram
 | `log_clients` | [`Log::Client`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/log/client.rb) | Diagnostics | ✔️ | ✔️ | — |
 | `notifications` | [`Notification`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/notification.rb) | Notifications | ✔️ | ✔️ | — |
 | `user_notifications` | [`UserNotification`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/user_notification.rb) | Notifications | ✔️ | ✔️ | — |
+| `app_versions` | [`AppVersion`](app/models/app_version.rb) | App versions | ✔️ | ✔️ | — |
+| `app_installs` | [`AppInstall`](app/models/app_install.rb) | App versions | ✔️ | ✔️ | — |
 
 ---
 
-## 12. Excluded Infrastructure Tables
+## 13. Excluded Infrastructure Tables
 
 The following tables are managed automatically by backend engine gems and are excluded from core application business logic:
 

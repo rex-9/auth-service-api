@@ -27,7 +27,7 @@ module IamConstants
     USERS         = "users".freeze
     ROLES         = "roles".freeze
     USER_ROLES    = "user_roles".freeze
-  PERMISSIONS   = "permissions".freeze
+    PERMISSIONS   = "permissions".freeze
     PRODUCTS      = "products".freeze
     PAYMENTS      = "payments".freeze
     SUBSCRIPTIONS = "subscriptions".freeze
@@ -40,11 +40,12 @@ module IamConstants
     CLIENTS       = "clients".freeze
     FEEDBACKS     = "feedbacks".freeze
     ANALYTICS     = "analytics".freeze
+    APP_VERSIONS  = "app_versions".freeze
+    APP_INSTALLS  = "app_installs".freeze
     ALL           = [
       USERS, ROLES, USER_ROLES, PERMISSIONS, PRODUCTS, PAYMENTS,
       SUBSCRIPTIONS, TRANSACTIONS, ACCESSES, ASSETS, NOTIFICATIONS,
-      AI, SPEECH, CLIENTS, FEEDBACKS, ANALYTICS
-
+      AI, SPEECH, CLIENTS, FEEDBACKS, ANALYTICS, APP_VERSIONS, APP_INSTALLS
     ].freeze
   end
 
@@ -61,7 +62,9 @@ module IamConstants
       { resource: Resource::AI, actions: Action::ALL },
       { resource: Resource::SPEECH, actions: Action::ALL },
       { resource: Resource::FEEDBACKS, actions: [ Action::CREATE, Action::READ ] },
-      { resource: Resource::NOTIFICATIONS, actions: [ Action::READ, Action::UPDATE, Action::DELETE ] }
+      { resource: Resource::NOTIFICATIONS, actions: [ Action::READ, Action::UPDATE, Action::DELETE ] },
+      { resource: Resource::APP_VERSIONS, actions: [ Action::READ ] },
+      { resource: Resource::APP_INSTALLS, actions: [ Action::CREATE ] }
     ].freeze
   end
 end

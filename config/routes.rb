@@ -39,6 +39,8 @@ Rails.application.routes.draw do
     resources :assets, only: %i[index show new create edit update destroy]
     resources :accesses, only: %i[index show new create edit update destroy]
     resources :feedbacks, only: %i[index show new create edit update destroy]
+    resources :app_versions, only: %i[index show new create edit update destroy]
+    resources :app_installs, only: %i[index show]
 
     namespace :iam do
       resources :permissions, only: %i[index show new create edit update destroy]
@@ -115,6 +117,10 @@ Rails.application.routes.draw do
         end
       end
     end
+
+    # ===== APP VERSIONS =====
+    get "app_versions/current", to: "app_versions#read_current"
+    post "app_installs", to: "app_installs#create_install"
 
     # ===== USERS =====
     get "users/current", to: "users#read_current_user"
@@ -204,6 +210,18 @@ Rails.application.routes.draw do
       resources :accesses, only: %i[index show create update destroy]
 
       resources :feedbacks, only: %i[index show update destroy]
+
+      resources :app_versions, only: %i[index show create update] do
+        collection do
+          get :read_discarded, path: "discarded"
+        end
+
+        member do
+          get :read_installs, path: "installs"
+          post :discard
+          post :undiscard
+        end
+      end
 
       get "analytics/overview", to: "analytics#read_overview"
     end

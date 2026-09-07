@@ -102,6 +102,7 @@ All tables use **UUID** primary keys (`gen_random_uuid()`), utilize **Discard** 
 | **Telemetry**        | `Log::Client`                                                                                | Frontend error ingest (stack traces, device, OS, browser, URL, severity, occurrences, local/session storage keys, cookies, resolution status).                                                                                                                                                         |
 | **Feedback**         | `Feedback`                                                                                   | Intelligent in-place feedback (1-10 rating, auto-inferred category: `bug`/`feature_request`/`improvement`/`general`, priority: `low`/`normal`/`high`/`urgent`, status, automated device/route telemetry).                                                                                              |
 | **Notifications**    | `Notification`, `UserNotification`                                                           | Multi-channel notification repository (In-App, Push, Email) with dynamic variable interpolation; persistent user in-app inbox receipts with immutable snapshots, read tracking, and Pagy pagination.                                                                                                   |
+| **App versions**     | `AppVersion`, `AppInstall`                                                                   | Global marketing versions (`draft` / `published` / `yanked`) and one current install snapshot per user per platform. Public `GET /v1/app_versions/current` computes `update_required` (client behind latest) and `must_update` (behind a live force row). Signed-in `POST /v1/app_installs` records the device. JSON admin version CRUD is `/v1/admin/app_versions` (discard/undiscard, `install_count`, `GET /v1/admin/app_versions/:id/installs`). Administrate is `/admin/app_versions`; installs are `/admin/app_installs`. The user show page lists only `latest_app_install` (newest `last_seen_at`). |
 
 ### ⚙️ Services & Background Jobs (Solid Queue / Waka / Media)
 
@@ -161,6 +162,7 @@ The `/v1/admin/` namespace provides comprehensive management capabilities protec
 - **IAM Management**: `GET/PATCH/DELETE /v1/admin/iam/roles` and `GET/POST/PATCH/DELETE /v1/admin/iam/permissions` (auto-named).
 - **Chat Moderation**: `GET/PATCH/DELETE /v1/admin/chat/rooms` and `/messages`.
 - **Product Management**: `GET/POST/PATCH/DELETE /v1/admin/payment/products` (Stripe sync, discard/undiscard).
+- **App Versions**: `GET/POST /v1/admin/app_versions`, `GET/PATCH /v1/admin/app_versions/:id`, discard/undiscard, `GET /v1/admin/app_versions/discarded`, and `GET /v1/admin/app_versions/:id/installs`. Version payloads include `install_count`.
 - **Asset Management**: `GET/PUT/DELETE /v1/admin/assets` (CRUD + upload + discard/undiscard/destroy, search, filter by type/format/source, dynamic in-place S3 rename on type update, `GET /v1/admin/assets/storage_stats` for Garage bucket & VPS disk metrics, real-time ActionCable compression status updates, secondary compression pass trigger with 2-pass safeguard).
 - **Notification Broadcasts**: `GET /v1/admin/notifications`, `POST /v1/admin/notifications`, and `POST /v1/admin/notifications/dispatch` (audience targeting via roles/users/all, multi-channel fanout).
 
@@ -266,7 +268,7 @@ All three pillars of the Rexone platform are fully aligned at **100% feature par
 | **Push Notifications (OneSignal)**                                               |      ✅       |         N/A          |            ✅            |
 | **Product Analytics (Firebase)**                                                 |      N/A      |         N/A          |            ✅            |
 | **Client Admin Panel: User, IAM, Product, Chat, Asset, Notification Management** |      ✅       |          ✅          |           N/A            |
-| **In-App Version Upgrader**                                                      |      N/A      |         N/A          |            ✅            |
+| **In-App Version Upgrader**                                                      |      ✅       |          ✅          |            ✅            |
 | **Automated Localization Parity Test Suite**                                     |      N/A      |         N/A          |            ✅            |
 
 ---
@@ -284,6 +286,7 @@ All three pillars of the Rexone platform are fully aligned at **100% feature par
   Accept-Language: en | my
   Content-Type: application/json
   ```
+- **App version splash check**: `GET /v1/app_versions/current?app_version=1.2.0` (no JWT required). Send `X-Platform: ios|android|web`. `update_required` is true when client semver is strictly less than the latest live number (optional update dialog). `must_update` is true when any live force row is greater than the client (hard block). `skip_premium` is true when client semver is strictly greater than the latest live version number. `store_url` comes from `IOS_STORE_URL` or `ANDROID_STORE_URL` env by `X-Platform` (web is null). This check does not write `AppInstall`. Unsigned or invalid JWT still returns 200. A valid JWT requires `read_app_versions`. After sign-in, `POST /v1/app_installs` with `{ app_install: { app_version, version_code } }` upserts one row per user per platform (`create_app_installs`). Clients show an update dialog when `update_required` is true and hard-block the app when `must_update` is true; mobile opens `store_url`. Clients skip the paywall when `skip_premium` is true.
 - **Standard JSON:API Response Envelope**:
   ```json
   {
@@ -365,7 +368,7 @@ Payload sent on uncaught errors in Web and Mobile:
   - **Rails Pulse**: Server hardware, CPU load, memory usage, request latency, slow database queries.
   - **RED (Rails Error Dashboard)**: Server-side Ruby exceptions, 500 errors, and Rails backtraces.
   - **Solid UI / Solid Queue**: Background jobs, queue throughput, retry backoffs, cron schedules.
-  - **Rails Administrate**: Low-level database table CRUD for development and database inspection.
+  - **Rails Administrate**: Low-level database table CRUD for development and database inspection. App versions CRUD is `/admin/app_versions`; install snapshots are read-only at `/admin/app_installs`.
 - **Client Admin Panel (React SPA)**:
   - Focuses exclusively on **Business Growth, Governance, and End-User Operations**:
     - Operational Analytics & KPIs (Gross revenue, active subscriptions, user acquisition, AI chat usage — see [ANALYTICS.md](ANALYTICS.md)).
