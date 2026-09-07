@@ -1255,6 +1255,30 @@ module Openapi
         post: operation(tags: "Admin / Assets", summary: "Manually trigger background compression for an asset",
                         parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422 ])
       }
+      paths["/v1/admin/assets/{id}/download"] = {
+        get: operation(tags: "Admin / Assets", summary: "Get a signed attachment URL for an asset",
+                       parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ])
+      }
+      paths["/v1/admin/assets/{id}/thumbnail/regenerate"] = {
+        post: operation(tags: "Admin / Assets", summary: "Queue video thumbnail regeneration",
+                        success: 202, parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422 ])
+      }
+      paths["/v1/admin/assets/{id}/thumbnail/upload"] = {
+        post: operation(tags: "Admin / Assets", summary: "Upload and replace a video thumbnail",
+                        parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422, 500 ])
+      }
+      paths["/v1/admin/assets/{id}/thumbnail/upload"][:post][:requestBody] = {
+        required: true,
+        content: {
+          "multipart/form-data" => {
+            schema: {
+              type: :object,
+              required: [ :file ],
+              properties: { file: { type: :string, format: :binary } }
+            }
+          }
+        }
+      }
 
       paths["/v1/assets"] = {
         get: operation(tags: "Assets", summary: "List stored assets", errors: [ 401, 403 ]),
