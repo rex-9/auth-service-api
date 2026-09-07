@@ -323,7 +323,12 @@ module Openapi
           category: { type: :string, nullable: true, example: "general" },
           priority: { type: :string, nullable: true, example: "normal" },
           platform: { type: :string, nullable: true, example: "web" },
-          version: { type: :string, nullable: true, example: "1.0.0" },
+          app_version: {
+            type: :string,
+            nullable: true,
+            example: "1.0.0",
+            description: "Client marketing semver. Looked up against versions.number and stored as version_id. Unknown or missing leaves version_id null."
+          },
           os: { type: :string, nullable: true, example: "mac" },
           device: { type: :string, nullable: true, example: "MacBookPro" },
           browser: { type: :string, nullable: true, example: "Chrome" },
@@ -386,7 +391,11 @@ module Openapi
           severity: { type: :string, enum: LOG_SEVERITIES, default: "error" },
           platform: { type: :string, enum: LOG_PLATFORMS, nullable: true },
           environment: { type: :string, enum: LOG_ENVIRONMENTS, nullable: true },
-          version: { type: :string, nullable: true },
+          app_version: {
+            type: :string,
+            nullable: true,
+            description: "Client marketing semver. Looked up against versions.number and stored as version_id. Unknown or missing leaves version_id null."
+          },
           browser: { type: :string, nullable: true },
           user_agent: { type: :string, nullable: true },
           os: { type: :string, nullable: true },

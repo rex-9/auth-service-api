@@ -351,7 +351,7 @@ Backend, frontend, synchronous, and asynchronous failures leave different clues.
 
 - **Rails Pulse** tracks request, query, and background-job performance with configurable thresholds.
 - **Rails Error Dashboard** captures, groups, analyzes, and retains backend exceptions. Optional Slack, email, Discord, PagerDuty, and webhook alerts are supported but disabled by default.
-- **Client Logs** accept structured errors from web and mobile clients, including stack traces, platform/device context, severity, occurrences, and resolution state.
+- **Client Logs** accept structured errors from web and mobile clients, including stack traces, platform/device context, severity, occurrences, and resolution state. Ingest still sends `app_version`; Core stores nullable `version_id` when that number matches a kept version. Feedback ingest uses the same lookup.
 - **Solid Web UI** exposes queue, cache, and cable operations.
 - **Health checks** are available at `/up` for containers and load balancers.
 

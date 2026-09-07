@@ -6,7 +6,7 @@ class UserVersionService
       record = UserVersion.find_or_initialize_by(user_id: user.id, platform: platform)
       record.number = number
       record.build_number = parse_version_code(version_code)
-      record.version = Version.find_by(number: number)
+      record.version = Version.lookup_by_number(number)
       record.last_seen_at = Time.current
       record.save!
       record

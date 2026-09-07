@@ -55,6 +55,17 @@ RSpec.describe "V1 Admin Feedbacks API", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response_data.dig("attributes", "content")).to eq("Admin inspectable item")
     end
+
+    it "exposes version_id and derived app_version when linked" do
+      version = create(:version, number: "1.4.0")
+      feedback = create(:feedback, version: version)
+
+      get "/v1/admin/feedbacks/#{feedback.id}", headers: headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response_data.dig("attributes", "version_id")).to eq(version.id)
+      expect(response_data.dig("attributes", "app_version")).to eq("1.4.0")
+    end
   end
 
   describe "PATCH /v1/admin/feedbacks/:id" do

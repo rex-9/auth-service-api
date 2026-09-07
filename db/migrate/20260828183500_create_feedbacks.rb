@@ -10,7 +10,6 @@ class CreateFeedbacks < ActiveRecord::Migration[8.1]
       t.string :priority, null: false, default: "normal"
       t.string :status, null: false, default: "new"
       t.string :platform, null: false, default: "web"
-      t.string :app_version
       t.string :os
       t.string :device
       t.string :browser

@@ -99,8 +99,8 @@ All tables use **UUID** primary keys (`gen_random_uuid()`), utilize **Discard** 
 | **Entitlements**     | `Access`                                                                                     | Granted/revoked/expired access records tied to `User` and `Product`.                                                                                                                                                                                                                                   |
 | **AI / Chat**        | `Chat::Room`, `Chat::Message`                                                                | Conversational rooms, messages with roles (`user`, `assistant`), `ai_status` (`queued`, `processing`, `completed`, `failed`), system prompts, temperature, max tokens, metadata.                                                                                                                       |
 | **Media**            | `Asset`                                                                                      | Unified media metadata (`storage_key` for Garage/S3/Cloudinary/Local — user objects under `user/{user_id}/`, platform objects under `admin/`; format, size_bytes, original_size_bytes, compressed_size_bytes, compression_ratio, compression_passes, status enum: `pending`/`processing`/`ready`/`optimal`, duration_secs, type, polymorphic `assetable_type`/`assetable_id`). |
-| **Telemetry**        | `Log::Client`                                                                                | Frontend error ingest (stack traces, device, OS, browser, URL, severity, occurrences, local/session storage keys, cookies, resolution status).                                                                                                                                                         |
-| **Feedback**         | `Feedback`                                                                                   | Intelligent in-place feedback (1-10 rating, auto-inferred category: `bug`/`feature_request`/`improvement`/`general`, priority: `low`/`normal`/`high`/`urgent`, status, automated device/route telemetry).                                                                                              |
+| **Telemetry**        | `Log::Client`                                                                                | Frontend error ingest (stack traces, device, OS, browser, URL, severity, occurrences, local/session storage keys, cookies, resolution status). Ingest still sends `app_version`; Core stores nullable `version_id`.                                                                                                                                                         |
+| **Feedback**         | `Feedback`                                                                                   | Intelligent in-place feedback (1-10 rating, auto-inferred category: `bug`/`feature_request`/`improvement`/`general`, priority: `low`/`normal`/`high`/`urgent`, status, automated device/route telemetry). Ingest still sends `app_version`; Core stores nullable `version_id`.                                                                                              |
 | **Notifications**    | `Notification`, `UserNotification`                                                           | Multi-channel notification repository (In-App, Push, Email) with dynamic variable interpolation; persistent user in-app inbox receipts with immutable snapshots, read tracking, and Pagy pagination.                                                                                                   |
 | **App versions**     | `Version`, `UserVersion`                                                                     | Global marketing versions (`draft` / `published` / `yanked`; publishing yanks every other kept published row) and one current user-version snapshot per user per platform. Public `GET /v1/versions/current` computes `update_required` (client behind the live version) and `must_update` (live version is force and greater than the client). Signed-in `POST /v1/versions/user-version` records the device. JSON admin `/v1/admin/versions` is super-admin only (discard/undiscard, `install_count`). `GET /v1/admin/versions/user_versions` lists all current snapshots (not nested under a version id). Administrate `/admin/versions` is super-admin only; user versions are `/admin/user_versions`. The user show page lists only `latest_user_version` (newest `last_seen_at`). |
 
@@ -345,7 +345,7 @@ Payload sent on uncaught errors in Web and Mobile:
     "severity": "error",
     "platform": "web" | "android" | "ios",
     "environment": "development" | "staging" | "production",
-    "version": "1.0.0",
+    "app_version": "1.0.0",
     "os": "Android",
     "os_version": "14",
     "device": "Pixel 8",
@@ -360,6 +360,8 @@ Payload sent on uncaught errors in Web and Mobile:
   }
 }
 ```
+
+Clients keep sending `"app_version": "1.0.0"`. Core looks up a kept `Version` by `number` and stores `version_id`. Unknown or missing `app_version` leaves `version_id` null (no 422). Admin JSON returns `version_id` plus derived `app_version` from `version.number`. The same lookup applies to `POST /v1/feedbacks`.
 
 ### 4. Password Retry & Cooldown Escalation Protocol
 

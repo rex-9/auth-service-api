@@ -9,7 +9,6 @@ class Log::ClientDashboard < Administrate::BaseDashboard
   # on pages throughout the dashboard.
   ATTRIBUTE_TYPES = {
     id: Field::String,
-    version: Field::String,
     browser: Field::String,
     context: Field::String.with_options(searchable: false),
     cookies: Field::String.with_options(searchable: false),
@@ -39,6 +38,7 @@ class Log::ClientDashboard < Administrate::BaseDashboard
     url: Field::String,
     user: Field::BelongsTo,
     user_agent: Field::String,
+    version: Field::BelongsTo,
     created_at: Field::DateTime,
     updated_at: Field::DateTime
   }.freeze

@@ -20,7 +20,8 @@ class V1::Log::ClientsController < V1::ApplicationController
       )
     else
       # New log - assign attributes and save
-      log_client.assign_attributes(log_client_params)
+      log_client.assign_attributes(log_client_params.except(:app_version))
+      log_client.version_id = Version.lookup_by_number(log_client_params[:app_version])&.id
       log_client.user = current_user if current_user.present?
       log_client.severity ||= "error"
       log_client.request_id ||= request.request_id
@@ -139,7 +140,7 @@ class V1::Log::ClientsController < V1::ApplicationController
   def log_client_params
     params.require(:log).permit(
       :message, :severity, :platform, :environment,
-      :version, :browser, :user_agent, :os, :os_version, :device,
+      :app_version, :browser, :user_agent, :os, :os_version, :device,
       :url, :method,
       context: {},
       stack_trace: [],
@@ -207,7 +208,7 @@ end
 #     },
 #     "platform": "web",
 #     "environment": "production",
-#     "version": "2.1.3",
+#     "app_version": "2.1.3",
 #     "browser": "Chrome 120.0.6099.109",
 #     "os": "macOS",
 #     "os_version": "10.15.0",

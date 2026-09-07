@@ -1,7 +1,7 @@
 # Database Schema Documentation (`rexone-core`)
 
 > **Database Engine:** PostgreSQL 16
-> **Schema Version:** `2026_09_05_100002`
+> **Schema Version:** `2026_09_05_190001`
 > **Key Conventions:** UUID v4 Primary Keys (`gen_random_uuid()`), Soft Deletion (`discard` gem), Audit Tracking (`Auditable` concern).
 
 > [!IMPORTANT]
@@ -74,6 +74,8 @@ erDiagram
 
   users ||--o{ user_versions : "runs"
   versions ||--o{ user_versions : "matches"
+  versions ||--o{ feedbacks : "reports"
+  versions ||--o{ log_clients : "reports"
 
   users ||--o{ assets : "assetable (polymorphic)"
   payment_products ||--o{ assets : "assetable (polymorphic)"
@@ -571,7 +573,7 @@ erDiagram
 ### 8.1. `feedbacks`
 
 - **Model**: [`Feedback`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/feedback.rb)
-- **Description**: In-app feedback reports, ratings, bug tickets, and admin triage tracking.
+- **Description**: In-app feedback reports, ratings, bug tickets, and admin triage tracking. Clients send `app_version`; Core stores nullable `version_id`.
 
 | Column              | Type       | Nullable | Default             | Description / Notes                                    |
 | :------------------ | :--------- | :------: | :------------------ | :----------------------------------------------------- |
@@ -584,7 +586,7 @@ erDiagram
 | `status`            | `string`   |    ❌    | `"new"`             | Enum: `new`, `in_progress`, `resolved`, `closed`       |
 | `platform`          | `string`   |    ❌    | `"web"`             | Enum: `web`, `ios`, `android`                          |
 | `admin_notes`       | `text`     |    ✔️    | `NULL`              | Internal triage / resolver comments                    |
-| `version`           | `string`   |    ✔️    | `NULL`              | Client version                                         |
+| `version_id`        | `uuid`     |    ✔️    | `NULL`              | Matching `Version` if ingest `app_version` matches `number`. API still accepts `app_version`; serializers derive it from `version.number`. |
 | `browser`           | `string`   |    ✔️    | `NULL`              | Client browser                                         |
 | `os`                | `string`   |    ✔️    | `NULL`              | Operating system                                       |
 | `device`            | `string`   |    ✔️    | `NULL`              | Client hardware                                        |
@@ -608,7 +610,8 @@ erDiagram
 - `index_feedbacks_on_rating` (`rating`)
 - `index_feedbacks_on_created_at` (`created_at`)
 - `index_feedbacks_on_discarded_at` (`discarded_at`)
-- FK to `users(id)`.
+- `index_feedbacks_on_version_id` (`version_id`)
+- FK to `users(id)`; FK to `versions(id)` `ON DELETE NULL`.
 
 ---
 
@@ -617,7 +620,7 @@ erDiagram
 ### 9.1. `log_clients`
 
 - **Model**: [`Log::Client`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/log/client.rb)
-- **Description**: Frontend client runtime error tracking, session snapshots, and resolution management.
+- **Description**: Frontend client runtime error tracking, session snapshots, and resolution management. Clients send `app_version`; Core stores nullable `version_id`.
 
 | Column                 | Type       | Nullable | Default             | Description / Notes                             |
 | :--------------------- | :--------- | :------: | :------------------ | :---------------------------------------------- |
@@ -630,7 +633,7 @@ erDiagram
 | `url`                  | `string`   |    ✔️    | `NULL`              | Page URL where error triggered                  |
 | `method`               | `string`   |    ✔️    | `NULL`              | Associated HTTP method                          |
 | `user_agent`           | `string`   |    ✔️    | `NULL`              | User Agent string                               |
-| `version`              | `string`   |    ✔️    | `NULL`              | Client build version                            |
+| `version_id`           | `uuid`     |    ✔️    | `NULL`              | Matching `Version` if ingest `app_version` matches `number`. API still accepts `app_version`; serializers derive it from `version.number`. |
 | `os`                   | `string`   |    ✔️    | `NULL`              | Operating system                                |
 | `os_version`           | `string`   |    ✔️    | `NULL`              | OS version number                               |
 | `browser`              | `string`   |    ✔️    | `NULL`              | Browser family                                  |
@@ -661,7 +664,8 @@ erDiagram
 - `index_log_clients_on_environment` (`environment`)
 - `index_log_clients_on_resolved_at` (`resolved_at`)
 - `index_log_clients_on_resolved_by_id` (`resolved_by_id`)
-- FKs to `users(id)` for `user_id`, `resolved_by_id`, `created_by_id`, `updated_by_id`.
+- `index_log_clients_on_version_id` (`version_id`)
+- FKs to `users(id)` for `user_id`, `resolved_by_id`, `created_by_id`, `updated_by_id`; FK to `versions(id)` `ON DELETE NULL`.
 
 ---
 
@@ -779,7 +783,7 @@ erDiagram
 - `index_versions_on_discarded_at` (`discarded_at`)
 - FKs: audit columns → `users(id)`.
 
-**Live scope** (public check): kept + `status = published` + (`released_at` is `NULL` or `<= now`). At most one kept published row exists. Versions are discard/undiscard only (non-destroyable). `install_count` is computed (kept `user_versions` rows whose `version_id` matches); it is not a stored column.
+**Live scope** (public check): kept + `status = published` + (`released_at` is `NULL` or `<= now`). At most one kept published row exists. Versions are discard/undiscard only (non-destroyable). `install_count` is computed (kept `user_versions` rows whose `version_id` matches); it is not a stored column. Feedback and client-log ingest send `app_version` (marketing semver); Core stores `version_id` when a kept `versions.number` matches, otherwise null.
 
 ### 11.2. `user_versions`
 - **Model**: [`UserVersion`](app/models/user_version.rb)

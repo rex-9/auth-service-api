@@ -4,6 +4,7 @@ class Feedback < ApplicationRecord
   self.primary_key = "id"
 
   belongs_to :user, optional: true
+  belongs_to :version, optional: true
 
   # ===== ENUMS =====
   enum :status, FeedbackConstants::Status::ALL.index_with(&:itself), prefix: true

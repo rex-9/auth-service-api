@@ -4,6 +4,8 @@ class Version < ApplicationRecord
   self.primary_key = "id"
 
   has_many :user_versions, dependent: :nullify
+  has_many :feedbacks, dependent: :nullify
+  has_many :log_clients, class_name: "Log::Client", dependent: :nullify
 
   enum :status, VersionConstants::Status::ALL.index_with(&:itself), prefix: true
 
@@ -26,6 +28,12 @@ class Version < ApplicationRecord
     where(status: VersionConstants::Status::PUBLISHED)
       .where("released_at IS NULL OR released_at <= ?", Time.current)
   }
+
+  def self.lookup_by_number(number)
+    return if number.blank?
+
+    find_by(number: number)
+  end
 
   before_save :yank_other_published_versions, if: :publishing?
   before_save :stamp_released_at_on_publish

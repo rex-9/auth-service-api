@@ -555,10 +555,12 @@ components:
               type: string
               nullable: true
               example: web
-            version:
+            app_version:
               type: string
               nullable: true
               example: 1.0.0
+              description: Client marketing semver. Looked up against versions.number
+                and stored as version_id. Unknown or missing leaves version_id null.
             os:
               type: string
               nullable: true
@@ -729,9 +731,11 @@ components:
               - staging
               - production
               nullable: true
-            version:
+            app_version:
               type: string
               nullable: true
+              description: Client marketing semver. Looked up against versions.number
+                and stored as version_id. Unknown or missing leaves version_id null.
             browser:
               type: string
               nullable: true

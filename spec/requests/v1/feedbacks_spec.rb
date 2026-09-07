@@ -42,6 +42,47 @@ RSpec.describe "V1 Feedbacks API", type: :request do
       expect(response_data.dig("attributes", "user_name")).to eq(user.name)
     end
 
+    it "links version_id when app_version matches a kept version" do
+      version = create(:version, number: "1.4.0")
+
+      post "/v1/feedbacks", params: {
+        feedback: {
+          content: "Loved the speed!",
+          app_version: "1.4.0"
+        }
+      }
+
+      expect(response).to have_http_status(:created)
+      expect(response_data.dig("attributes", "version_id")).to eq(version.id)
+      expect(response_data.dig("attributes", "app_version")).to eq("1.4.0")
+      expect(Feedback.last.version_id).to eq(version.id)
+    end
+
+    it "leaves version_id null when app_version is unknown" do
+      post "/v1/feedbacks", params: {
+        feedback: {
+          content: "Loved the speed!",
+          app_version: "9.9.9"
+        }
+      }
+
+      expect(response).to have_http_status(:created)
+      expect(response_data.dig("attributes", "version_id")).to be_nil
+      expect(response_data.dig("attributes", "app_version")).to be_nil
+      expect(Feedback.last.version_id).to be_nil
+    end
+
+    it "leaves version_id null when app_version is omitted" do
+      post "/v1/feedbacks", params: {
+        feedback: {
+          content: "Loved the speed!"
+        }
+      }
+
+      expect(response).to have_http_status(:created)
+      expect(Feedback.last.version_id).to be_nil
+    end
+
     it "rejects blank feedback content" do
       post "/v1/feedbacks", params: {
         feedback: {

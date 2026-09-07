@@ -26,6 +26,7 @@ class Log::Client < ApplicationRecord
   # ===== ASSOCIATIONS =====
   belongs_to :user, optional: true
   belongs_to :resolved_by, class_name: "User", optional: true
+  belongs_to :version, optional: true
 
   # ===== VALIDATIONS =====
   validates :message, presence: true

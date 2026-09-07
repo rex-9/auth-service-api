@@ -10,7 +10,6 @@ class FeedbackDashboard < Administrate::BaseDashboard
   ATTRIBUTE_TYPES = {
     id: Field::String,
     admin_notes: Field::Text,
-    version: Field::String,
     browser: Field::String,
     category: Field::Select.with_options(searchable: false, collection: ->(field) { field.resource.class.send(field.attribute.to_s.pluralize).keys }),
     content: Field::Text,
@@ -32,6 +31,7 @@ class FeedbackDashboard < Administrate::BaseDashboard
     updated_by_id: Field::String,
     updater: Field::BelongsTo,
     user: Field::BelongsTo,
+    version: Field::BelongsTo,
     created_at: Field::DateTime,
     updated_at: Field::DateTime
   }.freeze
@@ -46,6 +46,8 @@ class FeedbackDashboard < Administrate::BaseDashboard
     category
     priority
     content
+    version
+    browser
     admin_notes
   ].freeze
 

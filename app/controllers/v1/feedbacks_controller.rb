@@ -63,7 +63,7 @@ class V1::FeedbacksController < V1::ApplicationController
       :rating,
       :category,
       :priority,
-      :version,
+      :app_version,
       :os,
       :device,
       :browser,

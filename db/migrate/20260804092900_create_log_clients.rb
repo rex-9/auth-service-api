@@ -18,7 +18,6 @@ class CreateLogClients < ActiveRecord::Migration[8.1]
       # ===== PLATFORM & APP =====
       t.string :platform                                              # web | ios | android
       t.string :environment                                           # development | staging | production
-      t.string :app_version                                           # App version + build number
       t.string :browser                                               # Browser name + version
       t.string :os                                                    # OS name
       t.string :os_version                                            # OS version
