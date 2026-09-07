@@ -1,0 +1,32 @@
+name: Core CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build & Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up environment
+        run: cp .env.example .env
+
+      - name: Start Database
+        run: |
+          docker compose -f docker-compose.dev.yaml up -d db
+
+      - name: Syntax & Eager Loading Check
+        run: |
+          docker compose -f docker-compose.dev.yaml run --rm -T -e RAILS_ENV=test api bin/rails zeitwerk:check
+
+      - name: Prepare test database and run RSpec
+        run: |
+          docker compose -f docker-compose.dev.yaml run --rm -T -e RAILS_ENV=test api sh -c "bin/rails db:test:prepare && bundle exec rspec --tag ~type:system --tag ~e2e"

@@ -78,6 +78,7 @@ module AppConfig
   S3_ENDPOINT = env_or.call("S3_ENDPOINT", "http://garage:3100")
   S3_PUBLIC_ENDPOINT = env_or.call("S3_PUBLIC_ENDPOINT", "http://localhost:3100")
   S3_REGION = env_or.call("S3_REGION", "garage")
+  S3_FOLDER_PREFIX = env_or.call("S3_FOLDER_PREFIX", (RAILS_ENV == "development" ? "dev" : nil))
   S3_ACCESS_KEY = env_or.call("S3_ACCESS_KEY", "")
   s3_raw_secret = env_or.call("S3_SECRET_KEY", "")
   if s3_raw_secret =~ /\A([0-9a-f]{64})/i

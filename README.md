@@ -14,10 +14,11 @@ Built under a simple creed: **clear in thought, exact in structure, simple in us
 [![Rails](https://img.shields.io/badge/Rails-8.1-CC0000?logo=rubyonrails&logoColor=white)](https://rubyonrails.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![CI](https://github.com/rex-9/rexone-core/actions/workflows/test.yml/badge.svg)](https://github.com/rex-9/rexone-core/actions/workflows/test.yml)
 
 **API-first · Modular · Observable · Queue-aware · Built to grow**
 
-[Explore the foundation](#feature-map) · [Ecosystem Architecture](ECOSYSTEM.md) · [Development Law](LAW.md) · [Analytics Guide](ANALYTICS.md) · [Run it locally](#getting-started) · [Open the dashboards](#operations-center) · [Meet the architecture](#architecture)
+[Explore the foundation](#feature-map) · [Ecosystem Architecture](ECOSYSTEM.md) · [Development Law](LAW.md) · [Production Deployment](docs/DEPLOYMENT.md) · [Analytics Guide](docs/ANALYTICS.md) · [Run it locally](#getting-started) · [Open the dashboards](#operations-center) · [Meet the architecture](#architecture)
 
 </div>
 
@@ -147,6 +148,7 @@ The API and worker run as separate services in Docker, keeping request handling 
 - Devise authentication with JWT issuance and revocation.
 - Email/password registration, confirmation codes, password recovery, locking, tracking, and timeout support.
 - Google sign-in with a challenge flow for completing account creation.
+- Profile management and identity inspection supporting atomic name and username updates with validation.
 - Platform-aware active sessions backed by the application cache.
 - Rack Attack throttling for abusive or excessive requests.
 - Configurable CORS and Rails security defaults.
@@ -234,7 +236,6 @@ Each enabled channel receives its own Solid Queue job. A failed email therefore 
 
 The admin- and permission-protected `POST /v1/admin/notifications/dispatch` contract is ready for the dashboard to send custom content to confirmed users holding selected roles—or to the full confirmed audience—through any combination of socket, push, and email. Users with several selected roles are included only once. Audience fanout runs in the `notifications` queue, while each resulting channel delivery keeps its own retry boundary. Sensitive confirmation or password-reset workflows are never exposed as admin-selectable presets.
 
-
 ### Storage & assets
 
 The storage abstraction defaults to **Garage** (self-hosted S3-compatible distributed object storage on port 3100) with full fallback support for **Cloudinary** and local filesystem storage. Read the complete [Garage Guide](docs/GARAGE.md) for architecture, configuration, and UI tooling.
@@ -243,8 +244,9 @@ The storage abstraction defaults to **Garage** (self-hosted S3-compatible distri
   - Admin uploads: `admin/{type}_{name}_{timestamp}.{ext}`
   - User uploads: `users/{user_id}/{type}_{name}_{timestamp}.{ext}`
   - Google avatar imports: `users/{user_id}/avatar_google_{timestamp}.{ext}`
+  - **Environment Storage Partitions (`S3_FOLDER_PREFIX`)**: Garage automatically partitions new storage keys by Rails environment—`dev/` for development, `uat/` for UAT/staging, and `prod/` for production—with `S3_FOLDER_PREFIX` available as an explicit override. Partition handling belongs exclusively to Garage; asset records and admin database queries remain environment-agnostic and cover the complete assets table.
 - **Zero-Footprint Storage In-Place Rename**: When an administrator updates an asset's `type` via the Admin Portal, the backend dynamically moves the storage object (`StorageService::Client.move(old_key, new_key)`) without creating duplicate or orphaned files in Garage.
-- **Storage & VPS Capacity Monitoring**: `GET /v1/admin/assets/storage_stats` polls the Garage Admin API (`S3_ADMIN_ENDPOINT=http://garage:3101`, `S3_ADMIN_TOKEN=...`) to return real-time bucket usage (bytes, object count) and VPS host disk capacity (total/free bytes, used/free percentages), triggering proactive low-disk alerts when free disk space falls below 15%.
+- **Storage & VPS Capacity Monitoring**: The super-admin-only `GET /v1/admin/assets/storage_stats` endpoint polls the Garage Admin API (`S3_ADMIN_ENDPOINT=http://garage:3101`, `S3_ADMIN_TOKEN=...`) and reports bucket/VPS capacity, actual and database-tracked object/byte usage for each `dev/`, `uat/`, and `prod/` Garage partition, plus complete database asset totals. It triggers proactive low-disk alerts when free disk space falls below 15%.
 - **Automated Backup Scripts**:
   - `scripts/backup_db.sh`: Automated PostgreSQL database dumps with 7-day rolling retention.
   - `scripts/backup_garage.sh`: Automated Garage metadata & block backups with 7-day rolling retention.
@@ -469,8 +471,14 @@ Review and replace seeded credentials before using them outside local developmen
 # Generate OpenAPI output
 ./scripts/rswag.sh
 
-# Run the repository test script
+# Run the repository test script (RSpec)
 ./scripts/test.sh
+
+# Continuous Integration (GitHub Actions)
+# Automated PR workflow (.github/workflows/test.yml) executes:
+#   1. Syntax & autoload verification: bin/rails zeitwerk:check
+#   2. Test database preparation: bin/rails db:test:prepare
+#   3. RSpec test suite (excluding system/e2e specs): bundle exec rspec --tag ~type:system --tag ~e2e
 
 # Automated Backups
 ./scripts/backup_all.sh     # Backs up both PostgreSQL and Garage S3 storage
@@ -593,7 +601,7 @@ A software engineer, full-stack architect, and long-time practitioner of meditat
 I build systems the same way I approach the path itself: **with a clear mind, deliberate steps, and no unnecessary weight.**
 
 - GitHub: [@rex-9](https://github.com/rex-9)
-- Portfolio: [rex9.vercel.app](https://rex9.vercel.app)
+- Portfolio: [rex9.me](https://rex9.me)
 - LinkedIn: [rex9](https://www.linkedin.com/in/rex9/)
 
 _Built with ❤️ by Rex9 on Rexone Ecosystem_

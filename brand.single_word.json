@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "brand": {
+    "name": "Nova",
+    "slug": "nova",
+    "shortName": "Nova",
+    "description": "Intelligent Cloud Platform",
+    "company": "Rex9",
+    "author": "Rex (Htet Naing)",
+    "supportEmail": "rex9.tech@gmail.com",
+    "website": "https://rex9.me",
+    "logoPath": "brand/logo.png"
+  },
+  "mobile": {
+    "appName": "Nova Mobile",
+    "packageName": "com.rex9.nova",
+    "bundleId": "com.rex9.nova"
+  },
+  "web": {
+    "appName": "Nova Web",
+    "title": "Nova — Product Foundation",
+    "shortName": "Nova"
+  },
+  "core": {
+    "appName": "Nova Core",
+    "mailerSender": "no-reply@nova.me"
+  }
+}

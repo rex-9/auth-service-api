@@ -1,99 +1,102 @@
+# rexone-core/docker-compose.yaml
+# Production Docker Compose for Coolify Deployment
+
 services:
   api:
-    container_name: ${RAILS_CONTAINER_NAME}
+    container_name: ${RAILS_CONTAINER_NAME:-prod-rexone-api}
     build:
       context: .
-      dockerfile: ${RAILS_DOCKERFILE}
+      dockerfile: ${RAILS_DOCKERFILE:-Dockerfile}
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
+    env_file:
+      - .env
     environment:
-      RAILS_ENV: ${RAILS_ENV}
-      RAILS_JWT_SECRET_KEY: ${RAILS_JWT_SECRET_KEY}
+      RAILS_ENV: ${RAILS_ENV:-production}
+      RAILS_MASTER_KEY: ${RAILS_MASTER_KEY}
+      RAILS_SECRET_KEY_BASE: ${RAILS_SECRET_KEY_BASE}
       RAILS_DATABASE_URL: ${RAILS_DATABASE_URL}
+      RAILS_JWT_SECRET_KEY: ${RAILS_JWT_SECRET_KEY}
       RAILS_MAX_THREADS: ${RAILS_MAX_THREADS:-7}
       DB_POOL: ${API_DB_POOL:-7}
       RAILS_CLIENT_BASE_URL: ${RAILS_CLIENT_BASE_URL}
       RAILS_SERVER_BASE_URL: ${RAILS_SERVER_BASE_URL}
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-garage}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET:-rexone}
+      S3_REGION: ${S3_REGION:-garage}
+      S3_FOLDER_PREFIX: ${S3_FOLDER_PREFIX:-prod}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
     ports:
-      - ${RAILS_PORT_MAP}
+      - "${RAILS_PORT_MAP:-3000:3000}"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3000/up || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 20s
-    labels:
-      - coolify.traefik.middlewares=cors@file
+      start_period: 25s
+    networks:
+      - rexone-network
 
-  # Solid Queue Worker
+  # Solid Queue Default Worker
   waka:
-    container_name: ${WAKA_CONTAINER_NAME}
+    container_name: ${WAKA_CONTAINER_NAME:-prod-rexone-waka}
     build:
       context: .
-      dockerfile: ${RAILS_DOCKERFILE}
+      dockerfile: ${RAILS_DOCKERFILE:-Dockerfile}
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
+    env_file:
+      - .env
     environment:
-      RAILS_ENV: ${RAILS_ENV}
-      RAILS_JWT_SECRET_KEY: ${RAILS_JWT_SECRET_KEY}
+      RAILS_ENV: ${RAILS_ENV:-production}
+      RAILS_MASTER_KEY: ${RAILS_MASTER_KEY}
+      RAILS_SECRET_KEY_BASE: ${RAILS_SECRET_KEY_BASE}
       RAILS_DATABASE_URL: ${RAILS_DATABASE_URL}
+      RAILS_JWT_SECRET_KEY: ${RAILS_JWT_SECRET_KEY}
       RAILS_MAX_THREADS: ${RAILS_MAX_THREADS:-7}
       DB_POOL: ${WAKA_DB_POOL:-5}
       RAILS_CLIENT_BASE_URL: ${RAILS_CLIENT_BASE_URL}
       RAILS_SERVER_BASE_URL: ${RAILS_SERVER_BASE_URL}
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-garage}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET:-rexone}
+      S3_REGION: ${S3_REGION:-garage}
+      S3_FOLDER_PREFIX: ${S3_FOLDER_PREFIX:-prod}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
     command: ["./bin/jobs"]
     stop_grace_period: 45s
     labels:
-      - coolify.traefik.enable=false
+      - traefik.enable=false
+    networks:
+      - rexone-network
 
-  db:
-    container_name: ${DB_CONTAINER_NAME}
-    image: postgres:18-alpine
-    restart: unless-stopped
-    volumes:
-      - postgres:/var/lib/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${PG_USER} -h 127.0.0.1"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    environment:
-      POSTGRES_DB: ${PG_DATABASE}
-      POSTGRES_USER: ${PG_USER}
-      POSTGRES_PASSWORD: ${PG_PASSWORD}
-    # ports: # enable to access from outside of docker
-    #   - ${PG_PORT_MAP}
-
-  # ── MEDIA (Media Worker) ─── [OPTIONAL] ─────────────────
-  # Processes :media queue only (video/image compression).
-  # Same codebase as api/waka. Disable by not launching this service.
-  # Enable via MEDIA_CONTAINER_ENABLED=true in api/waka env.
+  # Media Worker (FFmpeg video/image transcoding queue)
   media:
-    container_name: ${MEDIA_CONTAINER_NAME}
+    container_name: ${MEDIA_CONTAINER_NAME:-prod-rexone-media}
     build:
       context: .
-      dockerfile: ${RAILS_DOCKERFILE}
+      dockerfile: ${RAILS_DOCKERFILE:-Dockerfile}
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
+    env_file:
+      - .env
     environment:
-      RAILS_ENV: ${RAILS_ENV}
-      RAILS_JWT_SECRET_KEY: ${RAILS_JWT_SECRET_KEY}
+      RAILS_ENV: ${RAILS_ENV:-production}
+      RAILS_MASTER_KEY: ${RAILS_MASTER_KEY}
+      RAILS_SECRET_KEY_BASE: ${RAILS_SECRET_KEY_BASE}
       RAILS_DATABASE_URL: ${RAILS_DATABASE_URL}
       RAILS_MAX_THREADS: ${RAILS_MAX_THREADS:-7}
       DB_POOL: ${MEDIA_DB_POOL:-3}
       STORAGE_PROVIDER: ${STORAGE_PROVIDER:-garage}
-      S3_ENDPOINT: ${S3_ENDPOINT:-http://garage:3100}
-      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://localhost:3100}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT}
       S3_BUCKET: ${S3_BUCKET:-rexone}
+      S3_REGION: ${S3_REGION:-garage}
+      S3_FOLDER_PREFIX: ${S3_FOLDER_PREFIX:-prod}
       S3_ACCESS_KEY: ${S3_ACCESS_KEY}
       S3_SECRET_KEY: ${S3_SECRET_KEY}
-      S3_REGION: ${S3_REGION:-garage}
     command: ["./bin/jobs", "-c", "config/queue.media.yml"]
     stop_grace_period: 60s
     deploy:
@@ -102,26 +105,61 @@ services:
           cpus: "3.0"
           memory: 4096M
     labels:
-      - coolify.traefik.enable=false
+      - traefik.enable=false
+    networks:
+      - rexone-network
 
-  # ── GARAGE (S3 Storage) ─── [OPTIONAL] ──────────────────
-  # Self-hosted S3-compatible object storage.
-  # Disable by not launching this service and using STORAGE_PROVIDER=cloudinary.
+  # ── OPTIONAL / STANDALONE DB (Profile: with-db) ───────────────────────
+  # Can be deployed independently or as part of compose with COMPOSE_PROFILES=with-db
+  db:
+    container_name: ${DB_CONTAINER_NAME:-prod-rexone-db}
+    image: postgres:18-alpine
+    profiles: ["with-db", "full"]
+    restart: unless-stopped
+    volumes:
+      - rexone-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-postgres} -h 127.0.0.1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    environment:
+      POSTGRES_DB: ${PG_DATABASE:-rexone_production}
+      POSTGRES_USER: ${PG_USER:-postgres}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+    networks:
+      - rexone-network
+
+  # ── OPTIONAL / STANDALONE GARAGE (Profile: with-garage) ───────────────
+  # Can be deployed independently or as part of compose with COMPOSE_PROFILES=with-garage
+  # Exactly one Garage container per project, partitioned by folders (e.g. prod/, uat/)
   garage:
     image: dxflrs/garage:v1.0.1
-    container_name: ${GARAGE_CONTAINER_NAME:-rexone-core-garage}
+    container_name: ${GARAGE_CONTAINER_NAME:-rexone-garage}
+    profiles: ["with-garage", "full"]
     restart: unless-stopped
     volumes:
       - ./config/garage.toml:/etc/garage.toml:ro
-      - garage-meta:/var/lib/garage/meta
-      - garage-data:/var/lib/garage/data
+      - rexone-garage-meta:/var/lib/garage/meta
+      - rexone-garage-data:/var/lib/garage/data
     ports:
       - "${S3_PORT_MAP:-3100:3100}"
       - "${S3_ADMIN_PORT_MAP:-3101:3101}"
     labels:
-      - coolify.traefik.enable=true
+      - traefik.enable=true
+      - traefik.http.services.garage.loadbalancer.server.port=3100
+    networks:
+      - rexone-network
+
+networks:
+  rexone-network:
+    name: ${DOCKER_NETWORK:-prod-rexone-net}
+    external: ${EXTERNAL_NETWORK:-false}
 
 volumes:
-  postgres:
-  garage-meta:
-  garage-data:
+  rexone-postgres-data:
+    name: ${POSTGRES_VOLUME:-prod-rexone-postgres-data}
+  rexone-garage-meta:
+    name: ${GARAGE_META_VOLUME:-rexone-garage-meta}
+  rexone-garage-data:
+    name: ${GARAGE_DATA_VOLUME:-rexone-garage-data}

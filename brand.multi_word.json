@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "brand": {
+    "name": "Pulse Flow",
+    "slug": "pulse-flow",
+    "shortName": "PulseFlow",
+    "description": "Unified Streamlining Platform",
+    "company": "Rex9",
+    "author": "Rex (Htet Naing)",
+    "supportEmail": "rex9.tech@gmail.com",
+    "website": "https://rex9.me",
+    "logoPath": "brand/logo.png"
+  },
+  "mobile": {
+    "appName": "Pulse Flow Mobile",
+    "packageName": "com.rex9.pulseflow",
+    "bundleId": "com.rex9.pulseflow"
+  },
+  "web": {
+    "appName": "Pulse Flow Web",
+    "title": "Pulse Flow — Product Foundation",
+    "shortName": "PulseFlow"
+  },
+  "core": {
+    "appName": "Pulse Flow Core",
+    "mailerSender": "no-reply@pulseflow.me"
+  }
+}

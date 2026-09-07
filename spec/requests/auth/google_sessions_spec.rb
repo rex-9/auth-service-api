@@ -47,7 +47,7 @@ RSpec.describe "Google authentication", type: :request do
       expect(StorageService::Client).to have_received(:upload).with(
         "https://example.com/avatar.jpg",
         hash_including(
-          storage_key: AssetConstants::AssetName.google_profile(user.id),
+          storage_key: a_string_starting_with("users/#{user.id}/avatar_google_"),
           folder: "user_uploads/#{AssetConstants::AssetType::AVATAR}",
           resource_type: AssetConstants::AssetFormat::IMAGE
         )
@@ -135,7 +135,7 @@ RSpec.describe "Google authentication", type: :request do
       expect(StorageService::Client).to have_received(:upload).with(
         "https://example.com/avatar.jpg",
         hash_including(
-          storage_key: AssetConstants::AssetName.google_profile(user.id),
+          storage_key: a_string_starting_with("users/#{user.id}/avatar_google_"),
           folder: "user_uploads/#{AssetConstants::AssetType::AVATAR}",
           resource_type: AssetConstants::AssetFormat::IMAGE
         )
@@ -194,6 +194,7 @@ RSpec.describe "Google authentication", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response_data.dig("user", "id")).to eq(user.id)
       expect(response_data["token"]).to be_present
+      expect(NotificationService::Center).not_to have_received(:welcome)
     end
 
     it "rejects an account discarded while its challenge was outstanding" do

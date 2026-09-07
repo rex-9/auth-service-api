@@ -1,6 +1,7 @@
 # app/controllers/v1/admin/assets_controller.rb
 
 class V1::Admin::AssetsController < V1::ApplicationController
+  before_action :super_admin_required!, only: :read_storage_stats
   before_action :set_active_asset, only: %i[show update discard update_compress]
   before_action :set_asset_including_discarded, only: %i[undiscard destroy]
 

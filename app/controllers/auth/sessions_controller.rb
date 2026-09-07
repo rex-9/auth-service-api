@@ -343,10 +343,12 @@ class Auth::SessionsController < Devise::SessionsController
       token = AppConfig::JWT_TOKEN.call(user)
       signup_active_session!(user: user, token: token)
 
-      NotificationService::Center.welcome(
-        user_id: user.id,
-        name: user.name || user.username
-      )
+      if created_user
+        NotificationService::Center.welcome(
+          user_id: user.id,
+          name: user.name || user.username
+        )
+      end
 
       render_json_response(
         status_code: created_user ? 201 : 200,

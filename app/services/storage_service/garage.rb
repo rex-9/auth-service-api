@@ -5,6 +5,9 @@ require_relative "error"
 module StorageService
   class Garage < Base
     LOG_PREFIX = "[Garage]".freeze
+    ENVIRONMENT_PREFIXES = %w[dev uat prod].freeze
+
+    attr_reader :client, :public_client
 
     def initialize
       require "aws-sdk-s3"
@@ -35,6 +38,7 @@ module StorageService
       if options[:folder].present? && !storage_key.to_s.include?("/")
         storage_key = File.join(options[:folder], storage_key)
       end
+      storage_key = apply_prefix(storage_key)
 
       body = file.is_a?(String) ? File.open(file, "rb") : file
       original_filename = file.is_a?(String) ? File.basename(file) : (file.respond_to?(:original_filename) ? file.original_filename : "upload")
@@ -65,7 +69,8 @@ module StorageService
     end
 
     def delete(identifier, options = {})
-      @client.delete_object(bucket: @bucket, key: identifier)
+      key = apply_prefix(identifier)
+      @client.delete_object(bucket: @bucket, key: key)
       true
     rescue Aws::S3::Errors::ServiceError => e
       Rails.logger.error("#{LOG_PREFIX} Delete Error: #{e.message}")
@@ -73,16 +78,17 @@ module StorageService
     end
 
     def url(identifier, options = {})
+      key = apply_prefix(identifier)
       expiry = options[:expiry] || 7.days.to_i
 
       presign_params = {
         bucket: @bucket,
-        key: identifier,
+        key: key,
         expires_in: expiry
       }
 
       content_type = options[:response_content_type] || options[:content_type]
-      content_type ||= Rack::Mime.mime_type(File.extname(identifier.to_s), nil)
+      content_type ||= Rack::Mime.mime_type(File.extname(key.to_s), nil)
       presign_params[:response_content_type] = content_type if content_type.present?
 
       disposition = options[:response_content_disposition] || options[:disposition]
@@ -92,7 +98,7 @@ module StorageService
       signer.presigned_url(:get_object, **presign_params)
     rescue Aws::S3::Errors::ServiceError, ArgumentError => e
       Rails.logger.error("#{LOG_PREFIX} URL presigning error: #{e.message}")
-      "#{@public_endpoint}/#{@bucket}/#{identifier}"
+      "#{@public_endpoint}/#{@bucket}/#{key}"
     end
 
     def move(source, destination, options = {})
@@ -102,19 +108,22 @@ module StorageService
     end
 
     def copy(source, destination, options = {})
+      target_source = apply_prefix(source)
+      target_destination = apply_prefix(destination)
+
       @client.copy_object(
         bucket: @bucket,
-        copy_source: "#{@bucket}/#{source}",
-        key: destination
+        copy_source: "#{@bucket}/#{target_source}",
+        key: target_destination
       )
 
-      head = @client.head_object(bucket: @bucket, key: destination)
+      head = @client.head_object(bucket: @bucket, key: target_destination)
 
       {
-        storage_key: destination,
-        url: url(destination),
+        storage_key: target_destination,
+        url: url(target_destination),
         bytes: head.content_length,
-        format: File.extname(destination).delete(".").downcase.presence || "unknown",
+        format: File.extname(target_destination).delete(".").downcase.presence || "unknown",
         resource_type: options[:resource_type] || "auto"
       }
     rescue Aws::S3::Errors::ServiceError => e
@@ -123,7 +132,8 @@ module StorageService
     end
 
     def exists?(identifier)
-      @client.head_object(bucket: @bucket, key: identifier)
+      key = apply_prefix(identifier)
+      @client.head_object(bucket: @bucket, key: key)
       true
     rescue Aws::S3::Errors::NotFound
       false
@@ -133,9 +143,21 @@ module StorageService
     end
 
     def list(prefix = nil, options = {})
+      effective_prefix = if folder_prefix
+        if prefix.blank?
+          "#{folder_prefix}/"
+        elsif prefix.to_s.start_with?("#{folder_prefix}/")
+          prefix.to_s
+        else
+          "#{folder_prefix}/#{prefix.to_s.sub(%r{\A/+}, '')}"
+        end
+      else
+        prefix
+      end
+
       result = @client.list_objects_v2(
         bucket: @bucket,
-        prefix: prefix,
+        prefix: effective_prefix,
         max_keys: options[:limit] || 100
       )
 
@@ -155,13 +177,14 @@ module StorageService
     end
 
     def generate_signed_url(identifier, options = {})
+      key = apply_prefix(identifier)
       expiry = options[:expiry] || 3600
 
       signer = Aws::S3::Presigner.new(client: @public_client)
       signed_url = signer.presigned_url(
         :get_object,
         bucket: @bucket,
-        key: identifier,
+        key: key,
         expires_in: expiry
       )
 
@@ -176,11 +199,12 @@ module StorageService
     end
 
     def download(identifier, destination_path = nil)
+      key = apply_prefix(identifier)
       if destination_path
-        @client.get_object(bucket: @bucket, key: identifier, response_target: destination_path)
+        @client.get_object(bucket: @bucket, key: key, response_target: destination_path)
         destination_path
       else
-        response = @client.get_object(bucket: @bucket, key: identifier)
+        response = @client.get_object(bucket: @bucket, key: key)
         response.body.read
       end
     rescue Aws::S3::Errors::ServiceError => e
@@ -269,6 +293,8 @@ module StorageService
         bucket: @bucket,
         bucket_bytes: bucket_bytes,
         bucket_objects: bucket_objects,
+        partitions: environment_partition_stats,
+        tracked_partitions: database_environment_partition_stats,
         disk_available_bytes: disk_avail,
         disk_total_bytes: disk_total,
         disk_used_percent: disk_used_percent,
@@ -282,6 +308,8 @@ module StorageService
         bucket: @bucket,
         bucket_bytes: 0,
         bucket_objects: 0,
+        partitions: empty_environment_partition_stats,
+        tracked_partitions: empty_environment_partition_stats,
         disk_available_bytes: 0,
         disk_total_bytes: 0,
         disk_used_percent: nil,
@@ -292,6 +320,63 @@ module StorageService
     end
 
     private
+
+    def environment_partition_stats
+      ENVIRONMENT_PREFIXES.index_with do |prefix|
+        bytes = 0
+        objects = 0
+        continuation_token = nil
+
+        loop do
+          options = { bucket: @bucket, prefix: "#{prefix}/" }
+          options[:continuation_token] = continuation_token if continuation_token.present?
+          response = @client.list_objects_v2(**options)
+
+          bytes += response.contents.sum(&:size)
+          objects += response.contents.size
+          break unless response.is_truncated
+
+          continuation_token = response.next_continuation_token
+        end
+
+        { bytes: bytes, objects: objects }
+      end
+    rescue Aws::S3::Errors::ServiceError => e
+      Rails.logger.warn("#{LOG_PREFIX} Could not fetch environment partition stats: #{e.message}")
+      empty_environment_partition_stats
+    end
+
+    def empty_environment_partition_stats
+      ENVIRONMENT_PREFIXES.index_with { { bytes: 0, objects: 0 } }
+    end
+
+    def database_environment_partition_stats
+      return empty_environment_partition_stats unless defined?(Asset)
+
+      ENVIRONMENT_PREFIXES.index_with do |prefix|
+        scope = Asset.kept.where("storage_key LIKE ?", "#{prefix}/%")
+        { bytes: scope.sum(:size_bytes).to_i, objects: scope.count }
+      end
+    end
+
+    def folder_prefix
+      raw = if defined?(AppConfig::S3_FOLDER_PREFIX)
+              AppConfig::S3_FOLDER_PREFIX
+      else
+              ENV["S3_FOLDER_PREFIX"]
+      end
+      raw.to_s.strip.gsub(%r{\A/+|/+$}, "").presence
+    end
+
+    def apply_prefix(key)
+      return key.to_s if key.blank?
+      return key.to_s unless folder_prefix
+
+      normalized_key = key.to_s.sub(%r{\A/+}, "")
+      return normalized_key if ENVIRONMENT_PREFIXES.any? { |prefix| normalized_key.start_with?("#{prefix}/") }
+
+      "#{folder_prefix}/#{normalized_key}"
+    end
 
     def generate_storage_key(file)
       basename = file.is_a?(String) ? File.basename(file, ".*") : File.basename(file.respond_to?(:original_filename) ? file.original_filename : "upload", ".*")
