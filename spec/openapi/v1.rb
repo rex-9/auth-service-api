@@ -747,6 +747,17 @@ module Openapi
         status: { type: :string, enum: MediaConstants::Status::ALL },
         assetable_type: { type: :string, nullable: true, description: "Polymorphic owner model, e.g. chat_message or user." },
         assetable_id: UUID.merge(nullable: true),
+        parent_asset_id: UUID.merge(nullable: true),
+        thumbnail: {
+          type: :object,
+          nullable: true,
+          properties: {
+            id: UUID,
+            url: { type: :string, format: :uri },
+            status: { type: :string, enum: MediaConstants::Status::ALL },
+            size_bytes: { type: :integer, nullable: true }
+          }
+        },
         created_at: DATE_TIME,
         updated_at: DATE_TIME
       ),
