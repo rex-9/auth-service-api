@@ -11,7 +11,8 @@ module IamConstants
       "users",
       "roles",
       "permissions",
-      "user_roles"
+      "user_roles",
+      "app_versions"
     ].freeze
   end
 

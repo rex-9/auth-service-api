@@ -1,4 +1,5 @@
 class V1::Admin::AppVersionsController < V1::ApplicationController
+  before_action :super_admin_required!
   before_action :set_active_version, only: %i[show update discard read_installs]
   before_action :set_version_including_discarded, only: :undiscard
 

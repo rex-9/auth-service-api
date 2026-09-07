@@ -165,7 +165,7 @@ Authorization is modeled explicitly instead of being buried in controller condit
 - Permissions cover operations such as `create`, `read`, `update`, and `delete`.
 - **Three-Tier Administrative Hierarchy & Permission Scoping**:
   - `super_admin`: Full, unrestricted authority across all resources, endpoints, and IAM governance.
-  - `admin`: Full operational authority across domain resources (`feedbacks`, `payments`, `ai`, `assets`, `logs`), strictly restricted from managing `users` and `iam`.
+  - `admin`: Full operational authority across domain resources (`feedbacks`, `payments`, `ai`, `assets`, `logs`), strictly restricted from managing `users`, `iam`, and `app_versions`.
   - Partial admins (`*_admin` naming convention): Roles named with the `_admin` suffix (e.g. `feedback_admin`, `payment_admin`) granted to users with the base `user` role.
   - **Permission Provenance & Endpoint Scoping**:
     - **`/v1/admin/*` Endpoints**: Require an admin role (a role whose name contains `admin`) that explicitly grants the required CRUD permission. Permissions inside non-admin roles (such as the base `user` role) cannot grant access to `/v1/admin/*`.
@@ -242,8 +242,8 @@ The storage abstraction defaults to **Garage** (self-hosted S3-compatible distri
 
 - **Hierarchical S3 Key Structure**:
   - Admin uploads: `admin/{type}_{name}_{timestamp}.{ext}`
-  - User uploads: `users/{user_id}/{type}_{name}_{timestamp}.{ext}`
-  - Google avatar imports: `users/{user_id}/avatar_google_{timestamp}.{ext}`
+  - User uploads: `user/{user_id}/{type}_{name}_{timestamp}.{ext}`
+  - Google avatar imports: `user/{user_id}/avatar_google_{timestamp}.{ext}`
   - **Environment Storage Partitions (`S3_FOLDER_PREFIX`)**: Garage automatically partitions new storage keys by Rails environment—`dev/` for development, `uat/` for UAT/staging, and `prod/` for production—with `S3_FOLDER_PREFIX` available as an explicit override. Partition handling belongs exclusively to Garage; asset records and admin database queries remain environment-agnostic and cover the complete assets table.
 - **Zero-Footprint Storage In-Place Rename**: When an administrator updates an asset's `type` via the Admin Portal, the backend dynamically moves the storage object (`StorageService::Client.move(old_key, new_key)`) without creating duplicate or orphaned files in Garage.
 - **Storage & VPS Capacity Monitoring**: The super-admin-only `GET /v1/admin/assets/storage_stats` endpoint polls the Garage Admin API (`S3_ADMIN_ENDPOINT=http://garage:3101`, `S3_ADMIN_TOKEN=...`) and reports bucket/VPS capacity, actual and database-tracked object/byte usage for each `dev/`, `uat/`, and `prod/` Garage partition, plus complete database asset totals. It triggers proactive low-disk alerts when free disk space falls below 15%.
@@ -361,7 +361,7 @@ That is full-stack visibility without requiring an external observability platfo
 
 The server-rendered Administrate workspace manages users, assets, access grants, IAM, payments, webhook events, chat data, client logs, app versions, and app installs.
 
-- **App versions** (`/admin/app_versions`): full version CRUD (`draft` / `published` / `yanked`, force-update flag, build numbers). `released_at` is stamped automatically on first publish (null until then).
+- **App versions** (`/admin/app_versions`): super-admin only. `draft` / `published` / `yanked`, force-update flag, build numbers. `released_at` is stamped automatically on first publish (null until then).
 - **App installs** (`/admin/app_installs`): index and show only. Rows are written by `POST /v1/app_installs`, not by the dashboard. The user show page lists only that user's latest install (`last_seen_at`), not every platform snapshot.
 
 Admin authentication uses application users over HTTP Basic and requires an `admin` or `super_admin` role.
@@ -372,7 +372,7 @@ A separate `/v1/admin` namespace supports the web admin client, exposing version
 - **IAM management**: Role management with permission matrix and permission CRUD with auto-generated names.
 - **Chat moderation**: Chat rooms and messages CRUD operations.
 - **Product management**: Stripe synchronized products with discard/undiscard operations.
-- **App versions**: JSON CRUD at `/v1/admin/app_versions` with discard/undiscard (`draft` / `published` / `yanked`, force-update flag, build numbers). `released_at` is stamped on first publish. Each version payload includes `install_count`. `GET /v1/admin/app_versions/:id/installs` lists current snapshots for that version.
+- **App versions**: JSON at `/v1/admin/app_versions` is super-admin only (same restriction as users and IAM). Includes discard/undiscard (`draft` / `published` / `yanked`, force-update flag, build numbers). `released_at` is stamped on first publish. Each version payload includes `install_count`. `GET /v1/admin/app_versions/:id/installs` lists current snapshots for that version.
 - **Notifications**: Broadcast dispatch with template catalog, multi-channel dispatch, and audience targeting (by roles, users, or all).
 
 ### Quality toolchain
@@ -391,7 +391,7 @@ Operational dashboards are mounted in the application and protected by admin aut
 | Path                  | Purpose                                      |
 | --------------------- | -------------------------------------------- |
 | `/admin`              | Administrate resource management             |
-| `/admin/app_versions` | App versions CRUD                            |
+| `/admin/app_versions` | App versions (super-admin only)              |
 | `/admin/app_installs` | App install snapshots (index/show)           |
 | `/admin/pulse`        | Request, query, and job performance          |
 | `/admin/red`          | Backend errors and diagnostics               |

@@ -2,18 +2,23 @@ require "rails_helper"
 
 RSpec.describe "V1 Admin App Versions API", type: :request do
   let(:admin) { create(:user) }
+  let(:super_admin) { create(:user) }
   let(:token) { jwt_for(admin) }
-  let(:headers) { authorization_headers(token) }
+  let(:super_token) { jwt_for(super_admin) }
+  let(:headers) { authorization_headers(super_token) }
+  let(:admin_headers) { authorization_headers(token) }
 
   before do
-    allow(CacheService).to receive(:read).and_return(token)
     allow(CacheService).to receive(:write)
+    allow(CacheService).to receive(:read).and_return(super_token)
+    allow(CacheService).to receive(:read).with("active_session:user:#{admin.id}:web").and_return(token)
     grant_admin_role(admin)
     grant_admin_permissions(admin, "app_versions", :read, :create, :update, :delete)
+    grant_super_admin_role(super_admin)
   end
 
   describe "GET /v1/admin/app_versions" do
-    it "lists versions for admins" do
+    it "lists versions for super admins" do
       create(:app_version, :published, number: "1.2.0", title: "Live")
       create(:app_version, number: "1.3.0", title: "Draft")
 
@@ -35,11 +40,18 @@ RSpec.describe "V1 Admin App Versions API", type: :request do
       expect(response_data.first.dig("attributes", "number")).to eq("1.2.0")
     end
 
+    it "forbids a regular admin even with app_versions permissions" do
+      get "/v1/admin/app_versions", headers: admin_headers
+
+      expect(response).to have_http_status(:forbidden)
+      expect(response_status["error"]).to eq(I18n.t("common.authorization.super_admin_required"))
+    end
+
     it "rejects non-admin users even with read_app_versions" do
       user = create(:user)
       user_token = jwt_for(user)
       grant_permissions(user, "app_versions", :read)
-      allow(CacheService).to receive(:read).and_return(user_token)
+      allow(CacheService).to receive(:read).with("active_session:user:#{user.id}:web").and_return(user_token)
 
       get "/v1/admin/app_versions", headers: authorization_headers(user_token)
 
@@ -112,6 +124,17 @@ RSpec.describe "V1 Admin App Versions API", type: :request do
       expect(response).to have_http_status(:unprocessable_content)
       expect(response_status["message"]).to eq(I18n.t("app_version.create_failed"))
     end
+
+    it "forbids a non-super-admin even with create_app_versions" do
+      post "/v1/admin/app_versions",
+           params: { app_version: { number: "2.0.0", title: "Next" } },
+           headers: admin_headers,
+           as: :json
+
+      expect(response).to have_http_status(:forbidden)
+      expect(response_status["error"]).to eq(I18n.t("common.authorization.super_admin_required"))
+      expect(AppVersion.count).to eq(0)
+    end
   end
 
   describe "PATCH /v1/admin/app_versions/:id" do
@@ -125,6 +148,18 @@ RSpec.describe "V1 Admin App Versions API", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(response_data).to include("title" => "New", "is_force_update" => true)
+    end
+
+    it "forbids a non-super-admin from updating" do
+      version = create(:app_version, number: "1.0.0", title: "Old")
+
+      patch "/v1/admin/app_versions/#{version.id}",
+            params: { app_version: { title: "New" } },
+            headers: admin_headers,
+            as: :json
+
+      expect(response).to have_http_status(:forbidden)
+      expect(version.reload.title).to eq("Old")
     end
   end
 
@@ -160,6 +195,15 @@ RSpec.describe "V1 Admin App Versions API", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response_status["message"]).to eq(I18n.t("app_version.restored"))
       expect(response_data["id"]).to eq(version.id)
+      expect(AppVersion.find(version.id)).to be_kept
+    end
+
+    it "forbids a non-super-admin from discarding" do
+      version = create(:app_version, number: "1.0.0")
+
+      post "/v1/admin/app_versions/#{version.id}/discard", headers: admin_headers
+
+      expect(response).to have_http_status(:forbidden)
       expect(AppVersion.find(version.id)).to be_kept
     end
   end

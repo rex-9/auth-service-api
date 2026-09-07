@@ -532,7 +532,7 @@ erDiagram
 | `id`                | `uuid`     |    ❌    | `gen_random_uuid()` | Primary Key                                                            |
 | `name`              | `string`   |    ❌    | —                   | File original name                                                     |
 | `url`               | `string`   |    ❌    | —                   | Accessible CDN or storage URL                                          |
-| `storage_key`       | `string`   |    ✔️    | `NULL`              | Cloud bucket path (e.g. `avatars/name_12345`)                          |
+| `storage_key`       | `string`   |    ✔️    | `NULL`              | Cloud bucket path (e.g. `user/{user_id}/avatar_profile_12345.png`)     |
 | `type`              | `string`   |    ❌    | `"general"`         | `general`, `avatar`, `audio`, `video`, `document` (STI disabled)       |
 | `source`            | `string`   |    ❌    | `"upload"`          | Source: `upload`, `google`                                             |
 | `format`            | `string`   |    ✔️    | `NULL`              | Format mime/type (e.g. `png`, `mp4`, `webm`)                           |

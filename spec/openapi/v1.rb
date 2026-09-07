@@ -880,6 +880,7 @@ module Openapi
           get: operation(
             tags: "Admin / App Versions",
             summary: "List app versions for the admin client",
+            description: "Super-admin only.",
             parameters: [
               query_parameter(:status, enum: AppVersionConstants::Status::ALL),
               query_parameter(:page, type: :integer),
@@ -892,6 +893,7 @@ module Openapi
           post: operation(
             tags: "Admin / App Versions",
             summary: "Create an app version",
+            description: "Super-admin only.",
             success: 201,
             body: ref(:admin_app_version_request),
             errors: [ 401, 403, 422 ]
@@ -901,6 +903,7 @@ module Openapi
           get: operation(
             tags: "Admin / App Versions",
             summary: "List discarded app versions",
+            description: "Super-admin only.",
             parameters: [
               query_parameter(:page, type: :integer),
               query_parameter(:limit, type: :integer),
@@ -914,12 +917,14 @@ module Openapi
           get: operation(
             tags: "Admin / App Versions",
             summary: "Get an app version",
+            description: "Super-admin only.",
             parameters: [ path_parameter(:id) ],
             errors: [ 401, 403, 404 ]
           ),
           patch: operation(
             tags: "Admin / App Versions",
             summary: "Update an app version",
+            description: "Super-admin only.",
             parameters: [ path_parameter(:id) ],
             body: ref(:admin_app_version_request),
             errors: [ 401, 403, 404, 422 ]
@@ -929,6 +934,7 @@ module Openapi
           post: operation(
             tags: "Admin / App Versions",
             summary: "Discard an app version",
+            description: "Super-admin only.",
             parameters: [ path_parameter(:id) ],
             errors: [ 401, 403, 404 ]
           )
@@ -937,6 +943,7 @@ module Openapi
           post: operation(
             tags: "Admin / App Versions",
             summary: "Restore a discarded app version",
+            description: "Super-admin only.",
             parameters: [ path_parameter(:id) ],
             errors: [ 401, 403, 404 ]
           )
@@ -945,6 +952,7 @@ module Openapi
           get: operation(
             tags: "Admin / App Versions",
             summary: "List current installs for an app version",
+            description: "Super-admin only.",
             parameters: [
               path_parameter(:id),
               query_parameter(:page, type: :integer),
