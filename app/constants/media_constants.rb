@@ -58,6 +58,8 @@ module MediaConstants
     ASSET_COMPRESSING = "asset_compressing".freeze
     ASSET_COMPRESSED = "asset_compressed".freeze
     ASSET_COMPRESSION_FAILED = "asset_compression_failed".freeze
+    ASSET_THUMBNAIL_GENERATED = "asset_thumbnail_generated".freeze
+    ASSET_THUMBNAIL_FAILED = "asset_thumbnail_failed".freeze
   end
 
   # Compressible formats

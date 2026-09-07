@@ -140,6 +140,9 @@ Rails.application.routes.draw do
           post :discard
           post :undiscard
           post :update_compress, path: "compress"
+          get :read_download, path: "download"
+          post :update_thumbnail_regenerate, path: "thumbnail/regenerate"
+          post :update_thumbnail_upload, path: "thumbnail/upload"
         end
       end
 

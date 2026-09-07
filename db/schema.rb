@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_05_100002) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_07_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "uuid-ossp"
@@ -55,6 +55,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_100002) do
     t.string "extension"
     t.string "format"
     t.string "name", null: false
+    t.uuid "parent_asset_id"
     t.bigint "size_bytes"
     t.string "source", default: "upload", null: false
     t.string "status", default: "pending", null: false
@@ -70,6 +71,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_100002) do
     t.index ["discarded_at"], name: "index_assets_on_discarded_at"
     t.index ["discarded_by_id"], name: "index_assets_on_discarded_by_id"
     t.index ["name"], name: "index_assets_on_name"
+    t.index ["parent_asset_id"], name: "index_assets_on_parent_asset_id", unique: true
     t.index ["status"], name: "index_assets_on_status"
     t.index ["type"], name: "index_assets_on_type"
     t.index ["undiscarded_by_id"], name: "index_assets_on_undiscarded_by_id"
@@ -1078,6 +1080,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_100002) do
   add_foreign_key "accesses", "users", column: "discarded_by_id"
   add_foreign_key "accesses", "users", column: "undiscarded_by_id"
   add_foreign_key "accesses", "users", column: "updated_by_id"
+  add_foreign_key "assets", "assets", column: "parent_asset_id"
   add_foreign_key "assets", "users", column: "created_by_id"
   add_foreign_key "assets", "users", column: "discarded_by_id"
   add_foreign_key "assets", "users", column: "undiscarded_by_id"

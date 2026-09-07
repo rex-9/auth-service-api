@@ -271,6 +271,7 @@ class V1::AssetsController < V1::ApplicationController
 
     if asset.compressible_video?
       Media::CompressVideoJob.perform_later(asset_id: asset.id)
+      Media::GenerateVideoThumbnailJob.perform_later(asset_id: asset.id)
       Rails.logger.info("[AssetsController] Enqueued video compression for asset #{asset.id}")
     elsif asset.compressible_image?
       Media::CompressImageJob.perform_later(asset_id: asset.id)

@@ -539,6 +539,7 @@ erDiagram
 | `status`            | `string`   |    ❌    | `"pending"`         | Pipeline status: `pending`, `processing`, `ready`, `optimal`, `failed` |
 | `assetable_type`    | `string`   |    ✔️    | `NULL`              | Polymorphic owner type (`User`, `Chat::Message`, etc.)                 |
 | `assetable_id`      | `uuid`     |    ✔️    | `NULL`              | Polymorphic owner ID                                                   |
+| `parent_asset_id`   | `uuid`     |    ✔️    | `NULL`              | Original video for a generated thumbnail asset                         |
 | `created_by_id`     | `uuid`     |    ✔️    | `NULL`              | Auditing: Creator                                                      |
 | `updated_by_id`     | `uuid`     |    ✔️    | `NULL`              | Auditing: Modifier                                                     |
 | `discarded_by_id`   | `uuid`     |    ✔️    | `NULL`              | Auditing: Discarder                                                    |
@@ -552,6 +553,7 @@ erDiagram
 
 - `index_assets_on_url` (UNIQUE: `url`)
 - `index_assets_on_assetable_type_and_assetable_id` (`assetable_type`, `assetable_id`)
+- `index_assets_on_parent_asset_id` (`parent_asset_id`, UNIQUE)
 - `index_assets_on_name` (`name`)
 - `index_assets_on_status` (`status`)
 - `index_assets_on_type` (`type`)
@@ -560,6 +562,10 @@ erDiagram
 **Storage Partition Independence**:
 
 - `Asset` has no knowledge of Garage environment partitions and all model and controller queries cover the complete assets table. Garage alone applies or preserves `dev/`, `uat/`, and `prod/` storage-key prefixes. Super-admin storage statistics aggregate every database asset.
+
+**Generated Video Thumbnails**:
+
+- A video may own one generated thumbnail through the unique self-reference `assets.parent_asset_id`. Thumbnail generation runs asynchronously on the `media` queue, stores a WebP object beside its source video, and preserves the original asset's polymorphic owner.
 
 ---
 

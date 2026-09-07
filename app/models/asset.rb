@@ -6,6 +6,13 @@ class Asset < ApplicationRecord
   self.inheritance_column = nil
 
   belongs_to :assetable, polymorphic: true, optional: true
+  belongs_to :parent_asset, class_name: "Asset", optional: true
+  has_one :thumbnail,
+          -> { where(type: AssetConstants::AssetType::THUMBNAIL) },
+          class_name: "Asset",
+          foreign_key: :parent_asset_id,
+          dependent: :destroy,
+          inverse_of: :parent_asset
 
   validates :name, presence: true
   validates :url, presence: true, uniqueness: true
