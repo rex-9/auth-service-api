@@ -1,6 +1,49 @@
-# app/constants/notification_constants/default_notifications.rb
+# frozen_string_literal: true
 
+# app/constants/notification_constants.rb
 module NotificationConstants
+  module AudienceType
+    ALL       = "all".freeze
+    ROLES     = "roles".freeze
+    USERS     = "users".freeze
+    AUDIENCES = [ ALL, ROLES, USERS ].freeze
+  end
+
+  module Category
+    SYSTEM    = "system".freeze
+    MARKETING = "marketing".freeze
+    BROADCAST = "broadcast".freeze
+
+    ALL = [
+      SYSTEM,
+      MARKETING,
+      BROADCAST
+    ].freeze
+  end
+
+  module Channel
+    SOCKET   = "socket".freeze
+    PUSH     = "push".freeze
+    EMAIL    = "email".freeze
+    CHANNELS = [ SOCKET, PUSH, EMAIL ].freeze
+    ALL      = CHANNELS
+  end
+
+  module NotificationType
+    PAYMENT_SUCCESS       = "payment_success".freeze
+    PAYMENT_FAILED        = "payment_failed".freeze
+    SUBSCRIPTION_CREATED  = "subscription_created".freeze
+    SUBSCRIPTION_CANCELED = "subscription_canceled".freeze
+    SUBSCRIPTION_RESUMED  = "subscription_resumed".freeze
+    AI_RESPONSE_READY     = "ai_response_ready".freeze
+    AI_RESPONSE_FAILED    = "ai_response_failed".freeze
+    TTS_READY             = "tts_ready".freeze
+    TTS_FAILED            = "tts_failed".freeze
+    WELCOME               = "welcome".freeze
+    SIGN_IN_ALERT         = "sign_in_alert".freeze
+    NOTIFICATION          = "notification".freeze
+  end
+
   module DefaultNotifications
     ALL = [
       {

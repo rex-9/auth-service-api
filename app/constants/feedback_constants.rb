@@ -1,5 +1,6 @@
-# app/constants/feedback_constants.rb
+# frozen_string_literal: true
 
+# app/constants/feedback_constants.rb
 module FeedbackConstants
   module Status
     NEW         = "new".freeze

@@ -1,5 +1,6 @@
-# app/constants/access_constants/access_status.rb
+# frozen_string_literal: true
 
+# app/constants/access_constants.rb
 module AccessConstants
   module AccessStatus
     ACTIVE  = "active".freeze

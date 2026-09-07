@@ -1,5 +1,6 @@
-# app/constants/seed_constants.rb
+# frozen_string_literal: true
 
+# app/constants/seed_constants.rb
 module SeedConstants
   module RoleDescriptions
     SUPER_ADMIN = "Full system access".freeze

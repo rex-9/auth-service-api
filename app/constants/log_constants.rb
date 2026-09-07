@@ -1,5 +1,6 @@
-# app/constants/log_constants.rb
+# frozen_string_literal: true
 
+# app/constants/log_constants.rb
 module LogConstants
   module Severity
     DEBUG    = "debug".freeze
