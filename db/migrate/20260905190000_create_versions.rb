@@ -36,8 +36,5 @@ class CreateVersions < ActiveRecord::Migration[8.1]
               name: "index_versions_on_one_published_kept"
     add_index :versions, :released_at
     add_index :versions, :discarded_at
-
-    add_reference :feedbacks, :version, type: :uuid, foreign_key: { on_delete: :nullify }
-    add_reference :log_clients, :version, type: :uuid, foreign_key: { on_delete: :nullify }
   end
 end

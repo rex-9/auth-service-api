@@ -30,6 +30,11 @@ class CreateLogClients < ActiveRecord::Migration[8.1]
                     type: :uuid,
                     foreign_key: true                                 # Authenticated user if available
 
+      # ===== Versioning =====
+      t.references :version,
+                    type: :uuid,
+                    foreign_key: { on_delete: :nullify }               # Version if available
+
       # ===== URL & ROUTE =====
       t.string :url                                                   # Full URL where error occurred
       t.string :method                                                # HTTP method (GET, POST, etc.)
