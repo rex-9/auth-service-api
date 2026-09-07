@@ -89,6 +89,35 @@ RSpec.describe StorageService::Garage do
     end
   end
 
+  describe "#storage_stats" do
+    it "reports Garage usage for every environment partition" do
+      allow(adapter).to receive(:require).with("net/http")
+      allow(adapter).to receive(:require).with("json")
+      allow(Net::HTTP).to receive(:start).and_raise(Errno::ECONNREFUSED)
+
+      partition_objects = {
+        "dev/" => [ double("Object", size: 100), double("Object", size: 200) ],
+        "uat/" => [ double("Object", size: 300) ],
+        "prod/" => [ double("Object", size: 400), double("Object", size: 500) ]
+      }
+      allow(s3_client).to receive(:list_objects_v2) do |prefix:, **|
+        double(
+          "ListOutput",
+          contents: partition_objects.fetch(prefix),
+          is_truncated: false
+        )
+      end
+
+      stats = adapter.storage_stats
+
+      expect(stats[:partitions]).to eq(
+        "dev" => { bytes: 300, objects: 2 },
+        "uat" => { bytes: 300, objects: 1 },
+        "prod" => { bytes: 900, objects: 2 }
+      )
+    end
+  end
+
   context "when S3_FOLDER_PREFIX is configured" do
     before do
       stub_const("AppConfig::S3_FOLDER_PREFIX", "prod")

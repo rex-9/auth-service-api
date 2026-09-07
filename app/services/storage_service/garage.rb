@@ -293,6 +293,7 @@ module StorageService
         bucket: @bucket,
         bucket_bytes: bucket_bytes,
         bucket_objects: bucket_objects,
+        partitions: environment_partition_stats,
         disk_available_bytes: disk_avail,
         disk_total_bytes: disk_total,
         disk_used_percent: disk_used_percent,
@@ -306,6 +307,7 @@ module StorageService
         bucket: @bucket,
         bucket_bytes: 0,
         bucket_objects: 0,
+        partitions: empty_environment_partition_stats,
         disk_available_bytes: 0,
         disk_total_bytes: 0,
         disk_used_percent: nil,
@@ -316,6 +318,35 @@ module StorageService
     end
 
     private
+
+    def environment_partition_stats
+      ENVIRONMENT_PREFIXES.index_with do |prefix|
+        bytes = 0
+        objects = 0
+        continuation_token = nil
+
+        loop do
+          options = { bucket: @bucket, prefix: "#{prefix}/" }
+          options[:continuation_token] = continuation_token if continuation_token.present?
+          response = @client.list_objects_v2(**options)
+
+          bytes += response.contents.sum(&:size)
+          objects += response.contents.size
+          break unless response.is_truncated
+
+          continuation_token = response.next_continuation_token
+        end
+
+        { bytes: bytes, objects: objects }
+      end
+    rescue Aws::S3::Errors::ServiceError => e
+      Rails.logger.warn("#{LOG_PREFIX} Could not fetch environment partition stats: #{e.message}")
+      empty_environment_partition_stats
+    end
+
+    def empty_environment_partition_stats
+      ENVIRONMENT_PREFIXES.index_with { { bytes: 0, objects: 0 } }
+    end
 
     def folder_prefix
       raw = if defined?(AppConfig::S3_FOLDER_PREFIX)
