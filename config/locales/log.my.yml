@@ -1,6 +1,6 @@
 my:
-  log:
-    clients:
+  client:
+    logs:
       occurrence_recorded: "Client log မှတ်တမ်းတင်ပြီးပါပြီ"
       created: "Client log ဖန်တီးပြီးပါပြီ"
       create_failed: "Client log ဖန်တီး၍ မရပါ"

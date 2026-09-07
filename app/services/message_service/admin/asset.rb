@@ -20,6 +20,12 @@ module MessageService
       COMPRESSION_NOT_SUPPORTED = "admin.asset.compression_not_supported".freeze
       COMPRESSION_IN_PROGRESS = "admin.asset.compression_in_progress".freeze
       COMPRESSION_COMPLETED = "admin.asset.compression_completed".freeze
+      THUMBNAIL_GENERATED = "admin.asset.thumbnail_generated".freeze
+      THUMBNAIL_FAILED = "admin.asset.thumbnail_failed".freeze
+      THUMBNAIL_REGENERATION_QUEUED = "admin.asset.thumbnail_regeneration_queued".freeze
+      THUMBNAIL_REPLACED = "admin.asset.thumbnail_replaced".freeze
+      THUMBNAIL_IMAGE_REQUIRED = "admin.asset.thumbnail_image_required".freeze
+      VIDEO_REQUIRED = "admin.asset.video_required".freeze
       COMPRESSION_FAILED = "admin.asset.compression_failed".freeze
       COMPRESSION_OPTIMAL = "admin.asset.compression_optimal".freeze
       COMPRESSION_ALREADY_OPTIMAL = "admin.asset.compression_already_optimal".freeze

@@ -2,7 +2,7 @@
 
 class V1::Admin::AssetsController < V1::ApplicationController
   before_action :super_admin_required!, only: :read_storage_stats
-  before_action :set_active_asset, only: %i[show update discard update_compress]
+  before_action :set_active_asset, only: %i[show update discard update_compress read_download update_thumbnail_regenerate update_thumbnail_upload]
   before_action :set_asset_including_discarded, only: %i[undiscard destroy]
 
   # GET /v1/admin/assets
@@ -406,7 +406,72 @@ class V1::Admin::AssetsController < V1::ApplicationController
     )
   end
 
+  def read_download
+    filename = File.basename(@asset.name).gsub(/[\r\n"]/, "_")
+    render_json_response(
+      status_code: 200,
+      message: admin_asset_message(MessageService::Admin::Asset::ASSET_RETRIEVED),
+      data: { download_url: @asset.storage_url(response_content_disposition: %(attachment; filename="#{filename}")) }
+    )
+  end
+
+  def update_thumbnail_regenerate
+    unless @asset.compressible_video?
+      message = admin_asset_message(MessageService::Admin::Asset::VIDEO_REQUIRED)
+      render_json_response(status_code: 422, message: message, error: message)
+      return
+    end
+
+    Media::GenerateVideoThumbnailJob.perform_later(asset_id: @asset.id, replace: true)
+    render_json_response(
+      status_code: 202,
+      message: admin_asset_message(MessageService::Admin::Asset::THUMBNAIL_REGENERATION_QUEUED),
+      data: { asset: AssetSerializer.new(@asset.reload).serializable_hash[:data][:attributes] }
+    )
+  end
+
+  def update_thumbnail_upload
+    file = params[:file]
+    unless @asset.compressible_video? && file.present? && file.content_type.to_s.start_with?("image/")
+      message = admin_asset_message(MessageService::Admin::Asset::THUMBNAIL_IMAGE_REQUIRED)
+      render_json_response(status_code: 422, message: message, error: message)
+      return
+    end
+
+    result = StorageService::Client.upload(
+      file,
+      storage_key: AssetConstants::AssetName.thumbnail_for(@asset, version: SecureRandom.uuid),
+      resource_type: "image"
+    )
+    replace_thumbnail!(@asset, result, fallback_size: file.size)
+    render_json_response(
+      status_code: 200,
+      message: admin_asset_message(MessageService::Admin::Asset::THUMBNAIL_REPLACED),
+      data: { asset: AssetSerializer.new(@asset.reload).serializable_hash[:data][:attributes] }
+    )
+  rescue StandardError
+    StorageService::Client.delete(result[:storage_key]) if result&.dig(:storage_key)
+    raise
+  end
+
   private
+
+  def replace_thumbnail!(asset, result, fallback_size:)
+    Asset.transaction do
+      asset.thumbnail&.destroy!
+      Asset.create!(
+        name: result[:storage_key], url: result[:url],
+        type: AssetConstants::AssetType::THUMBNAIL,
+        format: AssetConstants::AssetFormat::IMAGE,
+        extension: result[:format].presence || MediaConstants::IMAGE_EXT_WEBP,
+        size_bytes: result[:bytes] || fallback_size,
+        source: AssetConstants::AssetSource::UPLOAD,
+        status: MediaConstants::Status::READY,
+        storage_key: result[:storage_key], assetable: asset.assetable,
+        parent_asset: asset, created_by_id: current_user.id
+      )
+    end
+  end
 
   def admin_asset_message(key, **options)
     MessageService::Admin::Asset.t(key, **options)
@@ -478,6 +543,7 @@ class V1::Admin::AssetsController < V1::ApplicationController
 
     if asset.compressible_video?
       Media::CompressVideoJob.perform_later(asset_id: asset.id)
+      Media::GenerateVideoThumbnailJob.perform_later(asset_id: asset.id)
       Rails.logger.info("[AssetsController] Enqueued video compression for asset #{asset.id}")
     elsif asset.compressible_image?
       Media::CompressImageJob.perform_later(asset_id: asset.id)

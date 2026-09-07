@@ -53,7 +53,7 @@ Iam::Permission.find_each do |perm|
   Iam::RolePermission.create!(role: super_admin, permission: perm)
 end
 
-# Admin: ALL permissions EXCEPT User and IAM management
+# Admin: ALL permissions EXCEPT User, IAM, version, and user version management
 Iam::Permission.where.not(resource: IamConstants::Role::RESTRICTED_FOR_ADMIN).find_each do |perm|
   Iam::RolePermission.create!(role: admin, permission: perm)
 end

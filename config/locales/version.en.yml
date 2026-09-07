@@ -1,0 +1,12 @@
+en:
+  version:
+    current_fetched: "Client::Version fetched successfully."
+    fetched: "Versions fetched successfully."
+    created: "Client::Version created successfully."
+    create_failed: "Client::Version could not be created."
+    updated: "Client::Version updated successfully."
+    update_failed: "Client::Version could not be updated."
+    discarded: "Client::Version discarded successfully."
+    discarded_fetched: "Discarded versions fetched successfully."
+    restored: "Client::Version restored successfully."
+    not_found: "Client::Version not found."

@@ -1,6 +1,6 @@
-# app/models/log_client.rb
-class Log::Client < ApplicationRecord
-  self.table_name = "log_clients"
+# app/models/client/log_client.rb
+class Client::Log < ApplicationRecord
+  self.table_name = "client_logs"
 
   # ===== ENUMS =====
   enum :severity, {
@@ -26,6 +26,7 @@ class Log::Client < ApplicationRecord
   # ===== ASSOCIATIONS =====
   belongs_to :user, optional: true
   belongs_to :resolved_by, class_name: "User", optional: true
+  belongs_to :version, class_name: "Client::Version", optional: true
 
   # ===== VALIDATIONS =====
   validates :message, presence: true

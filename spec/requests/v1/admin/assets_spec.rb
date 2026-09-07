@@ -219,6 +219,97 @@ RSpec.describe "V1 Admin Assets API", type: :request do
     end
   end
 
+  describe "GET /v1/admin/assets/:id/download" do
+    it "returns an attachment URL for the asset" do
+      asset = create(:asset, name: "demo video.mp4")
+      allow_any_instance_of(Asset).to receive(:storage_url).and_return("https://assets.example.com/download")
+
+      get "/v1/admin/assets/#{asset.id}/download", headers: headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response_status["success"]).to be(true)
+      expect(response_data["download_url"]).to eq("https://assets.example.com/download")
+    end
+  end
+
+  describe "POST /v1/admin/assets/:id/thumbnail/regenerate" do
+    let(:video_asset) { create(:asset, format: "video", extension: "mp4") }
+
+    before { allow(Media::GenerateVideoThumbnailJob).to receive(:perform_later) }
+
+    it "accepts and queues replacement thumbnail generation" do
+      post "/v1/admin/assets/#{video_asset.id}/thumbnail/regenerate", headers: headers
+
+      expect(response).to have_http_status(:accepted)
+      expect(response_status["success"]).to be(true)
+      expect(Media::GenerateVideoThumbnailJob).to have_received(:perform_later).with(
+        asset_id: video_asset.id,
+        replace: true
+      )
+    end
+
+    it "rejects non-video assets" do
+      image = create(:asset, format: "image", extension: "png")
+
+      post "/v1/admin/assets/#{image.id}/thumbnail/regenerate", headers: headers
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response_status["success"]).to be(false)
+    end
+  end
+
+  describe "POST /v1/admin/assets/:id/thumbnail/upload" do
+    let(:video_asset) { create(:asset, format: "video", extension: "mp4") }
+    let(:image_file) { fixture_file_upload("avatar.png", "image/png") }
+
+    before do
+      allow(StorageService::Client).to receive(:upload).and_return(
+        storage_key: "dev/admin/thumbnail_replacement.webp",
+        url: "https://assets.example.com/thumbnail-replacement.webp",
+        bytes: 512,
+        format: "webp"
+      )
+      allow(StorageService::Client).to receive(:delete).and_return(true)
+    end
+
+    it "replaces the existing thumbnail record and storage object" do
+      previous = create(
+        :asset,
+        type: "thumbnail",
+        format: "image",
+        extension: "webp",
+        parent_asset: video_asset,
+        storage_key: "dev/admin/thumbnail_previous.webp"
+      )
+
+      post "/v1/admin/assets/#{video_asset.id}/thumbnail/upload",
+           params: { file: image_file },
+           headers: headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response_status["success"]).to be(true)
+      expect(Asset.exists?(previous.id)).to be(false)
+      expect(video_asset.reload.thumbnail.storage_key).to eq("dev/admin/thumbnail_replacement.webp")
+      expect(response_data.dig("asset", "thumbnail", "url")).to include("dev/admin/thumbnail_replacement.webp")
+      expect(StorageService::Client).to have_received(:delete).with(
+        "dev/admin/thumbnail_previous.webp",
+        resource_type: "image"
+      )
+    end
+
+    it "rejects a non-image replacement" do
+      document = fixture_file_upload("report.pdf", "application/pdf")
+
+      post "/v1/admin/assets/#{video_asset.id}/thumbnail/upload",
+           params: { file: document },
+           headers: headers
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response_status["success"]).to be(false)
+      expect(StorageService::Client).not_to have_received(:upload)
+    end
+  end
+
   describe "GET /v1/admin/assets/storage_stats" do
     it "returns storage statistics" do
       grant_super_admin_role(admin)

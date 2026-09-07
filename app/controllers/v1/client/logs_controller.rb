@@ -1,10 +1,10 @@
-# app/controllers/v1/log/clients_controller.rb
-class V1::Log::ClientsController < V1::ApplicationController
+# app/controllers/v1/client/logs_controller.rb
+class V1::Client::LogsController < V1::ApplicationController
   skip_before_action :authenticate_user!, only: [ :create ]
   before_action :set_log_client, only: [ :show, :update_resolve, :update_unresolve, :discard ]
   before_action :set_log_client_including_discarded, only: [ :undiscard, :destroy ]
 
-  # POST /log/clients
+  # POST /v1/client/logs
   def create
     log_client = find_or_initialize_log
 
@@ -20,7 +20,8 @@ class V1::Log::ClientsController < V1::ApplicationController
       )
     else
       # New log - assign attributes and save
-      log_client.assign_attributes(log_client_params)
+      log_client.assign_attributes(log_client_params.except(:app_version))
+      log_client.version_id = Client::Version.lookup_by_number(log_client_params[:app_version])&.id
       log_client.user = current_user if current_user.present?
       log_client.severity ||= "error"
       log_client.request_id ||= request.request_id
@@ -43,14 +44,14 @@ class V1::Log::ClientsController < V1::ApplicationController
     end
   end
 
-  # GET /log/clients
+  # GET /v1/client/logs
   def index
-    logs = Log::Client.all
+    logs = Client::Log.all
     logs = apply_filters(logs)
     logs = sort(logs, columns: SortConstants::Columns::CLIENT_LOG)
 
     pagy, records = pagy(logs)
-    serialized = Log::ClientSerializer.paginated(records, pagy)
+    serialized = Client::LogSerializer.paginated(records, pagy)
 
     render_json_response(
       status_code: 200,
@@ -60,38 +61,38 @@ class V1::Log::ClientsController < V1::ApplicationController
     )
   end
 
-  # GET /log/clients/:id
+  # GET /v1/client/logs/:id
   def show
     render_json_response(
       status_code: 200,
       message: log_message(MessageService::Log::FETCHED_ONE),
-      data: Log::ClientSerializer.new(@log_client).serializable_hash[:data]
+      data: Client::LogSerializer.new(@log_client).serializable_hash[:data]
     )
   end
 
-  # PATCH /log/clients/:id/resolve
+  # PUT /v1/client/logs/:id/resolve
   def update_resolve
     @log_client.resolve!(resolved_by: current_user)
 
     render_json_response(
       status_code: 200,
       message: log_message(MessageService::Log::RESOLVED),
-      data: Log::ClientSerializer.new(@log_client).serializable_hash[:data]
+      data: Client::LogSerializer.new(@log_client).serializable_hash[:data]
     )
   end
 
-  # PATCH /log/clients/:id/unresolve
+  # PUT /v1/client/logs/:id/unresolve
   def update_unresolve
     @log_client.unresolve!
 
     render_json_response(
       status_code: 200,
       message: log_message(MessageService::Log::UNRESOLVED),
-      data: Log::ClientSerializer.new(@log_client).serializable_hash[:data]
+      data: Client::LogSerializer.new(@log_client).serializable_hash[:data]
     )
   end
 
-  # POST /log/clients/:id/discard
+  # POST /v1/client/logs/:id/discard
   def discard
     @log_client.discard!
 
@@ -101,18 +102,18 @@ class V1::Log::ClientsController < V1::ApplicationController
     )
   end
 
-  # POST /log/clients/:id/undiscard
+  # POST /v1/client/logs/:id/undiscard
   def undiscard
     @log_client.undiscard!
 
     render_json_response(
       status_code: 200,
       message: log_message(MessageService::Log::RESOLVED),
-      data: Log::ClientSerializer.new(@log_client).serializable_hash[:data]
+      data: Client::LogSerializer.new(@log_client).serializable_hash[:data]
     )
   end
 
-  # DELETE /log/clients/:id
+  # DELETE /v1/client/logs/:id
   def destroy
     @log_client.destroy!
 
@@ -129,11 +130,11 @@ class V1::Log::ClientsController < V1::ApplicationController
   end
 
   def set_log_client
-    @log_client = Log::Client.find(params[:id])
+    @log_client = Client::Log.find(params[:id])
   end
 
   def set_log_client_including_discarded
-    @log_client = Log::Client.with_discarded.find(params[:id])
+    @log_client = Client::Log.with_discarded.find(params[:id])
   end
 
   def log_client_params
@@ -162,7 +163,7 @@ class V1::Log::ClientsController < V1::ApplicationController
       method: params[:log][:method]
     }.compact
 
-    Log::Client.find_or_initialize_by(conditions)
+    Client::Log.find_or_initialize_by(conditions)
   end
 
   def apply_filters(logs)

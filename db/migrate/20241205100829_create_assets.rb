@@ -14,6 +14,11 @@ class CreateAssets < ActiveRecord::Migration[8.1]
       t.uuid :assetable_id                                              # ID of the associated resource
       t.string :status, null: false, default: "pending"                   # Processing Status ("ready", "pending", "processing", "failed")
 
+      t.references :parent_asset,
+                  type: :uuid,
+                  index: { unique: true },
+                  foreign_key: { to_table: :assets }
+
       # ===== AUDIT =====
       t.references :created_by,
                    type: :uuid,

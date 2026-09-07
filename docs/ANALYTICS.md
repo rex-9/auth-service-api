@@ -49,7 +49,7 @@ Every analytics query flows through [`AnalyticsService::Overview`](file:///Users
 
 | Section | Method | Output Shape | Existing Models Queried |
 |---|---|---|---|
-| **KPIs** | `build_kpis` | `Hash<Symbol, Numeric>` | `User.kept`, `Payment::Transaction.kept`, `Payment::Subscription.kept`, `Chat::Message.kept`, `Feedback.kept`, `Log::Client.kept`, `Asset.all`. |
+| **KPIs** | `build_kpis` | `Hash<Symbol, Numeric>` | `User.kept`, `Payment::Transaction.kept`, `Payment::Subscription.kept`, `Chat::Message.kept`, `Feedback.kept`, `Client::Log.kept`, `Asset.all`. |
 | **Time Series** | `build_time_series` | `Array<Hash>` | Chronological data points grouped by UTC buckets (`hourly`, `daily`, `monthly`) based on date range duration. |
 | **Breakdowns** | `build_breakdowns` | `Hash<Symbol, Hash>` | Categorical distributions (e.g. feedback ratings 1..10, subscriptions by cycle, client errors by platform). |
 
@@ -273,7 +273,7 @@ The analytics engine automatically maps presets defined in `AnalyticsConstants::
 ## 🛡️ 5. Golden Rules for Analytics
 
 1. **Always Use `.kept` for Soft-Deleted Models**:
-   - `User.kept`, `Payment::Transaction.kept`, `Payment::Subscription.kept`, `Chat::Message.kept`, `Feedback.kept`, `Log::Client.kept`.
+   - `User.kept`, `Payment::Transaction.kept`, `Payment::Subscription.kept`, `Chat::Message.kept`, `Feedback.kept`, `Client::Log.kept`.
    - Never query discarded records in operational KPIs unless explicitly auditing the recycle bin.
 2. **Never Perform N+1 Queries**:
    - Always group using database aggregations (`group_count`, `group_sum`, `group(:column).count`).

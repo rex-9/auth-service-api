@@ -39,6 +39,10 @@ tags:
   description: Admin analytics overview metrics and KPIs.
 - name: Admin / Assets
   description: Admin asset management, upload, and media compression.
+- name: Admin / Versions
+  description: Super-admin only version CRUD with discard and restore.
+- name: Admin / User Versions
+  description: Super-admin only current user version snapshots.
 - name: IAM Permissions
   description: Super-admin permission management.
 - name: IAM Roles
@@ -49,6 +53,8 @@ tags:
   description: Products, checkout sessions, subscriptions, and transactions.
 - name: Accesses
   description: Product-access inspection and revocation.
+- name: Versions
+  description: Public force-update check and authenticated install recording.
 - name: Feedbacks
   description: User feedback submission and inspection.
 - name: Assets
@@ -251,9 +257,11 @@ components:
           - notifications
           - ai
           - speech
-          - clients
+          - logs
           - feedbacks
           - analytics
+          - versions
+          - user_versions
           example: users
       required: []
     admin_user_request:
@@ -312,6 +320,66 @@ components:
           required: []
       required:
       - user
+    user_version_request:
+      type: object
+      properties:
+        user_version:
+          type: object
+          properties:
+            version:
+              type: string
+              example: 1.2.0
+              description: Client marketing semver x.y.z
+            version_code:
+              type: integer
+              minimum: 1
+              nullable: true
+              example: 84
+              description: Optional client build number
+          required:
+          - version
+      required:
+      - user_version
+    admin_version_request:
+      type: object
+      properties:
+        version:
+          type: object
+          properties:
+            number:
+              type: string
+              example: 1.2.0
+              description: Marketing semver x.y.z
+            title:
+              type: string
+              example: Spring release
+            description:
+              type: string
+              nullable: true
+              example: Release notes
+            is_force_update:
+              type: boolean
+              example: false
+            status:
+              type: string
+              enum:
+              - draft
+              - published
+              - yanked
+              example: draft
+            ios_build_number:
+              type: integer
+              minimum: 1
+              nullable: true
+              example: 90
+            android_build_number:
+              type: integer
+              minimum: 1
+              nullable: true
+              example: 84
+          required: []
+      required:
+      - version
     admin_chat_room_request:
       type: object
       properties:
@@ -491,6 +559,8 @@ components:
               type: string
               nullable: true
               example: 1.0.0
+              description: Client marketing semver. Looked up against versions.number
+                and stored as version_id. Unknown or missing leaves version_id null.
             os:
               type: string
               nullable: true
@@ -664,6 +734,8 @@ components:
             app_version:
               type: string
               nullable: true
+              description: Client marketing semver. Looked up against versions.number
+                and stored as version_id. Unknown or missing leaves version_id null.
             browser:
               type: string
               nullable: true
@@ -716,12 +788,8 @@ components:
       properties:
         event:
           type: string
-          enum:
-          - general_announcement
-          - maintenance_notice
-          - feature_update
-          description: Admin-enabled event whose server-side template supplies the
-            title and message.
+          description: Notification event or UUID whose server-side template supplies
+            the title and message.
         audience:
           description: Use exactly one audience shape. Role matches use OR semantics
             and each user is notified once.
@@ -806,6 +874,14 @@ components:
         size_bytes:
           type: integer
           description: Exact file size in bytes.
+      required:
+      - file
+    asset_thumbnail_upload_request:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
       required:
       - file
     checkout_session_request:
@@ -1542,6 +1618,7 @@ components:
           - pending
           - processing
           - ready
+          - optimal
           - failed
         assetable_type:
           type: string
@@ -1551,6 +1628,31 @@ components:
           type: string
           format: uuid
           nullable: true
+        parent_asset_id:
+          type: string
+          format: uuid
+          nullable: true
+        thumbnail:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            url:
+              type: string
+              format: uri
+            status:
+              type: string
+              enum:
+              - pending
+              - processing
+              - ready
+              - optimal
+              - failed
+            size_bytes:
+              type: integer
+              nullable: true
         created_at:
           type: string
           format: date-time
@@ -2314,6 +2416,735 @@ paths:
             schema:
               type: object
               additionalProperties: true
+  "/v1/client/versions/current":
+    get:
+      tags:
+      - Versions
+      summary: Check the latest live app version and whether the client should update
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: version
+        in: query
+        required: false
+        description: Client marketing semver x.y.z
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+      description: Public splash check. Query version (semver) drives update_required,
+        must_update, and skip_premium. Missing or invalid JWT still returns 200. A
+        valid JWT requires read_versions. Install tracking is POST /v1/client/versions/user-version.
+  "/v1/client/versions/user-version":
+    post:
+      tags:
+      - Versions
+      summary: Record the current user's version for this platform
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '422':
+          description: Unprocessable Content
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      description: Authenticated upsert of Client::UserVersion for the current user
+        and X-Platform. Requires create_user_versions. version is required marketing
+        semver; version_code is optional.
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/user_version_request"
+  "/v1/admin/client/versions":
+    get:
+      tags:
+      - Admin / Versions
+      summary: List versions for the admin client
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - draft
+          - published
+          - yanked
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - asc
+          - desc
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      description: Super-admin only.
+      security:
+      - bearerAuth: []
+    post:
+      tags:
+      - Admin / Versions
+      summary: Create a version
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '422':
+          description: Unprocessable Content
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      description: Super-admin only.
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/admin_version_request"
+  "/v1/admin/client/versions/discarded":
+    get:
+      tags:
+      - Admin / Versions
+      summary: List discarded versions
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - asc
+          - desc
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      description: Super-admin only.
+      security:
+      - bearerAuth: []
+  "/v1/admin/client/versions/{id}":
+    get:
+      tags:
+      - Admin / Versions
+      summary: Get a version
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      description: Super-admin only.
+      security:
+      - bearerAuth: []
+    put:
+      tags:
+      - Admin / Versions
+      summary: Update a version
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '422':
+          description: Unprocessable Content
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      description: Super-admin only.
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/admin_version_request"
+  "/v1/admin/client/versions/{id}/discard":
+    post:
+      tags:
+      - Admin / Versions
+      summary: Discard a version
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      description: Super-admin only.
+      security:
+      - bearerAuth: []
+  "/v1/admin/client/versions/{id}/undiscard":
+    post:
+      tags:
+      - Admin / Versions
+      summary: Restore a discarded version
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      description: Super-admin only.
+      security:
+      - bearerAuth: []
+  "/v1/admin/client/versions/{id}/user_versions":
+    get:
+      tags:
+      - Admin / Versions
+      summary: List current user versions for a version
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - asc
+          - desc
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      description: Super-admin only.
+      security:
+      - bearerAuth: []
+  "/v1/admin/client/versions/user_versions":
+    get:
+      tags:
+      - Admin / User Versions
+      summary: List current user versions
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: platform
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - web
+          - android
+          - ios
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - asc
+          - desc
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      description: Super-admin only. All current user+platform snapshots under the
+        versions admin namespace.
+      security:
+      - bearerAuth: []
   "/v1/users/current":
     get:
       tags:
@@ -5121,7 +5952,7 @@ paths:
                 "$ref": "#/components/schemas/error_response"
       security:
       - bearerAuth: []
-  "/v1/log/clients":
+  "/v1/client/logs":
     get:
       tags:
       - Client Logs
@@ -5261,7 +6092,7 @@ paths:
           application/json:
             schema:
               "$ref": "#/components/schemas/client_log_request"
-  "/v1/log/clients/{id}":
+  "/v1/client/logs/{id}":
     get:
       tags:
       - Client Logs
@@ -5378,7 +6209,7 @@ paths:
                 "$ref": "#/components/schemas/error_response"
       security:
       - bearerAuth: []
-  "/v1/log/clients/{id}/resolve":
+  "/v1/client/logs/{id}/resolve":
     put:
       tags:
       - Client Logs
@@ -5437,7 +6268,7 @@ paths:
                 "$ref": "#/components/schemas/error_response"
       security:
       - bearerAuth: []
-  "/v1/log/clients/{id}/unresolve":
+  "/v1/client/logs/{id}/unresolve":
     put:
       tags:
       - Client Logs
@@ -7584,6 +8415,207 @@ paths:
                 "$ref": "#/components/schemas/error_response"
       security:
       - bearerAuth: []
+  "/v1/admin/assets/{id}/download":
+    get:
+      tags:
+      - Admin / Assets
+      summary: Get a signed attachment URL for an asset
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+  "/v1/admin/assets/{id}/thumbnail/regenerate":
+    post:
+      tags:
+      - Admin / Assets
+      summary: Queue video thumbnail regeneration
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '202':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '422':
+          description: Unprocessable Content
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+  "/v1/admin/assets/{id}/thumbnail/upload":
+    post:
+      tags:
+      - Admin / Assets
+      summary: Upload and replace a video thumbnail
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '422':
+          description: Unprocessable Content
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              "$ref": "#/components/schemas/asset_thumbnail_upload_request"
   "/v1/assets":
     get:
       tags:

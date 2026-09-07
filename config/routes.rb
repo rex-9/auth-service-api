@@ -39,6 +39,11 @@ Rails.application.routes.draw do
     resources :assets, only: %i[index show new create edit update destroy]
     resources :accesses, only: %i[index show new create edit update destroy]
     resources :feedbacks, only: %i[index show new create edit update destroy]
+    namespace :client do
+      resources :logs, only: %i[index show new create edit update destroy]
+      resources :versions, only: %i[index show new create edit update destroy]
+      resources :user_versions, only: %i[index show]
+    end
 
     namespace :iam do
       resources :permissions, only: %i[index show new create edit update destroy]
@@ -57,10 +62,6 @@ Rails.application.routes.draw do
     namespace :chat do
       resources :rooms, only: %i[index show new create edit update destroy]
       resources :messages, only: %i[index show new create edit update destroy]
-    end
-
-    namespace :log do
-      resources :clients, only: %i[index show new create edit update destroy]
     end
 
     resources :notifications, only: %i[index show new create edit update destroy]
@@ -104,9 +105,8 @@ Rails.application.routes.draw do
   # API V1 - All API routes should be API-only (no new/edit)
   # ============================================================
   namespace :v1 do
-    # Client Logging
-    namespace :log do
-      resources :clients, only: [ :create, :index, :show, :destroy ] do
+    namespace :client do
+      resources :logs, only: [ :create, :index, :show, :destroy ] do
         member do
           put :update_resolve, path: "resolve"
           put :update_unresolve, path: "unresolve"
@@ -114,6 +114,8 @@ Rails.application.routes.draw do
           post :undiscard
         end
       end
+      get "versions/current", to: "versions#read_current"
+      post "versions/user-version", to: "user_versions#create_install"
     end
 
     # ===== USERS =====
@@ -140,6 +142,9 @@ Rails.application.routes.draw do
           post :discard
           post :undiscard
           post :update_compress, path: "compress"
+          get :read_download, path: "download"
+          post :update_thumbnail_regenerate, path: "thumbnail/regenerate"
+          post :update_thumbnail_upload, path: "thumbnail/upload"
         end
       end
 
@@ -204,6 +209,21 @@ Rails.application.routes.draw do
       resources :accesses, only: %i[index show create update destroy]
 
       resources :feedbacks, only: %i[index show update destroy]
+
+      namespace :client do
+        resources :versions, only: %i[index show create update] do
+          collection do
+            get :read_discarded, path: "discarded"
+            get "user_versions", to: "user_versions#index"
+          end
+
+          member do
+            get :read_user_versions, path: "user_versions"
+            post :discard
+            post :undiscard
+          end
+        end
+      end
 
       get "analytics/overview", to: "analytics#read_overview"
     end

@@ -1,7 +1,7 @@
-# db/migrate/xxxx_create_log_clients.rb
-class CreateLogClients < ActiveRecord::Migration[8.1]
+# db/migrate/xxxx_create_client_logs.rb
+class CreateClientLogs < ActiveRecord::Migration[8.1]
   def change
-    create_table :log_clients, id: :uuid do |t|
+    create_table :client_logs, id: :uuid do |t|
       # ===== CORE ERROR DATA =====
       t.string :message, null: false                                  # Error message
       t.string :severity, null: false, default: "error"               # debug | info | warning | error | critical
@@ -18,7 +18,6 @@ class CreateLogClients < ActiveRecord::Migration[8.1]
       # ===== PLATFORM & APP =====
       t.string :platform                                              # web | ios | android
       t.string :environment                                           # development | staging | production
-      t.string :app_version                                           # App version + build number
       t.string :browser                                               # Browser name + version
       t.string :os                                                    # OS name
       t.string :os_version                                            # OS version
@@ -30,6 +29,11 @@ class CreateLogClients < ActiveRecord::Migration[8.1]
       t.references :user,
                     type: :uuid,
                     foreign_key: true                                 # Authenticated user if available
+
+      # ===== Versioning =====
+      t.references :version,
+                    type: :uuid,
+                    foreign_key: { to_table: :client_versions, on_delete: :nullify } # Client::Version if available
 
       # ===== URL & ROUTE =====
       t.string :url                                                   # Full URL where error occurred
@@ -60,15 +64,15 @@ class CreateLogClients < ActiveRecord::Migration[8.1]
     end
 
     # ===== INDEXES =====
-    add_index :log_clients, :severity                                 # Filter by severity
-    add_index :log_clients, :platform                                 # Filter by platform
-    add_index :log_clients, :environment                              # Filter by environment
-    add_index :log_clients, :created_at                               # Sort by creation time
-    add_index :log_clients, :resolved_at                              # Filter resolved/unresolved
-    add_index :log_clients, [ :platform, :severity ]                  # Common filter combo
-    add_index :log_clients, [ :user_id, :created_at ]                 # User's errors in chronological order
-    add_index :log_clients, :local_storage_keys, using: :gin          # Search by storage keys
-    add_index :log_clients, :session_storage_keys, using: :gin        # Search by storage keys
-    add_index :log_clients, :discarded_at                             # Soft delete filtering
+    add_index :client_logs, :severity                                 # Filter by severity
+    add_index :client_logs, :platform                                 # Filter by platform
+    add_index :client_logs, :environment                              # Filter by environment
+    add_index :client_logs, :created_at                               # Sort by creation time
+    add_index :client_logs, :resolved_at                              # Filter resolved/unresolved
+    add_index :client_logs, [ :platform, :severity ]                  # Common filter combo
+    add_index :client_logs, [ :user_id, :created_at ]                 # User's errors in chronological order
+    add_index :client_logs, :local_storage_keys, using: :gin          # Search by storage keys
+    add_index :client_logs, :session_storage_keys, using: :gin        # Search by storage keys
+    add_index :client_logs, :discarded_at                             # Soft delete filtering
   end
 end
