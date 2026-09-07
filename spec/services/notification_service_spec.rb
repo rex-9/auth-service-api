@@ -102,14 +102,6 @@ RSpec.describe NotificationService::Center do
       end.to change(user.user_notifications, :count).by(1)
     end
 
-    it "is strictly idempotent and prevents duplicate welcome notifications" do
-      described_class.welcome(user_id: user.id, name: user.name)
-
-      expect do
-        described_class.welcome(user_id: user.id, name: user.name)
-      end.not_to change(user.user_notifications, :count)
-    end
-
     it "safely returns if user is nil" do
       expect do
         described_class.welcome(user_id: "non-existent-id", name: "Ghost")

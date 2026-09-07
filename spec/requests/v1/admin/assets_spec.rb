@@ -45,6 +45,16 @@ RSpec.describe "V1 Admin Assets API", type: :request do
       expect(response_data.size).to eq(1)
       expect(response_data.first.dig("attributes", "id")).to eq(needle.id)
     end
+
+    it "safely handles serialization when AppConfig::S3_FOLDER_PREFIX is undefined" do
+      hide_const("AppConfig::S3_FOLDER_PREFIX")
+      create(:asset, name: "Resilient Asset", storage_key: "dev/images/resilient.png")
+
+      get "/v1/admin/assets", headers: headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response_data.first.dig("attributes", "name")).to eq("Resilient Asset")
+    end
   end
 
   describe "GET /v1/admin/assets/:id" do
@@ -208,6 +218,30 @@ RSpec.describe "V1 Admin Assets API", type: :request do
       expect(stats["bucket_objects"]).to eq(5)
       expect(stats["db_assets_count"]).to eq(2)
       expect(stats["db_assets_bytes"]).to eq(2000)
+    end
+
+    it "scopes db_assets_count and db_assets_bytes strictly to current environment" do
+      stub_const("AppConfig::S3_FOLDER_PREFIX", "dev")
+      allow(StorageService::Client).to receive(:storage_stats).and_return(
+        provider: "garage",
+        bucket: "rexone",
+        bucket_bytes: 5000,
+        bucket_objects: 5,
+        disk_available_bytes: 50_000_000_000,
+        disk_total_bytes: 60_000_000_000,
+        disk_used_percent: 16.7,
+        disk_free_percent: 83.3,
+        node_capacity_bytes: 1_000_000_000
+      )
+      create(:asset, storage_key: "dev/images/1.png", size_bytes: 1000)
+      create(:asset, storage_key: "prod/images/2.png", size_bytes: 5000)
+
+      get "/v1/admin/assets/storage_stats", headers: headers
+
+      expect(response).to have_http_status(:ok)
+      stats = response_data.dig("stats")
+      expect(stats["db_assets_count"]).to eq(1)
+      expect(stats["db_assets_bytes"]).to eq(1000)
     end
   end
 

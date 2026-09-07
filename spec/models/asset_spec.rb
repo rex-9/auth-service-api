@@ -154,5 +154,33 @@ RSpec.describe Asset, type: :model do
       expect(described_class.failed).to include(fail_asset)
       expect(described_class.failed).not_to include(ready_asset, proc_asset, opt_asset)
     end
+
+    describe "environment scoping" do
+      it "scopes to dev/ folder when S3_FOLDER_PREFIX is 'dev' and excludes foreign environments" do
+        stub_const("AppConfig::S3_FOLDER_PREFIX", "dev")
+
+        dev_asset = create(:asset, storage_key: "dev/admin/test.png")
+        prod_asset = create(:asset, storage_key: "prod/admin/test.png")
+        uat_asset = create(:asset, storage_key: "uat/admin/test.png")
+        root_asset = create(:asset, storage_key: "admin/test.png")
+        google_asset = create(:asset, source: "google", storage_key: nil)
+
+        results = described_class.all
+        expect(results).to include(dev_asset, google_asset)
+        expect(results).not_to include(prod_asset, uat_asset, root_asset)
+      end
+
+      it "scopes to prod/ folder when S3_FOLDER_PREFIX is 'prod' and excludes foreign environments" do
+        stub_const("AppConfig::S3_FOLDER_PREFIX", "prod")
+
+        dev_asset = create(:asset, storage_key: "dev/admin/test.png")
+        prod_asset = create(:asset, storage_key: "prod/admin/test.png")
+        uat_asset = create(:asset, storage_key: "uat/admin/test.png")
+
+        results = described_class.all
+        expect(results).to include(prod_asset)
+        expect(results).not_to include(dev_asset, uat_asset)
+      end
+    end
   end
 end

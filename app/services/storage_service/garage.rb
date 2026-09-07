@@ -142,14 +142,13 @@ module StorageService
     end
 
     def list(prefix = nil, options = {})
-      effective_prefix = if AppConfig::S3_FOLDER_PREFIX.present?
-        prefix_str = AppConfig::S3_FOLDER_PREFIX.to_s.strip
+      effective_prefix = if folder_prefix
         if prefix.blank?
-          "#{prefix_str}/"
-        elsif prefix.to_s.start_with?("#{prefix_str}/")
+          "#{folder_prefix}/"
+        elsif prefix.to_s.start_with?("#{folder_prefix}/")
           prefix.to_s
         else
-          "#{prefix_str}/#{prefix.to_s.sub(%r{\A/+}, '')}"
+          "#{folder_prefix}/#{prefix.to_s.sub(%r{\A/+}, '')}"
         end
       else
         prefix
@@ -317,15 +316,23 @@ module StorageService
 
     private
 
+    def folder_prefix
+      raw = if defined?(AppConfig::S3_FOLDER_PREFIX)
+              AppConfig::S3_FOLDER_PREFIX
+      else
+              ENV["S3_FOLDER_PREFIX"]
+      end
+      raw.to_s.strip.presence
+    end
+
     def apply_prefix(key)
       return key.to_s if key.blank?
-      prefix = AppConfig::S3_FOLDER_PREFIX.to_s.strip
-      return key.to_s if prefix.empty?
+      return key.to_s unless folder_prefix
 
-      if key.to_s.start_with?("#{prefix}/")
+      if key.to_s.start_with?("#{folder_prefix}/")
         key.to_s
       else
-        "#{prefix}/#{key.to_s.sub(%r{\A/+}, '')}"
+        "#{folder_prefix}/#{key.to_s.sub(%r{\A/+}, '')}"
       end
     end
 

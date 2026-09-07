@@ -30,6 +30,17 @@ class Asset < ApplicationRecord
   scope :processing, -> { where(status: MediaConstants::Status::PROCESSING) }
   scope :failed, -> { where(status: MediaConstants::Status::FAILED) }
 
+  KNOWN_ENVIRONMENT_PREFIXES = %w[dev uat prod].freeze
+
+  def self.current_folder_prefix
+    raw = if defined?(AppConfig::S3_FOLDER_PREFIX)
+            AppConfig::S3_FOLDER_PREFIX
+    else
+            ENV["S3_FOLDER_PREFIX"]
+    end
+    raw.to_s.strip.gsub(%r{\A/+|/+$}, "").presence
+  end
+
   def delete_from_storage
     return unless storage_key.present?
 
