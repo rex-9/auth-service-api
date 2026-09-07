@@ -3,46 +3,48 @@
 module AssetConstants
   module AssetName
     TTS_MESSAGE_PREFIX = "tts_message_".freeze
+    ADMIN_NAMESPACE = "admin".freeze
+    USER_NAMESPACE = "user".freeze
 
     def self.google_profile(user_id)
-      "user/#{user_id}/avatar_google_#{Time.now.to_i}".freeze
+      "#{USER_NAMESPACE}/#{user_id}/avatar_google_#{Time.now.to_i}".freeze
     end
 
     def self.tts_for_message(message_id)
-      "admin/audio_tts_message_#{message_id}_#{Time.now.to_i}.mp3".freeze
+      "#{ADMIN_NAMESPACE}/audio_tts_message_#{message_id}_#{Time.now.to_i}.mp3".freeze
     end
 
     def self.for_admin(type:, original_filename:)
       ext = File.extname(original_filename.to_s).downcase
       base = File.basename(original_filename.to_s, ext).parameterize(separator: "_").presence || "asset"
-      "admin/#{type}_#{base}_#{Time.now.to_i}#{ext}".freeze
+      "#{ADMIN_NAMESPACE}/#{type}_#{base}_#{Time.now.to_i}#{ext}".freeze
     end
 
     def self.for_user(user_id:, type:, original_filename:)
       ext = File.extname(original_filename.to_s).downcase
       base = File.basename(original_filename.to_s, ext).parameterize(separator: "_").presence || "asset"
-      "user/#{user_id}/#{type}_#{base}_#{Time.now.to_i}#{ext}".freeze
+      "#{USER_NAMESPACE}/#{user_id}/#{type}_#{base}_#{Time.now.to_i}#{ext}".freeze
     end
 
     def self.rename_type(old_key, new_type, user_id = nil)
       return old_key if old_key.blank? || new_type.blank?
 
       key_str = old_key.to_s
-      if key_str.start_with?("admin/")
-        filename = key_str.delete_prefix("admin/")
+      if key_str.start_with?("#{ADMIN_NAMESPACE}/")
+        filename = key_str.delete_prefix("#{ADMIN_NAMESPACE}/")
         parts = filename.split("_", 2)
         new_filename = parts.length > 1 ? "#{new_type}_#{parts[1]}" : "#{new_type}_#{filename}"
-        "admin/#{new_filename}".freeze
-      elsif key_str.start_with?("user/")
+        "#{ADMIN_NAMESPACE}/#{new_filename}".freeze
+      elsif key_str.start_with?("#{USER_NAMESPACE}/")
         segments = key_str.split("/", 3)
         if segments.length == 3
           uid = segments[1]
           filename = segments[2]
           parts = filename.split("_", 2)
           new_filename = parts.length > 1 ? "#{new_type}_#{parts[1]}" : "#{new_type}_#{filename}"
-          "user/#{uid}/#{new_filename}".freeze
+          "#{USER_NAMESPACE}/#{uid}/#{new_filename}".freeze
         else
-          "user/#{user_id || 'general'}/#{new_type}_#{File.basename(key_str)}".freeze
+          "#{USER_NAMESPACE}/#{user_id || 'general'}/#{new_type}_#{File.basename(key_str)}".freeze
         end
       else
         ext = File.extname(key_str)
@@ -50,9 +52,9 @@ module AssetConstants
         parts = base.split("_", 2)
         rest = parts.length > 1 ? parts[1] : base
         if user_id.present?
-          "user/#{user_id}/#{new_type}_#{rest}#{ext}".freeze
+          "#{USER_NAMESPACE}/#{user_id}/#{new_type}_#{rest}#{ext}".freeze
         else
-          "admin/#{new_type}_#{rest}#{ext}".freeze
+          "#{ADMIN_NAMESPACE}/#{new_type}_#{rest}#{ext}".freeze
         end
       end
     end

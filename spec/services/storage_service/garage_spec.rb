@@ -179,12 +179,12 @@ RSpec.describe StorageService::Garage do
       ])
       expect(s3_client).to receive(:list_objects_v2).with(
         bucket: "rexone",
-        prefix: "prod/users",
+        prefix: "prod/user",
         max_keys: 100
       ).and_return(list_output)
       allow(adapter).to receive(:url).with("prod/user/1/avatar.png").and_return("http://localhost:3100/rexone/prod/user/1/avatar.png")
 
-      results = adapter.list("users")
+      results = adapter.list("user")
       expect(results.first[:storage_key]).to eq("prod/user/1/avatar.png")
     end
   end
