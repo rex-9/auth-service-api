@@ -46,6 +46,22 @@ RSpec.describe "V1 Admin Assets API", type: :request do
       expect(response_data.first.dig("attributes", "id")).to eq(needle.id)
     end
 
+    it "lists assets from every storage partition" do
+      stub_const("AppConfig::S3_FOLDER_PREFIX", "dev")
+      dev_asset = create(:asset, storage_key: "dev/images/current.png")
+      uat_asset = create(:asset, storage_key: "uat/images/foreign.png")
+      prod_asset = create(:asset, storage_key: "prod/images/foreign.png")
+
+      get "/v1/admin/assets", headers: headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response_data.map { |asset| asset.dig("attributes", "id") }).to contain_exactly(
+        dev_asset.id,
+        uat_asset.id,
+        prod_asset.id
+      )
+    end
+
     it "safely handles serialization when AppConfig::S3_FOLDER_PREFIX is undefined" do
       hide_const("AppConfig::S3_FOLDER_PREFIX")
       create(:asset, name: "Resilient Asset", storage_key: "dev/images/resilient.png")
@@ -67,6 +83,16 @@ RSpec.describe "V1 Admin Assets API", type: :request do
       expect(response_data.dig("asset", "id")).to eq(asset.id)
       expect(response_data.dig("asset", "status")).to eq("ready")
       expect(response_data.dig("asset")).not_to have_key("created_by_id")
+    end
+
+    it "allows direct access to an asset from another environment partition" do
+      stub_const("AppConfig::S3_FOLDER_PREFIX", "dev")
+      prod_asset = create(:asset, storage_key: "prod/images/shared.png")
+
+      get "/v1/admin/assets/#{prod_asset.id}", headers: headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response_data.dig("asset", "id")).to eq(prod_asset.id)
     end
   end
 
@@ -195,6 +221,7 @@ RSpec.describe "V1 Admin Assets API", type: :request do
 
   describe "GET /v1/admin/assets/storage_stats" do
     it "returns storage statistics" do
+      grant_super_admin_role(admin)
       allow(StorageService::Client).to receive(:storage_stats).and_return(
         provider: "garage",
         bucket: "rexone",
@@ -220,7 +247,8 @@ RSpec.describe "V1 Admin Assets API", type: :request do
       expect(stats["db_assets_bytes"]).to eq(2000)
     end
 
-    it "scopes db_assets_count and db_assets_bytes strictly to current environment" do
+    it "counts database assets across all environment partitions" do
+      grant_super_admin_role(admin)
       stub_const("AppConfig::S3_FOLDER_PREFIX", "dev")
       allow(StorageService::Client).to receive(:storage_stats).and_return(
         provider: "garage",
@@ -240,8 +268,15 @@ RSpec.describe "V1 Admin Assets API", type: :request do
 
       expect(response).to have_http_status(:ok)
       stats = response_data.dig("stats")
-      expect(stats["db_assets_count"]).to eq(1)
-      expect(stats["db_assets_bytes"]).to eq(1000)
+      expect(stats["db_assets_count"]).to eq(2)
+      expect(stats["db_assets_bytes"]).to eq(6000)
+    end
+
+    it "requires super admin access" do
+      get "/v1/admin/assets/storage_stats", headers: headers
+
+      expect(response).to have_http_status(:forbidden)
+      expect(response_status["error"]).to eq(I18n.t("common.authorization.super_admin_required"))
     end
   end
 

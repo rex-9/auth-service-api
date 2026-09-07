@@ -557,9 +557,9 @@ erDiagram
 - `index_assets_on_type` (`type`)
 - `index_assets_on_discarded_at` (`discarded_at`)
 
-**Environment Isolation**:
+**Storage Partition Independence**:
 
-- Environment partitioning is a model default: ordinary `Asset` queries are restricted to the active Rails environment folder (`dev/%`, `uat/%`, or `prod/%`), with `S3_FOLDER_PREFIX` as an explicit override. This prevents cross-environment leakage through APIs, jobs, associations, and statistics. `Asset.for_environment(prefix)` explicitly selects a partition.
+- `Asset` has no knowledge of Garage environment partitions and all model and controller queries cover the complete assets table. Garage alone applies or preserves `dev/`, `uat/`, and `prod/` storage-key prefixes. Super-admin storage statistics aggregate every database asset.
 
 ---
 

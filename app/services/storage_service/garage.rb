@@ -5,6 +5,7 @@ require_relative "error"
 module StorageService
   class Garage < Base
     LOG_PREFIX = "[Garage]".freeze
+    ENVIRONMENT_PREFIXES = %w[dev uat prod].freeze
 
     attr_reader :client, :public_client
 
@@ -322,18 +323,17 @@ module StorageService
       else
               ENV["S3_FOLDER_PREFIX"]
       end
-      raw.to_s.strip.presence
+      raw.to_s.strip.gsub(%r{\A/+|/+$}, "").presence
     end
 
     def apply_prefix(key)
       return key.to_s if key.blank?
       return key.to_s unless folder_prefix
 
-      if key.to_s.start_with?("#{folder_prefix}/")
-        key.to_s
-      else
-        "#{folder_prefix}/#{key.to_s.sub(%r{\A/+}, '')}"
-      end
+      normalized_key = key.to_s.sub(%r{\A/+}, "")
+      return normalized_key if ENVIRONMENT_PREFIXES.any? { |prefix| normalized_key.start_with?("#{prefix}/") }
+
+      "#{folder_prefix}/#{normalized_key}"
     end
 
     def generate_storage_key(file)

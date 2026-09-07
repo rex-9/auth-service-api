@@ -244,9 +244,9 @@ The storage abstraction defaults to **Garage** (self-hosted S3-compatible distri
   - Admin uploads: `admin/{type}_{name}_{timestamp}.{ext}`
   - User uploads: `users/{user_id}/{type}_{name}_{timestamp}.{ext}`
   - Google avatar imports: `users/{user_id}/avatar_google_{timestamp}.{ext}`
-  - **Environment Scoping (`S3_FOLDER_PREFIX`)**: Automatically partitions storage keys by Rails environment—`dev/` for development, `uat/` for UAT/staging, and `prod/` for production—with `S3_FOLDER_PREFIX` available as an explicit override. `Asset` applies the active partition as a model default, so admin panels, APIs, jobs, statistics, and associations cannot fetch foreign-stage records accidentally.
+  - **Environment Storage Partitions (`S3_FOLDER_PREFIX`)**: Garage automatically partitions new storage keys by Rails environment—`dev/` for development, `uat/` for UAT/staging, and `prod/` for production—with `S3_FOLDER_PREFIX` available as an explicit override. Partition handling belongs exclusively to Garage; asset records and admin database queries remain environment-agnostic and cover the complete assets table.
 - **Zero-Footprint Storage In-Place Rename**: When an administrator updates an asset's `type` via the Admin Portal, the backend dynamically moves the storage object (`StorageService::Client.move(old_key, new_key)`) without creating duplicate or orphaned files in Garage.
-- **Storage & VPS Capacity Monitoring**: `GET /v1/admin/assets/storage_stats` polls the Garage Admin API (`S3_ADMIN_ENDPOINT=http://garage:3101`, `S3_ADMIN_TOKEN=...`) to return real-time bucket usage (bytes, object count) and VPS host disk capacity (total/free bytes, used/free percentages), triggering proactive low-disk alerts when free disk space falls below 15%.
+- **Storage & VPS Capacity Monitoring**: The super-admin-only `GET /v1/admin/assets/storage_stats` endpoint polls the Garage Admin API (`S3_ADMIN_ENDPOINT=http://garage:3101`, `S3_ADMIN_TOKEN=...`) and reports bucket/VPS capacity plus database asset totals across all environment partitions, triggering proactive low-disk alerts when free disk space falls below 15%.
 - **Automated Backup Scripts**:
   - `scripts/backup_db.sh`: Automated PostgreSQL database dumps with 7-day rolling retention.
   - `scripts/backup_garage.sh`: Automated Garage metadata & block backups with 7-day rolling retention.

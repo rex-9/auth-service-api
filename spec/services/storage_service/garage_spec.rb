@@ -2,6 +2,7 @@ require "rails_helper"
 
 RSpec.describe StorageService::Garage do
   before do
+    stub_const("AppConfig::S3_FOLDER_PREFIX", nil)
     unless defined?(Aws::S3::Client)
       stub_const("Aws::S3::Client", Class.new { def initialize(*_args, **_kwargs); end })
       stub_const("Aws::S3::Presigner", Class.new { def initialize(*_args, **_kwargs); end })
@@ -123,6 +124,12 @@ RSpec.describe StorageService::Garage do
 
       result = adapter.upload(file_double, storage_key: "prod/users/1/avatar.png")
       expect(result[:storage_key]).to eq("prod/users/1/avatar.png")
+    end
+
+    it "preserves an explicit key from another environment partition" do
+      expect(s3_client).to receive(:head_object).with(bucket: "rexone", key: "uat/users/1/avatar.png")
+
+      expect(adapter.exists?("uat/users/1/avatar.png")).to be(true)
     end
 
     it "prefixes delete calls" do
