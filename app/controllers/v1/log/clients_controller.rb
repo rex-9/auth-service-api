@@ -20,7 +20,8 @@ class V1::Log::ClientsController < V1::ApplicationController
       )
     else
       # New log - assign attributes and save
-      log_client.assign_attributes(log_client_params)
+      log_client.assign_attributes(log_client_params.except(:app_version))
+      log_client.version_id = Version.lookup_by_number(log_client_params[:app_version])&.id
       log_client.user = current_user if current_user.present?
       log_client.severity ||= "error"
       log_client.request_id ||= request.request_id

@@ -12,6 +12,9 @@ class User < ApplicationRecord
   has_many :roles, through: :user_roles, class_name: "Iam::Role"
   has_many :feedbacks, dependent: :nullify
   has_many :user_notifications, dependent: :destroy
+  has_many :user_versions, dependent: :destroy
+  has_one :latest_user_version, -> { order(last_seen_at: :desc, updated_at: :desc) },
+          class_name: "UserVersion"
 
   devise :database_authenticatable, :registerable, :validatable, :confirmable,
   :recoverable, :rememberable, :lockable, :trackable, :timeoutable,

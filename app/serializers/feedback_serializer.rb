@@ -8,7 +8,7 @@ class FeedbackSerializer < ApplicationSerializer
              :priority,
              :status,
              :platform,
-             :app_version,
+             :version_id,
              :os,
              :device,
              :browser,
@@ -17,6 +17,10 @@ class FeedbackSerializer < ApplicationSerializer
              :admin_notes,
              :created_at,
              :updated_at
+
+  attribute :app_version do |feedback|
+    feedback.version&.number
+  end
 
   attribute :user_id do |feedback|
     feedback.user_id

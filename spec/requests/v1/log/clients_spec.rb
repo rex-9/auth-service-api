@@ -29,6 +29,61 @@ RSpec.describe "V1 Log Clients API", type: :request do
       expect(response_data).to include("id")
     end
 
+    it "links version_id when app_version matches a kept version" do
+      version = create(:version, number: "1.4.0")
+
+      post "/v1/log/clients",
+           params: {
+             log: {
+               message: "TypeError: Cannot read property",
+               severity: "error",
+               platform: "web",
+               environment: "production",
+               app_version: "1.4.0"
+             }
+           }
+
+      expect(response).to have_http_status(:created)
+      log = Log::Client.find(response_data["id"])
+      expect(log.version_id).to eq(version.id)
+
+      get "/v1/log/clients/#{log.id}", headers: headers
+
+      expect(response_data.dig("attributes", "version_id")).to eq(version.id)
+      expect(response_data.dig("attributes", "app_version")).to eq("1.4.0")
+    end
+
+    it "leaves version_id null when app_version is unknown" do
+      post "/v1/log/clients",
+           params: {
+             log: {
+               message: "Unknown version crash",
+               severity: "error",
+               platform: "web",
+               environment: "production",
+               app_version: "9.9.9"
+             }
+           }
+
+      expect(response).to have_http_status(:created)
+      expect(Log::Client.find(response_data["id"]).version_id).to be_nil
+    end
+
+    it "leaves version_id null when app_version is omitted" do
+      post "/v1/log/clients",
+           params: {
+             log: {
+               message: "Missing version crash",
+               severity: "error",
+               platform: "web",
+               environment: "production"
+             }
+           }
+
+      expect(response).to have_http_status(:created)
+      expect(Log::Client.find(response_data["id"]).version_id).to be_nil
+    end
+
     it "increments occurrence count for identical existing logs" do
       log = create(
         :log_client,

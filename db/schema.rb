@@ -124,7 +124,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_07_120000) do
 
   create_table "feedbacks", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.text "admin_notes"
-    t.string "app_version"
     t.string "browser"
     t.string "category", default: "general", null: false
     t.text "content", null: false
@@ -144,6 +143,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_07_120000) do
     t.datetime "updated_at", null: false
     t.uuid "updated_by_id"
     t.uuid "user_id"
+    t.uuid "version_id"
     t.index ["category"], name: "index_feedbacks_on_category"
     t.index ["created_at"], name: "index_feedbacks_on_created_at"
     t.index ["created_by_id"], name: "index_feedbacks_on_created_by_id"
@@ -156,6 +156,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_07_120000) do
     t.index ["undiscarded_by_id"], name: "index_feedbacks_on_undiscarded_by_id"
     t.index ["updated_by_id"], name: "index_feedbacks_on_updated_by_id"
     t.index ["user_id"], name: "index_feedbacks_on_user_id"
+    t.index ["version_id"], name: "index_feedbacks_on_version_id"
   end
 
   create_table "iam_permissions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -242,7 +243,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_07_120000) do
   end
 
   create_table "log_clients", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.string "app_version"
     t.string "browser"
     t.jsonb "context", default: {}
     t.jsonb "cookies", default: {}
@@ -270,6 +270,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_07_120000) do
     t.string "url"
     t.string "user_agent"
     t.uuid "user_id"
+    t.uuid "version_id"
     t.index ["created_at"], name: "index_log_clients_on_created_at"
     t.index ["created_by_id"], name: "index_log_clients_on_created_by_id"
     t.index ["discarded_at"], name: "index_log_clients_on_discarded_at"
@@ -284,6 +285,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_07_120000) do
     t.index ["updated_by_id"], name: "index_log_clients_on_updated_by_id"
     t.index ["user_id", "created_at"], name: "index_log_clients_on_user_id_and_created_at"
     t.index ["user_id"], name: "index_log_clients_on_user_id"
+    t.index ["version_id"], name: "index_log_clients_on_version_id"
   end
 
   create_table "notifications", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1029,6 +1031,33 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_07_120000) do
     t.index ["user_id"], name: "index_user_notifications_on_user_id"
   end
 
+  create_table "user_versions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.integer "build_number"
+    t.datetime "created_at", null: false
+    t.uuid "created_by_id"
+    t.datetime "discarded_at"
+    t.uuid "discarded_by_id"
+    t.datetime "last_seen_at", null: false
+    t.string "number", null: false
+    t.string "platform", null: false
+    t.datetime "undiscarded_at"
+    t.uuid "undiscarded_by_id"
+    t.datetime "updated_at", null: false
+    t.uuid "updated_by_id"
+    t.uuid "user_id", null: false
+    t.uuid "version_id"
+    t.index ["created_by_id"], name: "index_user_versions_on_created_by_id"
+    t.index ["discarded_at"], name: "index_user_versions_on_discarded_at"
+    t.index ["discarded_by_id"], name: "index_user_versions_on_discarded_by_id"
+    t.index ["last_seen_at"], name: "index_user_versions_on_last_seen_at"
+    t.index ["number"], name: "index_user_versions_on_number"
+    t.index ["undiscarded_by_id"], name: "index_user_versions_on_undiscarded_by_id"
+    t.index ["updated_by_id"], name: "index_user_versions_on_updated_by_id"
+    t.index ["user_id", "platform"], name: "index_user_versions_on_user_id_and_platform_kept", unique: true, where: "(discarded_at IS NULL)"
+    t.index ["user_id"], name: "index_user_versions_on_user_id"
+    t.index ["version_id"], name: "index_user_versions_on_version_id"
+  end
+
   create_table "users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "confirmation_code"
     t.datetime "confirmation_sent_at"
@@ -1074,6 +1103,36 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_07_120000) do
     t.index ["username"], name: "index_users_on_username", unique: true
   end
 
+  create_table "versions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.integer "android_build_number"
+    t.datetime "created_at", null: false
+    t.uuid "created_by_id"
+    t.text "description"
+    t.datetime "discarded_at"
+    t.uuid "discarded_by_id"
+    t.integer "ios_build_number"
+    t.boolean "is_force_update", default: false, null: false
+    t.string "number", null: false
+    t.datetime "released_at"
+    t.string "status", default: "draft", null: false
+    t.string "title", null: false
+    t.datetime "undiscarded_at"
+    t.uuid "undiscarded_by_id"
+    t.datetime "updated_at", null: false
+    t.uuid "updated_by_id"
+    t.index ["android_build_number"], name: "index_versions_on_android_build_number_kept", unique: true, where: "((discarded_at IS NULL) AND (android_build_number IS NOT NULL))"
+    t.index ["created_by_id"], name: "index_versions_on_created_by_id"
+    t.index ["discarded_at"], name: "index_versions_on_discarded_at"
+    t.index ["discarded_by_id"], name: "index_versions_on_discarded_by_id"
+    t.index ["ios_build_number"], name: "index_versions_on_ios_build_number_kept", unique: true, where: "((discarded_at IS NULL) AND (ios_build_number IS NOT NULL))"
+    t.index ["number"], name: "index_versions_on_number_kept", unique: true, where: "(discarded_at IS NULL)"
+    t.index ["released_at"], name: "index_versions_on_released_at"
+    t.index ["status"], name: "index_versions_on_one_published_kept", unique: true, where: "(((status)::text = 'published'::text) AND (discarded_at IS NULL))"
+    t.index ["status"], name: "index_versions_on_status"
+    t.index ["undiscarded_by_id"], name: "index_versions_on_undiscarded_by_id"
+    t.index ["updated_by_id"], name: "index_versions_on_updated_by_id"
+  end
+
   add_foreign_key "accesses", "payment_products", column: "product_id"
   add_foreign_key "accesses", "users"
   add_foreign_key "accesses", "users", column: "created_by_id"
@@ -1096,6 +1155,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_07_120000) do
   add_foreign_key "chat_rooms", "users", column: "undiscarded_by_id"
   add_foreign_key "chat_rooms", "users", column: "updated_by_id"
   add_foreign_key "feedbacks", "users"
+  add_foreign_key "feedbacks", "versions", on_delete: :nullify
   add_foreign_key "iam_permissions", "users", column: "created_by_id"
   add_foreign_key "iam_permissions", "users", column: "discarded_by_id"
   add_foreign_key "iam_permissions", "users", column: "undiscarded_by_id"
@@ -1120,6 +1180,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_07_120000) do
   add_foreign_key "log_clients", "users", column: "created_by_id"
   add_foreign_key "log_clients", "users", column: "resolved_by_id"
   add_foreign_key "log_clients", "users", column: "updated_by_id"
+  add_foreign_key "log_clients", "versions", on_delete: :nullify
   add_foreign_key "notifications", "users", column: "created_by_id"
   add_foreign_key "notifications", "users", column: "discarded_by_id"
   add_foreign_key "notifications", "users", column: "undiscarded_by_id"
@@ -1169,8 +1230,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_07_120000) do
   add_foreign_key "user_notifications", "users", column: "discarded_by_id"
   add_foreign_key "user_notifications", "users", column: "undiscarded_by_id"
   add_foreign_key "user_notifications", "users", column: "updated_by_id"
+  add_foreign_key "user_versions", "users"
+  add_foreign_key "user_versions", "users", column: "created_by_id"
+  add_foreign_key "user_versions", "users", column: "discarded_by_id"
+  add_foreign_key "user_versions", "users", column: "undiscarded_by_id"
+  add_foreign_key "user_versions", "users", column: "updated_by_id"
+  add_foreign_key "user_versions", "versions", on_delete: :nullify
   add_foreign_key "users", "users", column: "created_by_id"
   add_foreign_key "users", "users", column: "discarded_by_id"
   add_foreign_key "users", "users", column: "undiscarded_by_id"
   add_foreign_key "users", "users", column: "updated_by_id"
+  add_foreign_key "versions", "users", column: "created_by_id"
+  add_foreign_key "versions", "users", column: "discarded_by_id"
+  add_foreign_key "versions", "users", column: "undiscarded_by_id"
+  add_foreign_key "versions", "users", column: "updated_by_id"
 end

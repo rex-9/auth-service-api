@@ -15,6 +15,7 @@ class UserDashboard < Administrate::BaseDashboard
   ATTRIBUTE_TYPES = {
     id: Field::String,
     accesses: Field::HasMany,
+    latest_user_version: Field::HasOne,
     assets: Field::HasMany,
     confirmation_code: Field::String,
     confirmation_sent_at: Field::DateTime,
@@ -77,6 +78,7 @@ class UserDashboard < Administrate::BaseDashboard
   SHOW_PAGE_ATTRIBUTES = %i[
     id
     accesses
+    latest_user_version
     assets
     confirmation_code
     confirmation_sent_at

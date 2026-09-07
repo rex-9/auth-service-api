@@ -80,7 +80,7 @@ Just deliberate engineering, tested boundaries, and a foundation built to remain
 | Localization   | Request-scoped English and Myanmar responses with modular domain translations                           | [Localization](#localization)                          |
 | Data lifecycle | PostgreSQL, global soft deletion, actor-aware auditing, JSON:API serialization                          | [Data & API design](#data--api-design)                 |
 | Operations     | Performance, errors, client logs, queues, cache, cable, health checks                                   | [Observability](#observability)                        |
-| Administration | Administrate for Server plus Client Admin API for users, IAM, products, chat, assets, notifications     | [Administration](#administration)                      |
+| Administration | Administrate for Server plus Client Admin API for users, IAM, products, chat, assets, notifications, app versions | [Administration](#administration)                      |
 | Delivery       | Docker images, 5-container topology (API/waka/media/db/garage), graceful shutdown                       | [Deployment](#deployment)                              |
 | Quality        | RSpec, factories, security scanning, dependency auditing, linting                                       | [Quality toolchain](#quality-toolchain)                |
 
@@ -165,12 +165,12 @@ Authorization is modeled explicitly instead of being buried in controller condit
 - Permissions cover operations such as `create`, `read`, `update`, and `delete`.
 - **Three-Tier Administrative Hierarchy & Permission Scoping**:
   - `super_admin`: Full, unrestricted authority across all resources, endpoints, and IAM governance.
-  - `admin`: Full operational authority across domain resources (`feedbacks`, `payments`, `ai`, `assets`, `logs`), strictly restricted from managing `users` and `iam`.
+  - `admin`: Full operational authority across domain resources (`feedbacks`, `payments`, `ai`, `assets`, `logs`), strictly restricted from managing `users`, `iam`, `versions`, and `user_versions`.
   - Partial admins (`*_admin` naming convention): Roles named with the `_admin` suffix (e.g. `feedback_admin`, `payment_admin`) granted to users with the base `user` role.
   - **Permission Provenance & Endpoint Scoping**:
     - **`/v1/admin/*` Endpoints**: Require an admin role (a role whose name contains `admin`) that explicitly grants the required CRUD permission. Permissions inside non-admin roles (such as the base `user` role) cannot grant access to `/v1/admin/*`.
     - **`/v1/*` Endpoints**: Permissions in an admin role (e.g. `read_users` in `user_admin`) grant access to both `/v1/users` and `/v1/admin/users`, whereas permissions in standard user roles only grant access to `/v1/users`.
-- New users receive the default user role automatically.
+- New users receive the default user role automatically. That role includes `read_versions` (splash check when signed in) and `create_user_versions` (record the device). Public unsigned splash still skips login. Version create/update/delete stay off the default user role.
 
 This gives small products a sensible starting policy and growing products a clean path to granular authorization.
 
@@ -342,13 +342,17 @@ The API selects a locale for each request in this order:
 
 Locale switching is request-scoped through `I18n.with_locale`, preventing one request's language from leaking into another under concurrent execution. Adding another language means mirroring the modular files in `config/locales` and registering its locale code.
 
+### App version check
+
+Clients call `GET /v1/versions/current?version=1.2.0` on splash. `update_required` is true when the client marketing semver is strictly less than the live version (optional update dialog). `must_update` is true when that live version is a force update and greater than the client (blocking dialog). `skip_premium` is true when that client semver is strictly greater than the live version number (TestFlight/beta ahead of store). Store links come from `IOS_STORE_URL` / `ANDROID_STORE_URL` (`store_url` follows `X-Platform`). Version build numbers are not returned. Missing or invalid JWT still returns the latest **live** version plus computed `update_required` / `must_update` / `skip_premium`. A valid JWT requires `read_versions`. This check never writes `UserVersion`. Signed-in clients record the device with `POST /v1/versions/user-version` (`create_user_versions`, `version` required, `version_code` optional). Draft, yanked, and future `released_at` rows are excluded from the public check. Publishing a version yanks every other kept published row (only one published at a time). Version CRUD lives in Administrate at `/admin/versions` and in the JSON admin API at `/v1/admin/versions`.
+
 ### Observability
 
 Backend, frontend, synchronous, and asynchronous failures leave different clues. Rexone Core gives each one a proper home.
 
 - **Rails Pulse** tracks request, query, and background-job performance with configurable thresholds.
 - **Rails Error Dashboard** captures, groups, analyzes, and retains backend exceptions. Optional Slack, email, Discord, PagerDuty, and webhook alerts are supported but disabled by default.
-- **Client Logs** accept structured errors from web and mobile clients, including stack traces, platform/device context, severity, occurrences, and resolution state.
+- **Client Logs** accept structured errors from web and mobile clients, including stack traces, platform/device context, severity, occurrences, and resolution state. Ingest still sends `app_version`; Core stores nullable `version_id` when that number matches a kept version. Feedback ingest uses the same lookup.
 - **Solid Web UI** exposes queue, cache, and cable operations.
 - **Health checks** are available at `/up` for containers and load balancers.
 
@@ -356,7 +360,10 @@ That is full-stack visibility without requiring an external observability platfo
 
 ### Administration
 
-The server-rendered Administrate workspace manages users, assets, access grants, IAM, payments, webhook events, chat data, and client logs.
+The server-rendered Administrate workspace manages users, assets, access grants, IAM, payments, webhook events, chat data, client logs, app versions, and user versions.
+
+- **App versions** (`/admin/versions`): super-admin only. `draft` / `published` / `yanked`, force-update flag, build numbers. `released_at` is stamped automatically on first publish (null until then). Publishing yanks every other kept published version.
+- **User versions** (`/admin/user_versions`): index and show only. Rows are written by `POST /v1/versions/user-version`, not by the dashboard. The user show page lists only that user's latest user version (`last_seen_at`), not every platform snapshot.
 
 Admin authentication uses application users over HTTP Basic and requires an `admin` or `super_admin` role.
 
@@ -366,6 +373,8 @@ A separate `/v1/admin` namespace supports the web admin client, exposing version
 - **IAM management**: Role management with permission matrix and permission CRUD with auto-generated names.
 - **Chat moderation**: Chat rooms and messages CRUD operations.
 - **Product management**: Stripe synchronized products with discard/undiscard operations.
+- **App versions**: JSON at `/v1/admin/versions` is super-admin only (same restriction as users and IAM). Includes discard/undiscard (`draft` / `published` / `yanked`, force-update flag, build numbers). `released_at` is stamped on first publish. Publishing yanks every other kept published version. Each version payload includes `install_count`. `GET /v1/admin/versions/:id/user_versions` lists current snapshots for that version.
+- **User versions**: JSON at `/v1/admin/versions/user_versions` is super-admin only. Lists all current user+platform snapshots.
 - **Notifications**: Broadcast dispatch with template catalog, multi-channel dispatch, and audience targeting (by roles, users, or all).
 
 ### Quality toolchain
@@ -381,16 +390,18 @@ A separate `/v1/admin` namespace supports the web admin client, exposing version
 
 Operational dashboards are mounted in the application and protected by admin authentication. API documentation and the health endpoint are listed alongside them for convenience.
 
-| Path           | Purpose                             |
-| -------------- | ----------------------------------- |
-| `/admin`       | Administrate resource management    |
-| `/admin/pulse` | Request, query, and job performance |
-| `/admin/red`   | Backend errors and diagnostics      |
-| `/admin/queue` | Solid Queue inspection and control  |
-| `/admin/cache` | Solid Cache inspection              |
-| `/admin/cable` | Solid Cable inspection              |
-| `/api-docs`    | Swagger/OpenAPI documentation       |
-| `/up`          | Application health check            |
+| Path                  | Purpose                                      |
+| --------------------- | -------------------------------------------- |
+| `/admin`              | Administrate resource management             |
+| `/admin/versions`     | App versions (super-admin only)              |
+| `/admin/user_versions` | User version snapshots (index/show)          |
+| `/admin/pulse`        | Request, query, and job performance          |
+| `/admin/red`          | Backend errors and diagnostics               |
+| `/admin/queue`        | Solid Queue inspection and control           |
+| `/admin/cache`        | Solid Cache inspection                       |
+| `/admin/cable`        | Solid Cable inspection                       |
+| `/api-docs`           | Swagger/OpenAPI documentation                |
+| `/up`                 | Application health check                     |
 
 Client-side errors are accepted at `POST /v1/log/clients` and managed from the admin area.
 
@@ -505,6 +516,7 @@ The important groups are:
 - Media compression: `MEDIA_CONTAINER_ENABLED`, upload size limits (`MEDIA_MAX_VIDEO_SIZE_MB`, `MEDIA_MAX_NON_VIDEO_SIZE_MB`), video profile (CRF, preset, bitrate, resolution), and image profile (JPEG/PNG/WebP quality, compression).
 - Solid Queue process, supervisors (`SOLID_QUEUE_IN_PUMA`), and shutdown settings (`SOLID_QUEUE_SHUTDOWN_TIMEOUT`).
 - Observability & Error Dashboard: `DASHBOARD_BASE_URL`, `APP_VERSION`, `GIT_SHA`.
+- App store listings for force-update: `IOS_STORE_URL`, `ANDROID_STORE_URL` (returned as `store_url` on `GET /v1/versions/current`, chosen from `X-Platform`).
 
 Keep real credentials in your deployment platform or encrypted secret store—not in Git.
 
@@ -525,6 +537,7 @@ The API is broader than a starter CRUD demo. Its main route families are:
 | AI               | `/v1/ai/*`                                                               |
 | Speech           | `/v1/speech/*`, `SpeechLiveChannel` (WS)                                 |
 | Client telemetry | `/v1/log/clients`                                                        |
+| App versions     | `/v1/versions/current`, `/v1/versions/user-version`, `/v1/admin/versions`, `/v1/admin/versions/user_versions`, `/admin/versions` |
 
 Use `/api-docs` for the interactive OpenAPI view and [`config/routes.rb`](config/routes.rb) for the authoritative route map.
 

@@ -135,4 +135,22 @@ RSpec.describe User, type: :model do
       expect(described_class.jwt_revoked?({ "jti" => user.jti }, user)).to be(false)
     end
   end
+
+  describe "latest_user_version" do
+    it "returns the user version with the newest last_seen_at" do
+      user = create(:user)
+      user.user_versions.create!(
+        platform: AuthConstants::Platform::WEB,
+        number: "1.0.0",
+        last_seen_at: 2.days.ago
+      )
+      latest = user.user_versions.create!(
+        platform: AuthConstants::Platform::IOS,
+        number: "1.1.0",
+        last_seen_at: 1.hour.ago
+      )
+
+      expect(user.latest_user_version).to eq(latest)
+    end
+  end
 end
