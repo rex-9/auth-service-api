@@ -315,7 +315,7 @@ rexone/
 │   ├── logo_company_1788533943.png
 │   ├── banner_summer_sale_1788534000.webp
 │   └── product_tshirt_black_1788534200.jpg
-└── users/
+└── user/
     ├── 550e8400-e29b-41d4-a716-446655440000/
     │   ├── avatar_profile_1788533943.png
     │   ├── audio_voice_note_1788534120.mp3
@@ -324,31 +324,31 @@ rexone/
         └── avatar_profile_1788536000.jpg
 ```
 
-### 1. Short Scope Prefixes: `admin/` vs `users/`
+### 1. Short Scope Prefixes: `admin/` vs `user/`
 
 - Avoid redundant suffixes like `_uploads` (e.g. `admin_uploads/`, `user_uploads/`). In object storage, all stored objects are uploaded assets.
 - **`admin/`**: Holds platform-wide assets, system logos, marketing hero banners, static email templates, and admin catalog files.
-- **`users/`**: Scoped container for all end-user content.
+- **`user/`**: Scoped container for all end-user content.
 
-### 2. User Subfolders: `users/{user_id}/` (The Gold Standard)
+### 2. User Subfolders: `user/{user_id}/` (The Gold Standard)
 
-Partitioning user assets by `users/{user_id}/` provides critical production advantages:
+Partitioning user assets by `user/{user_id}/` provides critical production advantages:
 
-- **GDPR / Account Deletion ("Right to be Forgotten")**: When a user deletes their account, purging all their files is a single atomic S3 prefix deletion (`delete_objects` with prefix `users/{user_id}/`).
-- **Quota Tracking & Billing**: Calculating a user's total storage consumption requires only a single S3 query: sum the `size` of all objects with prefix `users/{user_id}/`.
+- **GDPR / Account Deletion ("Right to be Forgotten")**: When a user deletes their account, purging all their files is a single atomic S3 prefix deletion (`delete_objects` with prefix `user/{user_id}/`).
+- **Quota Tracking & Billing**: Calculating a user's total storage consumption requires only a single S3 query: sum the `size` of all objects with prefix `user/{user_id}/`.
 - **Zero Collision Risk**: Multiple users can upload `photo.jpg` simultaneously without name collision.
 - **Intuitive GUI Browsing**: In Cyberduck or S3 browsers, you see organized per-user folders rather than tens of thousands of loose files in a single flat directory.
 
 ### 3. Put `type` in the Filename, NOT as a Subfolder
 
-**Why avoid `users/{user_id}/{type}/` subfolders?**
+**Why avoid `user/{user_id}/{type}/` subfolders?**
 
 - **Types are Mutable**: An asset's `type` often evolves over time (e.g., from `general` to `avatar`, or from `attachment` to `document`).
 - **Moving Files in S3 is Costly**: Object storage does not have a native "rename" or "move" operation. Moving a file requires `CopyObject` (copying the entire byte stream) + `DeleteObject` (deleting the old key). This invalidates cached presigned URLs, introduces race conditions, and requires updating database references.
 - **Folder Proliferation**: Most users only upload 1–3 files (e.g. 1 avatar). Creating separate subfolders (`/avatar/`, `/audio/`, `/document/`, `/general/`) for every user creates excessive empty folders and navigation friction in S3 GUIs.
 
 **Recommended Filename Pattern:**
-`users/{user_id}/{type}_{sanitized_basename}_{timestamp}.{ext}`
+`user/{user_id}/{type}_{sanitized_basename}_{timestamp}.{ext}`
 and for admins:
 `admin/{type}_{sanitized_basename}_{timestamp}.{ext}`
 

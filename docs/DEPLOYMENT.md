@@ -90,8 +90,8 @@ flowchart TD
   - Volumes: `rexone-garage-meta` and `rexone-garage-data`
   - Network: Connected to both `prod-rexone-net` and `uat-rexone-net`
 - **Environment Isolation via Folder Partitioning (`S3_FOLDER_PREFIX`):**
-  - **Production:** `S3_FOLDER_PREFIX=prod` → all uploads are saved under `prod/users/...`, `prod/user_uploads/...`
-  - **UAT:** `S3_FOLDER_PREFIX=uat` → all uploads are saved under `uat/users/...`, `uat/user_uploads/...`
+  - **Production:** `S3_FOLDER_PREFIX=prod` → user uploads are saved under `prod/user/...`
+  - **UAT:** `S3_FOLDER_PREFIX=uat` → user uploads are saved under `uat/user/...`
   - `StorageService::Garage` handles prefix application and transparent listing/deletions automatically without code changes in controllers or jobs.
 
 ---
@@ -280,8 +280,7 @@ After deploying all services, verify each component:
 - [ ] **API Health:** `curl -fsS https://api.rexone.me/up` returns `HTTP 200 OK`.
 - [ ] **Action Cable WebSockets:** Browser connects to `wss://api.rexone.me/cable` with `201/101 Switching Protocols` without origin rejection.
 - [ ] **Garage S3 Public Read:** Visit `https://s3.rexone.me/rexone` (should return valid XML from Garage, not Traefik 404/502).
-- [ ] **Folder Partitioning:** Upload an asset on Prod → check Garage to verify key starts with `prod/` (e.g. `prod/users/...`); upload on UAT → starts with `uat/`.
+- [ ] **Folder Partitioning:** Upload an asset on Prod → check Garage to verify the key starts with `prod/` (e.g. `prod/user/...`); upload on UAT → starts with `uat/`.
 - [ ] **Media Worker Compression:** Upload a video via web/mobile; check `docker logs prod-rexone-media` for `[CompressVideoJob] Compressed ... bytes`.
 - [ ] **Solid Queue Background Jobs:** `docker logs prod-rexone-waka` shows active Solid Queue polling without errors.
 - [ ] **Web SPA Routing:** Visiting deep links (e.g. `https://rexone.me/profile`, `https://rexone.me/ai`) returns HTTP 200 and loads React correctly (not Nginx 404).
-
