@@ -99,10 +99,10 @@ All tables use **UUID** primary keys (`gen_random_uuid()`), utilize **Discard** 
 | **Entitlements**     | `Access`                                                                                     | Granted/revoked/expired access records tied to `User` and `Product`.                                                                                                                                                                                                                                   |
 | **AI / Chat**        | `Chat::Room`, `Chat::Message`                                                                | Conversational rooms, messages with roles (`user`, `assistant`), `ai_status` (`queued`, `processing`, `completed`, `failed`), system prompts, temperature, max tokens, metadata.                                                                                                                       |
 | **Media**            | `Asset`                                                                                      | Unified media metadata (`storage_key` for Garage/S3/Cloudinary/Local — user objects under `user/{user_id}/`, platform objects under `admin/`; format, size_bytes, original_size_bytes, compressed_size_bytes, compression_ratio, compression_passes, status enum: `pending`/`processing`/`ready`/`optimal`, duration_secs, type, polymorphic `assetable_type`/`assetable_id`), and `parent_asset_id` for canonical generated video thumbnails. |
-| **Telemetry**        | `Log::Client`                                                                                | Frontend error ingest (stack traces, device, OS, browser, URL, severity, occurrences, local/session storage keys, cookies, resolution status). Ingest still sends `app_version`; Core stores nullable `version_id`.                                                                                                                                                         |
+| **Telemetry**        | `Client::Log`                                                                                | Frontend error ingest (stack traces, device, OS, browser, URL, severity, occurrences, local/session storage keys, cookies, resolution status). Ingest still sends `app_version`; Core stores nullable `version_id`.                                                                                                                                                         |
 | **Feedback**         | `Feedback`                                                                                   | Intelligent in-place feedback (1-10 rating, auto-inferred category: `bug`/`feature_request`/`improvement`/`general`, priority: `low`/`normal`/`high`/`urgent`, status, automated device/route telemetry). Ingest still sends `app_version`; Core stores nullable `version_id`.                                                                                              |
 | **Notifications**    | `Notification`, `UserNotification`                                                           | Multi-channel notification repository (In-App, Push, Email) with dynamic variable interpolation; persistent user in-app inbox receipts with immutable snapshots, read tracking, and Pagy pagination.                                                                                                   |
-| **App versions**     | `Version`, `UserVersion`                                                                     | Global marketing versions (`draft` / `published` / `yanked`; publishing yanks every other kept published row) and one current user-version snapshot per user per platform. Public `GET /v1/versions/current` computes `update_required` (client behind the live version) and `must_update` (live version is force and greater than the client). Signed-in `POST /v1/versions/user-version` records the device. JSON admin `/v1/admin/versions` is super-admin only (discard/undiscard, `install_count`). `GET /v1/admin/versions/user_versions` lists all current snapshots (not nested under a version id). Administrate `/admin/versions` is super-admin only; user versions are `/admin/user_versions`. The user show page lists only `latest_user_version` (newest `last_seen_at`). |
+| **App versions**     | `Client::Version`, `Client::UserVersion`                                                                     | Global marketing versions (`draft` / `published` / `yanked`; publishing yanks every other kept published row) and one current user-version snapshot per user per platform. Public `GET /v1/client/versions/current` computes `update_required` (client behind the live version) and `must_update` (live version is force and greater than the client). Signed-in `POST /v1/client/versions/user-version` records the device. JSON admin `/v1/admin/client/versions` is super-admin only (discard/undiscard, `install_count`). `GET /v1/admin/client/versions/user_versions` lists all current snapshots (not nested under a version id). Administrate `/admin/client/versions` is super-admin only; user versions are `/admin/client/user_versions`. The user show page lists only `latest_user_version` (newest `last_seen_at`). |
 
 ### ⚙️ Services & Background Jobs (Solid Queue / Waka / Media)
 
@@ -162,8 +162,8 @@ The `/v1/admin/` namespace provides comprehensive management capabilities protec
 - **IAM Management**: `GET/PATCH/DELETE /v1/admin/iam/roles` and `GET/POST/PATCH/DELETE /v1/admin/iam/permissions` (auto-named).
 - **Chat Moderation**: `GET/PATCH/DELETE /v1/admin/chat/rooms` and `/messages`.
 - **Product Management**: `GET/POST/PATCH/DELETE /v1/admin/payment/products` (Stripe sync, discard/undiscard).
-- **App Versions**: Super-admin only. `GET/POST /v1/admin/versions`, `GET/PUT /v1/admin/versions/:id`, discard/undiscard, `GET /v1/admin/versions/discarded`, and `GET /v1/admin/versions/:id/user_versions`. Version payloads include `install_count`.
-- **User Versions**: Super-admin only. `GET /v1/admin/versions/user_versions` lists all current user+platform snapshots (optional `platform` filter).
+- **App Versions**: Super-admin only. `GET/POST /v1/admin/client/versions`, `GET/PUT /v1/admin/client/versions/:id`, discard/undiscard, `GET /v1/admin/client/versions/discarded`, and `GET /v1/admin/client/versions/:id/user_versions`. Client::Version payloads include `install_count`.
+- **User Versions**: Super-admin only. `GET /v1/admin/client/versions/user_versions` lists all current user+platform snapshots (optional `platform` filter).
 - **Asset Management**: `GET/PUT/DELETE /v1/admin/assets` (environment-agnostic CRUD + upload + discard/undiscard/destroy across the complete assets table, search, filter by type/format/source, Garage-owned storage partitioning with singular `user/{user_id}/...` and `admin/...` namespaces beneath each environment prefix, dynamic in-place S3 rename on type update, super-admin-only `GET /v1/admin/assets/storage_stats` with complete database totals, per-environment Garage object/byte usage, and bucket/VPS disk metrics, real-time ActionCable compression status updates, secondary compression pass trigger with 2-pass safeguard).
 - **Video Thumbnail Contract**: Core generates canonical WebP thumbnails in the `media` queue, links each thumbnail `Asset` to its source through `parent_asset_id`, exposes `thumbnail` on serialized source assets, and emits `asset_thumbnail_generated` with `{ asset_id, thumbnail }`. Admin clients may request server regeneration or upload an image replacement; Core remains responsible for persistence and cleanup of the superseded Garage object.
 - **Notification Broadcasts**: `GET /v1/admin/notifications`, `POST /v1/admin/notifications`, and `POST /v1/admin/notifications/dispatch` (audience targeting via roles/users/all, multi-channel fanout).
@@ -231,7 +231,7 @@ Rexone Mobile has a strictly governed design system accessible via `lib/design/d
 - **Stripe & Billing**: In-app Stripe Checkout WebView (`CheckoutPage`), subscription state cards, billing history, and confirmation-guarded cancellation/resumption.
 - **AI Assistant**: Persistent multi-room chat, background processing indicator, real-time completion toasts via WebSocket, and chat history management.
 - **Real-Time WebSockets**: Action Cable client (`SocketService`) paired with `SocketController` for global notification dispatching and deduplication.
-- **Client Telemetry**: Automatic global capture of Flutter errors and platform dispatcher errors dispatched to Core's `POST /v1/log/clients`.
+- **Client Telemetry**: Automatic global capture of Flutter errors and platform dispatcher errors dispatched to Core's `POST /v1/client/logs`.
 - **Localization**: 100% translated in English (`en_US`), Spanish (`es_ES`), and Burmese (`my_MM`). Synchronizes `X-Locale` and `Accept-Language` headers on every HTTP request.
 
 ---
@@ -250,7 +250,7 @@ All three pillars of the Rexone platform are fully aligned at **100% feature par
 | **Multi-Language Localization (`en`, `es`, `my`)**                               |      ✅       |          ✅          |            ✅            |
 | **HTTP `X-Locale` / `Accept-Language` Sync**                                     |      ✅       |          ✅          |            ✅            |
 | **Destructive Action Confirmation Prompts**                                      |      N/A      | ✅ (`ConfirmDialog`) | ✅ (`AppDialog.confirm`) |
-| **Error Telemetry Ingest & Storage (`/v1/log/clients`)**                         |      ✅       |          ✅          |            ✅            |
+| **Error Telemetry Ingest & Storage (`/v1/client/logs`)**                         |      ✅       |          ✅          |            ✅            |
 | **Stripe: Product & Pricing Catalogue**                                          |      ✅       |          ✅          |            ✅            |
 | **Stripe: Checkout Session Handoff**                                             |      ✅       |    ✅ (Redirect)     |       ✅ (WebView)       |
 | **Stripe: Subscriptions & Cancellation/Resumption**                              |      ✅       |          ✅          |            ✅            |
@@ -270,7 +270,7 @@ All three pillars of the Rexone platform are fully aligned at **100% feature par
 | **Push Notifications (OneSignal)**                                               |      ✅       |         N/A          |            ✅            |
 | **Product Analytics (Firebase)**                                                 |      N/A      |         N/A          |            ✅            |
 | **Client Admin Panel: User, IAM, Product, Chat, Asset, Notification Management** |      ✅       |          ✅          |           N/A            |
-| **In-App Version Upgrader**                                                      |      ✅       |          ✅          |            ✅            |
+| **In-App Client::Version Upgrader**                                                      |      ✅       |          ✅          |            ✅            |
 | **Automated Localization Parity Test Suite**                                     |      N/A      |         N/A          |            ✅            |
 
 ---
@@ -288,7 +288,7 @@ All three pillars of the Rexone platform are fully aligned at **100% feature par
   Accept-Language: en | my
   Content-Type: application/json
   ```
-- **App version splash check**: `GET /v1/versions/current?version=1.2.0` (no JWT required). Send `X-Platform: ios|android|web`. `update_required` is true when client semver is strictly less than the live number (optional update dialog). `must_update` is true when the live version is a force update and greater than the client (hard block). `skip_premium` is true when client semver is strictly greater than the live version number. `store_url` comes from `IOS_STORE_URL` or `ANDROID_STORE_URL` env by `X-Platform` (web is null). This check does not write `UserVersion`. Unsigned or invalid JWT still returns 200. A valid JWT requires `read_versions`. After sign-in, `POST /v1/versions/user-version` with `{ user_version: { version, version_code } }` upserts one row per user per platform (`create_user_versions`). Publishing a version yanks every other kept published row. Clients show an update dialog when `update_required` is true and hard-block the app when `must_update` is true; mobile opens `store_url`. Clients skip the paywall when `skip_premium` is true.
+- **App version splash check**: `GET /v1/client/versions/current?version=1.2.0` (no JWT required). Send `X-Platform: ios|android|web`. `update_required` is true when client semver is strictly less than the live number (optional update dialog). `must_update` is true when the live version is a force update and greater than the client (hard block). `skip_premium` is true when client semver is strictly greater than the live version number. `store_url` comes from `IOS_STORE_URL` or `ANDROID_STORE_URL` env by `X-Platform` (web is null). This check does not write `Client::UserVersion`. Unsigned or invalid JWT still returns 200. A valid JWT requires `read_versions`. After sign-in, `POST /v1/client/versions/user-version` with `{ user_version: { version, version_code } }` upserts one row per user per platform (`create_user_versions`). Publishing a version yanks every other kept published row. Clients show an update dialog when `update_required` is true and hard-block the app when `must_update` is true; mobile opens `store_url`. Clients skip the paywall when `skip_premium` is true.
 - **Standard JSON:API Response Envelope**:
   ```json
   {
@@ -335,7 +335,7 @@ All three pillars of the Rexone platform are fully aligned at **100% feature par
       - `final`: Final transcription chunk `{ "type": "final", "text": "finalized sentence", "is_final": true }`
       - `error`: Streaming speech recognition failure `{ "type": "error", "error": "Reason" }`
 
-### 3. Client Telemetry Contract (`POST /v1/log/clients`)
+### 3. Client Telemetry Contract (`POST /v1/client/logs`)
 
 Payload sent on uncaught errors in Web and Mobile:
 
@@ -362,7 +362,7 @@ Payload sent on uncaught errors in Web and Mobile:
 }
 ```
 
-Clients keep sending `"app_version": "1.0.0"`. Core looks up a kept `Version` by `number` and stores `version_id`. Unknown or missing `app_version` leaves `version_id` null (no 422). Admin JSON returns `version_id` plus derived `app_version` from `version.number`. The same lookup applies to `POST /v1/feedbacks`.
+Clients keep sending `"app_version": "1.0.0"`. Core looks up a kept `Client::Version` by `number` and stores `version_id`. Unknown or missing `app_version` leaves `version_id` null (no 422). Admin JSON returns `version_id` plus derived `app_version` from `version.number`. The same lookup applies to `POST /v1/feedbacks`.
 
 ### 4. Password Retry & Cooldown Escalation Protocol
 
@@ -382,14 +382,14 @@ Clients keep sending `"app_version": "1.0.0"`. Core looks up a kept `Version` by
   - **Rails Pulse**: Server hardware, CPU load, memory usage, request latency, slow database queries.
   - **RED (Rails Error Dashboard)**: Server-side Ruby exceptions, 500 errors, and Rails backtraces.
   - **Solid UI / Solid Queue**: Background jobs, queue throughput, retry backoffs, cron schedules.
-  - **Rails Administrate**: Low-level database table CRUD for development and database inspection. App versions at `/admin/versions` is super-admin only; user-version snapshots are read-only at `/admin/user_versions`.
+  - **Rails Administrate**: Low-level database table CRUD for development and database inspection. App versions at `/admin/client/versions` is super-admin only; user-version snapshots are read-only at `/admin/client/user_versions`.
 - **Client Admin Panel (React SPA)**:
   - Focuses exclusively on **Business Growth, Governance, and End-User Operations**:
     - Operational Analytics & KPIs (Gross revenue, active subscriptions, user acquisition, AI chat usage — see [ANALYTICS.md](ANALYTICS.md)).
     - Governance & RBAC (User management, role assignment, permission matrix, lifecycle recovery).
     - Commerce Catalogue (Product creation, Free vs. Premium rules, entitlements).
     - User Feedback Inbox & Triage (Ratings, category taxonomy, priority levels, status workflows).
-    - Client Telemetry (`Log::Client` capturing browser/mobile JS crashes that never touch Rails RED).
+    - Client Telemetry (`Client::Log` capturing browser/mobile JS crashes that never touch Rails RED).
 - **Strict Non-Duplication Rule**: Never duplicate server CPU/memory, queue depths, or database query telemetry inside the Client Admin Panel. Prioritize business domain operations and client-side observability.
 
 ---

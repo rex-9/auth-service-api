@@ -10,9 +10,9 @@ module Openapi
     SECURITY = [ { bearerAuth: [] } ].freeze
     STATUSES = Chat::Message::STATUSES.values.freeze
     AI_ROLES = [ AiConstants::ChatRole::USER, AiConstants::ChatRole::ASSISTANT ].freeze
-    LOG_SEVERITIES = Log::Client.severities.keys.freeze
-    LOG_PLATFORMS = Log::Client.platforms.keys.freeze
-    LOG_ENVIRONMENTS = Log::Client.environments.keys.freeze
+    LOG_SEVERITIES = Client::Log.severities.keys.freeze
+    LOG_PLATFORMS = Client::Log.platforms.keys.freeze
+    LOG_ENVIRONMENTS = Client::Log.environments.keys.freeze
 
     def ref(name)
       { "$ref": "#/components/schemas/#{name}" }
@@ -460,6 +460,10 @@ module Openapi
         duration_secs: { type: :integer, description: "Duration in seconds for audio / video files." },
         size_bytes: { type: :integer, description: "Exact file size in bytes." }
       ),
+      asset_thumbnail_upload_request: object(
+        required: [ :file ],
+        file: { type: :string, format: :binary }
+      ),
       checkout_session_request: object(
         required: %i[product_id success_url cancel_url],
         product_id: UUID,
@@ -874,11 +878,11 @@ module Openapi
             errors: [ 400, 500, 503 ]
           )
         },
-        "/v1/versions/current" => {
+        "/v1/client/versions/current" => {
           get: operation(
             tags: "Versions",
             summary: "Check the latest live app version and whether the client should update",
-            description: "Public splash check. Query version (semver) drives update_required, must_update, and skip_premium. Missing or invalid JWT still returns 200. A valid JWT requires read_versions. Install tracking is POST /v1/versions/user-version.",
+            description: "Public splash check. Query version (semver) drives update_required, must_update, and skip_premium. Missing or invalid JWT still returns 200. A valid JWT requires read_versions. Install tracking is POST /v1/client/versions/user-version.",
             security: nil,
             parameters: [
               query_parameter(:version, description: "Client marketing semver x.y.z")
@@ -886,17 +890,17 @@ module Openapi
             errors: []
           )
         },
-        "/v1/versions/user-version" => {
+        "/v1/client/versions/user-version" => {
           post: operation(
             tags: "Versions",
             summary: "Record the current user's version for this platform",
-            description: "Authenticated upsert of UserVersion for the current user and X-Platform. Requires create_user_versions. version is required marketing semver; version_code is optional.",
+            description: "Authenticated upsert of Client::UserVersion for the current user and X-Platform. Requires create_user_versions. version is required marketing semver; version_code is optional.",
             body: ref(:user_version_request),
             success: 201,
             errors: [ 401, 403, 422 ]
           )
         },
-        "/v1/admin/versions" => {
+        "/v1/admin/client/versions" => {
           get: operation(
             tags: "Admin / Versions",
             summary: "List versions for the admin client",
@@ -919,7 +923,7 @@ module Openapi
             errors: [ 401, 403, 422 ]
           )
         },
-        "/v1/admin/versions/discarded" => {
+        "/v1/admin/client/versions/discarded" => {
           get: operation(
             tags: "Admin / Versions",
             summary: "List discarded versions",
@@ -933,7 +937,7 @@ module Openapi
             errors: [ 401, 403 ]
           )
         },
-        "/v1/admin/versions/{id}" => {
+        "/v1/admin/client/versions/{id}" => {
           get: operation(
             tags: "Admin / Versions",
             summary: "Get a version",
@@ -950,7 +954,7 @@ module Openapi
             errors: [ 401, 403, 404, 422 ]
           )
         },
-        "/v1/admin/versions/{id}/discard" => {
+        "/v1/admin/client/versions/{id}/discard" => {
           post: operation(
             tags: "Admin / Versions",
             summary: "Discard a version",
@@ -959,7 +963,7 @@ module Openapi
             errors: [ 401, 403, 404 ]
           )
         },
-        "/v1/admin/versions/{id}/undiscard" => {
+        "/v1/admin/client/versions/{id}/undiscard" => {
           post: operation(
             tags: "Admin / Versions",
             summary: "Restore a discarded version",
@@ -968,7 +972,7 @@ module Openapi
             errors: [ 401, 403, 404 ]
           )
         },
-        "/v1/admin/versions/{id}/user_versions" => {
+        "/v1/admin/client/versions/{id}/user_versions" => {
           get: operation(
             tags: "Admin / Versions",
             summary: "List current user versions for a version",
@@ -983,7 +987,7 @@ module Openapi
             errors: [ 401, 403, 404 ]
           )
         },
-        "/v1/admin/versions/user_versions" => {
+        "/v1/admin/client/versions/user_versions" => {
           get: operation(
             tags: "Admin / User Versions",
             summary: "List current user versions",
@@ -1200,7 +1204,7 @@ module Openapi
       log_filters = %i[severity platform environment unresolved resolved storage_issues].map do |name|
         query_parameter(name, type: name.in?(%i[unresolved resolved storage_issues]) ? :boolean : :string)
       end
-      paths["/v1/log/clients"] = {
+      paths["/v1/client/logs"] = {
         get: operation(tags: "Client Logs", summary: "List and filter client error reports",
                        parameters: log_filters + [
                          query_parameter(:limit, type: :integer, minimum: 1),
@@ -1211,14 +1215,14 @@ module Openapi
         post: operation(tags: "Client Logs", summary: "Report or increment a client error", success: 201,
                         security: nil, body: ref(:client_log_request), errors: [ 422 ])
       }
-      paths["/v1/log/clients/{id}"] = {
+      paths["/v1/client/logs/{id}"] = {
         get: operation(tags: "Client Logs", summary: "Get a client error report",
                        parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ]),
         delete: operation(tags: "Client Logs", summary: "Delete a client error report",
                           parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ])
       }
       %w[resolve unresolve].each do |action|
-        paths["/v1/log/clients/{id}/#{action}"] = {
+        paths["/v1/client/logs/{id}/#{action}"] = {
           put: operation(tags: "Client Logs", summary: "Mark a client error as #{action}d",
                          parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ])
         }
@@ -1424,11 +1428,7 @@ module Openapi
         required: true,
         content: {
           "multipart/form-data" => {
-            schema: {
-              type: :object,
-              required: [ :file ],
-              properties: { file: { type: :string, format: :binary } }
-            }
+            schema: ref(:asset_thumbnail_upload_request)
           }
         }
       }

@@ -4,7 +4,9 @@ class CreateFeedbacks < ActiveRecord::Migration[8.1]
   def change
     create_table :feedbacks, id: :uuid, default: -> { "gen_random_uuid()" } do |t|
       t.references :user, type: :uuid, foreign_key: true, index: true
-      t.references :version, type: :uuid, foreign_key: { on_delete: :nullify }
+      t.references :version,
+                   type: :uuid,
+                   foreign_key: { to_table: :client_versions, on_delete: :nullify }
       t.text :content, null: false
       t.integer :rating, null: true
       t.string :category, null: false, default: "general"

@@ -257,7 +257,7 @@ components:
           - notifications
           - ai
           - speech
-          - clients
+          - logs
           - feedbacks
           - analytics
           - versions
@@ -874,6 +874,14 @@ components:
         size_bytes:
           type: integer
           description: Exact file size in bytes.
+      required:
+      - file
+    asset_thumbnail_upload_request:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
       required:
       - file
     checkout_session_request:
@@ -2408,7 +2416,7 @@ paths:
             schema:
               type: object
               additionalProperties: true
-  "/v1/versions/current":
+  "/v1/client/versions/current":
     get:
       tags:
       - Versions
@@ -2449,8 +2457,8 @@ paths:
                 "$ref": "#/components/schemas/response"
       description: Public splash check. Query version (semver) drives update_required,
         must_update, and skip_premium. Missing or invalid JWT still returns 200. A
-        valid JWT requires read_versions. Install tracking is POST /v1/versions/user-version.
-  "/v1/versions/user-version":
+        valid JWT requires read_versions. Install tracking is POST /v1/client/versions/user-version.
+  "/v1/client/versions/user-version":
     post:
       tags:
       - Versions
@@ -2501,9 +2509,9 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/error_response"
-      description: Authenticated upsert of UserVersion for the current user and X-Platform.
-        Requires create_user_versions. version is required marketing semver; version_code
-        is optional.
+      description: Authenticated upsert of Client::UserVersion for the current user
+        and X-Platform. Requires create_user_versions. version is required marketing
+        semver; version_code is optional.
       security:
       - bearerAuth: []
       requestBody:
@@ -2512,7 +2520,7 @@ paths:
           application/json:
             schema:
               "$ref": "#/components/schemas/user_version_request"
-  "/v1/admin/versions":
+  "/v1/admin/client/versions":
     get:
       tags:
       - Admin / Versions
@@ -2651,7 +2659,7 @@ paths:
           application/json:
             schema:
               "$ref": "#/components/schemas/admin_version_request"
-  "/v1/admin/versions/discarded":
+  "/v1/admin/client/versions/discarded":
     get:
       tags:
       - Admin / Versions
@@ -2722,7 +2730,7 @@ paths:
       description: Super-admin only.
       security:
       - bearerAuth: []
-  "/v1/admin/versions/{id}":
+  "/v1/admin/client/versions/{id}":
     get:
       tags:
       - Admin / Versions
@@ -2853,7 +2861,7 @@ paths:
           application/json:
             schema:
               "$ref": "#/components/schemas/admin_version_request"
-  "/v1/admin/versions/{id}/discard":
+  "/v1/admin/client/versions/{id}/discard":
     post:
       tags:
       - Admin / Versions
@@ -2913,7 +2921,7 @@ paths:
       description: Super-admin only.
       security:
       - bearerAuth: []
-  "/v1/admin/versions/{id}/undiscard":
+  "/v1/admin/client/versions/{id}/undiscard":
     post:
       tags:
       - Admin / Versions
@@ -2973,7 +2981,7 @@ paths:
       description: Super-admin only.
       security:
       - bearerAuth: []
-  "/v1/admin/versions/{id}/user_versions":
+  "/v1/admin/client/versions/{id}/user_versions":
     get:
       tags:
       - Admin / Versions
@@ -3056,7 +3064,7 @@ paths:
       description: Super-admin only.
       security:
       - bearerAuth: []
-  "/v1/admin/versions/user_versions":
+  "/v1/admin/client/versions/user_versions":
     get:
       tags:
       - Admin / User Versions
@@ -5944,7 +5952,7 @@ paths:
                 "$ref": "#/components/schemas/error_response"
       security:
       - bearerAuth: []
-  "/v1/log/clients":
+  "/v1/client/logs":
     get:
       tags:
       - Client Logs
@@ -6084,7 +6092,7 @@ paths:
           application/json:
             schema:
               "$ref": "#/components/schemas/client_log_request"
-  "/v1/log/clients/{id}":
+  "/v1/client/logs/{id}":
     get:
       tags:
       - Client Logs
@@ -6201,7 +6209,7 @@ paths:
                 "$ref": "#/components/schemas/error_response"
       security:
       - bearerAuth: []
-  "/v1/log/clients/{id}/resolve":
+  "/v1/client/logs/{id}/resolve":
     put:
       tags:
       - Client Logs
@@ -6260,7 +6268,7 @@ paths:
                 "$ref": "#/components/schemas/error_response"
       security:
       - bearerAuth: []
-  "/v1/log/clients/{id}/unresolve":
+  "/v1/client/logs/{id}/unresolve":
     put:
       tags:
       - Client Logs
@@ -8607,13 +8615,7 @@ paths:
         content:
           multipart/form-data:
             schema:
-              type: object
-              required:
-              - file
-              properties:
-                file:
-                  type: string
-                  format: binary
+              "$ref": "#/components/schemas/asset_thumbnail_upload_request"
   "/v1/assets":
     get:
       tags:

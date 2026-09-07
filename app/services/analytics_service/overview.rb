@@ -135,8 +135,8 @@ module AnalyticsService
       ai_messages_count   = current_messages.where(role: AiConstants::ChatRole::ASSISTANT).count
 
       # Client Logs (Errors)
-      unresolved_errors = Log::Client.kept.where(resolved_at: nil).count
-      total_period_errors = Log::Client.kept.where(created_at: time_range).count
+      unresolved_errors = Client::Log.kept.where(resolved_at: nil).count
+      total_period_errors = Client::Log.kept.where(created_at: time_range).count
 
       # Feedbacks
       period_feedbacks = Feedback.kept.where(created_at: time_range).count
@@ -258,7 +258,7 @@ module AnalyticsService
         .group(:rating)
         .count
 
-      errors_by_platform = Log::Client.kept
+      errors_by_platform = Client::Log.kept
         .where(created_at: time_range)
         .group(:platform)
         .count
