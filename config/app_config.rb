@@ -129,6 +129,10 @@ module AppConfig
   APP_VERSION = env_or.call("APP_VERSION", nil)
   GIT_SHA = env_or.call("GIT_SHA", nil)
 
+  # Public store listings (not per version row; not media assets)
+  IOS_STORE_URL = env_or.call("IOS_STORE_URL", nil)
+  ANDROID_STORE_URL = env_or.call("ANDROID_STORE_URL", nil)
+
   # Notification Retention & Cleanup
   NOTIFICATION_READ_RETENTION_DAYS = env_or.call("NOTIFICATION_READ_RETENTION_DAYS", "30").to_i
   NOTIFICATION_UNREAD_RETENTION_DAYS = env_or.call("NOTIFICATION_UNREAD_RETENTION_DAYS", "90").to_i

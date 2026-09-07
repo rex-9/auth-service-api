@@ -88,7 +88,7 @@ class FeedbackService
         priority: priority,
         status: FeedbackConstants::Status::NEW,
         platform: platform,
-        app_version: params[:app_version],
+        version_id: Client::Version.lookup_by_number(params[:app_version])&.id,
         os: params[:os],
         device: params[:device],
         browser: params[:browser],

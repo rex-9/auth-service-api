@@ -1,0 +1,6 @@
+en:
+  user_version:
+    created: "User version recorded successfully."
+    updated: "User version updated successfully."
+    create_failed: "Unable to record user version."
+    fetched: "User versions fetched successfully."

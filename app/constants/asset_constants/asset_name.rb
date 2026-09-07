@@ -26,6 +26,11 @@ module AssetConstants
       "#{USER_NAMESPACE}/#{user_id}/#{type}_#{base}_#{Time.now.to_i}#{ext}".freeze
     end
 
+    def self.thumbnail_for(asset, version: nil)
+      suffix = version.present? ? "_#{version}" : ""
+      "#{File.dirname(asset.storage_key)}/thumbnail_#{asset.id}#{suffix}.webp".freeze
+    end
+
     def self.rename_type(old_key, new_type, user_id = nil)
       return old_key if old_key.blank? || new_type.blank?
 

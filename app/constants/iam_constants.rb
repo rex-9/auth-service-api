@@ -11,7 +11,9 @@ module IamConstants
       "users",
       "roles",
       "permissions",
-      "user_roles"
+      "user_roles",
+      "versions",
+      "user_versions"
     ].freeze
   end
 
@@ -37,20 +39,21 @@ module IamConstants
     NOTIFICATIONS = "notifications".freeze
     AI            = "ai".freeze
     SPEECH        = "speech".freeze
-    CLIENTS       = "clients".freeze
+    LOGS          = "logs".freeze
     FEEDBACKS     = "feedbacks".freeze
     ANALYTICS     = "analytics".freeze
+    VERSIONS      = "versions".freeze
+    USER_VERSIONS = "user_versions".freeze
     ALL           = [
       USERS, ROLES, USER_ROLES, PERMISSIONS, PRODUCTS, PAYMENTS,
       SUBSCRIPTIONS, TRANSACTIONS, ACCESSES, ASSETS, NOTIFICATIONS,
-      AI, SPEECH, CLIENTS, FEEDBACKS, ANALYTICS
-
+      AI, SPEECH, LOGS, FEEDBACKS, ANALYTICS, VERSIONS, USER_VERSIONS
     ].freeze
   end
 
   module DefaultPermissions
     USER = [
-      { resource: Resource::CLIENTS, actions: [ Action::CREATE ] },
+      { resource: Resource::LOGS, actions: [ Action::CREATE ] },
       { resource: Resource::PRODUCTS, actions: [ Action::READ ] },
       { resource: Resource::PAYMENTS, actions: [ Action::CREATE ] },
       { resource: Resource::SUBSCRIPTIONS, actions: [ Action::READ, Action::CREATE ] },
@@ -61,7 +64,9 @@ module IamConstants
       { resource: Resource::AI, actions: Action::ALL },
       { resource: Resource::SPEECH, actions: Action::ALL },
       { resource: Resource::FEEDBACKS, actions: [ Action::CREATE, Action::READ ] },
-      { resource: Resource::NOTIFICATIONS, actions: [ Action::READ, Action::UPDATE, Action::DELETE ] }
+      { resource: Resource::NOTIFICATIONS, actions: [ Action::READ, Action::UPDATE, Action::DELETE ] },
+      { resource: Resource::VERSIONS, actions: [ Action::READ ] },
+      { resource: Resource::USER_VERSIONS, actions: [ Action::CREATE ] }
     ].freeze
   end
 end

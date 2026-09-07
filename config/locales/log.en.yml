@@ -1,6 +1,6 @@
 en:
-  log:
-    clients:
+  client:
+    logs:
       occurrence_recorded: "Client log occurrence recorded"
       created: "Client log created successfully"
       create_failed: "Failed to create client log"

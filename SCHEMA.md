@@ -1,7 +1,7 @@
 # Database Schema Documentation (`rexone-core`)
 
 > **Database Engine:** PostgreSQL 16
-> **Schema Version:** `2026_09_05_100002`
+> **Schema Version:** `2026_09_05_190001`
 > **Key Conventions:** UUID v4 Primary Keys (`gen_random_uuid()`), Soft Deletion (`discard` gem), Audit Tracking (`Auditable` concern).
 
 > [!IMPORTANT]
@@ -67,10 +67,15 @@ erDiagram
   chat_rooms ||--o{ chat_messages : "contains"
 
   users ||--o{ feedbacks : "submits"
-  users ||--o{ log_clients : "originates"
+  users ||--o{ client_logs : "originates"
 
   users ||--o{ user_notifications : "receives"
   notification_templates ||--o{ user_notifications : "templated_by"
+
+  users ||--o{ client_user_versions : "runs"
+  client_versions ||--o{ client_user_versions : "matches"
+  versions ||--o{ feedbacks : "reports"
+  versions ||--o{ client_logs : "reports"
 
   users ||--o{ assets : "assetable (polymorphic)"
   payment_products ||--o{ assets : "assetable (polymorphic)"
@@ -529,7 +534,7 @@ erDiagram
 | `id`                | `uuid`     |    ❌    | `gen_random_uuid()` | Primary Key                                                            |
 | `name`              | `string`   |    ❌    | —                   | File original name                                                     |
 | `url`               | `string`   |    ❌    | —                   | Accessible CDN or storage URL                                          |
-| `storage_key`       | `string`   |    ✔️    | `NULL`              | Cloud bucket path (e.g. `avatars/name_12345`)                          |
+| `storage_key`       | `string`   |    ✔️    | `NULL`              | Cloud bucket path (e.g. `user/{user_id}/avatar_profile_12345.png`)     |
 | `type`              | `string`   |    ❌    | `"general"`         | `general`, `avatar`, `audio`, `video`, `document` (STI disabled)       |
 | `source`            | `string`   |    ❌    | `"upload"`          | Source: `upload`, `google`                                             |
 | `format`            | `string`   |    ✔️    | `NULL`              | Format mime/type (e.g. `png`, `mp4`, `webm`)                           |
@@ -539,6 +544,7 @@ erDiagram
 | `status`            | `string`   |    ❌    | `"pending"`         | Pipeline status: `pending`, `processing`, `ready`, `optimal`, `failed` |
 | `assetable_type`    | `string`   |    ✔️    | `NULL`              | Polymorphic owner type (`User`, `Chat::Message`, etc.)                 |
 | `assetable_id`      | `uuid`     |    ✔️    | `NULL`              | Polymorphic owner ID                                                   |
+| `parent_asset_id`   | `uuid`     |    ✔️    | `NULL`              | Original video for a generated thumbnail asset                         |
 | `created_by_id`     | `uuid`     |    ✔️    | `NULL`              | Auditing: Creator                                                      |
 | `updated_by_id`     | `uuid`     |    ✔️    | `NULL`              | Auditing: Modifier                                                     |
 | `discarded_by_id`   | `uuid`     |    ✔️    | `NULL`              | Auditing: Discarder                                                    |
@@ -552,6 +558,7 @@ erDiagram
 
 - `index_assets_on_url` (UNIQUE: `url`)
 - `index_assets_on_assetable_type_and_assetable_id` (`assetable_type`, `assetable_id`)
+- `index_assets_on_parent_asset_id` (`parent_asset_id`, UNIQUE)
 - `index_assets_on_name` (`name`)
 - `index_assets_on_status` (`status`)
 - `index_assets_on_type` (`type`)
@@ -561,6 +568,10 @@ erDiagram
 
 - `Asset` has no knowledge of Garage environment partitions and all model and controller queries cover the complete assets table. Garage alone applies or preserves `dev/`, `uat/`, and `prod/` storage-key prefixes. Super-admin storage statistics aggregate every database asset.
 
+**Generated Video Thumbnails**:
+
+- A video may own one generated thumbnail through the unique self-reference `assets.parent_asset_id`. Thumbnail generation runs asynchronously on the `media` queue, stores a WebP object beside its source video, and preserves the original asset's polymorphic owner.
+
 ---
 
 ## 8. User Feedback
@@ -568,32 +579,32 @@ erDiagram
 ### 8.1. `feedbacks`
 
 - **Model**: [`Feedback`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/feedback.rb)
-- **Description**: In-app feedback reports, ratings, bug tickets, and admin triage tracking.
+- **Description**: In-app feedback reports, ratings, bug tickets, and admin triage tracking. Clients send `app_version`; Core stores nullable `version_id`.
 
-| Column              | Type       | Nullable | Default             | Description / Notes                                    |
-| :------------------ | :--------- | :------: | :------------------ | :----------------------------------------------------- |
-| `id`                | `uuid`     |    ❌    | `gen_random_uuid()` | Primary Key                                            |
-| `user_id`           | `uuid`     |    ✔️    | `NULL`              | Submitting user (optional for guest feedback)          |
-| `content`           | `text`     |    ❌    | —                   | Feedback message / report                              |
-| `rating`            | `integer`  |    ✔️    | `NULL`              | Star rating (1..5)                                     |
-| `category`          | `string`   |    ❌    | `"general"`         | Enum: `general`, `bug`, `feature`, `improvement`, etc. |
-| `priority`          | `string`   |    ❌    | `"normal"`          | Enum: `low`, `normal`, `high`, `urgent`                |
-| `status`            | `string`   |    ❌    | `"new"`             | Enum: `new`, `in_progress`, `resolved`, `closed`       |
-| `platform`          | `string`   |    ❌    | `"web"`             | Enum: `web`, `ios`, `android`                          |
-| `admin_notes`       | `text`     |    ✔️    | `NULL`              | Internal triage / resolver comments                    |
-| `app_version`       | `string`   |    ✔️    | `NULL`              | Client version                                         |
-| `browser`           | `string`   |    ✔️    | `NULL`              | Client browser                                         |
-| `os`                | `string`   |    ✔️    | `NULL`              | Operating system                                       |
-| `device`            | `string`   |    ✔️    | `NULL`              | Client hardware                                        |
-| `page`              | `string`   |    ✔️    | `NULL`              | Source page URL or route                               |
-| `metadata`          | `jsonb`    |    ❌    | `{}`                | Diagnostic payload                                     |
-| `created_by_id`     | `uuid`     |    ✔️    | `NULL`              | Auditing: Creator                                      |
-| `updated_by_id`     | `uuid`     |    ✔️    | `NULL`              | Auditing: Modifier                                     |
-| `discarded_by_id`   | `uuid`     |    ✔️    | `NULL`              | Auditing: Discarder                                    |
-| `undiscarded_by_id` | `uuid`     |    ✔️    | `NULL`              | Auditing: Restorer                                     |
-| `discarded_at`      | `datetime` |    ✔️    | `NULL`              | Soft delete timestamp                                  |
-| `created_at`        | `datetime` |    ❌    | —                   | Timestamp                                              |
-| `updated_at`        | `datetime` |    ❌    | —                   | Timestamp                                              |
+| Column              | Type       | Nullable | Default             | Description / Notes                                                                                                                                |
+| :------------------ | :--------- | :------: | :------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                | `uuid`     |    ❌    | `gen_random_uuid()` | Primary Key                                                                                                                                        |
+| `user_id`           | `uuid`     |    ✔️    | `NULL`              | Submitting user (optional for guest feedback)                                                                                                      |
+| `content`           | `text`     |    ❌    | —                   | Feedback message / report                                                                                                                          |
+| `rating`            | `integer`  |    ✔️    | `NULL`              | Star rating (1..5)                                                                                                                                 |
+| `category`          | `string`   |    ❌    | `"general"`         | Enum: `general`, `bug`, `feature`, `improvement`, etc.                                                                                             |
+| `priority`          | `string`   |    ❌    | `"normal"`          | Enum: `low`, `normal`, `high`, `urgent`                                                                                                            |
+| `status`            | `string`   |    ❌    | `"new"`             | Enum: `new`, `in_progress`, `resolved`, `closed`                                                                                                   |
+| `platform`          | `string`   |    ❌    | `"web"`             | Enum: `web`, `ios`, `android`                                                                                                                      |
+| `admin_notes`       | `text`     |    ✔️    | `NULL`              | Internal triage / resolver comments                                                                                                                |
+| `version_id`        | `uuid`     |    ✔️    | `NULL`              | Matching `Client::Version` if ingest `app_version` matches `number`. API still accepts `app_version`; serializers derive it from `version.number`. |
+| `browser`           | `string`   |    ✔️    | `NULL`              | Client browser                                                                                                                                     |
+| `os`                | `string`   |    ✔️    | `NULL`              | Operating system                                                                                                                                   |
+| `device`            | `string`   |    ✔️    | `NULL`              | Client hardware                                                                                                                                    |
+| `page`              | `string`   |    ✔️    | `NULL`              | Source page URL or route                                                                                                                           |
+| `metadata`          | `jsonb`    |    ❌    | `{}`                | Diagnostic payload                                                                                                                                 |
+| `created_by_id`     | `uuid`     |    ✔️    | `NULL`              | Auditing: Creator                                                                                                                                  |
+| `updated_by_id`     | `uuid`     |    ✔️    | `NULL`              | Auditing: Modifier                                                                                                                                 |
+| `discarded_by_id`   | `uuid`     |    ✔️    | `NULL`              | Auditing: Discarder                                                                                                                                |
+| `undiscarded_by_id` | `uuid`     |    ✔️    | `NULL`              | Auditing: Restorer                                                                                                                                 |
+| `discarded_at`      | `datetime` |    ✔️    | `NULL`              | Soft delete timestamp                                                                                                                              |
+| `created_at`        | `datetime` |    ❌    | —                   | Timestamp                                                                                                                                          |
+| `updated_at`        | `datetime` |    ❌    | —                   | Timestamp                                                                                                                                          |
 
 **Indexes & Foreign Keys**:
 
@@ -605,60 +616,62 @@ erDiagram
 - `index_feedbacks_on_rating` (`rating`)
 - `index_feedbacks_on_created_at` (`created_at`)
 - `index_feedbacks_on_discarded_at` (`discarded_at`)
-- FK to `users(id)`.
+- `index_feedbacks_on_version_id` (`version_id`)
+- FK to `users(id)`; FK to `versions(id)` `ON DELETE NULL`.
 
 ---
 
 ## 9. Diagnostics & Logging
 
-### 9.1. `log_clients`
+### 9.1. `client_logs`
 
-- **Model**: [`Log::Client`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/log/client.rb)
-- **Description**: Frontend client runtime error tracking, session snapshots, and resolution management.
+- **Model**: [`Client::Log`](app/models/client/log.rb)
+- **Description**: Frontend client runtime error tracking, session snapshots, and resolution management. Clients send `app_version`; Core stores nullable `version_id`.
 
-| Column                 | Type       | Nullable | Default             | Description / Notes                             |
-| :--------------------- | :--------- | :------: | :------------------ | :---------------------------------------------- |
-| `id`                   | `uuid`     |    ❌    | `gen_random_uuid()` | Primary Key                                     |
-| `user_id`              | `uuid`     |    ✔️    | `NULL`              | Authenticated user (if logged in)               |
-| `message`              | `string`   |    ❌    | —                   | Error message string                            |
-| `severity`             | `string`   |    ❌    | `"error"`           | `debug`, `info`, `warning`, `error`, `critical` |
-| `platform`             | `string`   |    ✔️    | `NULL`              | `web`, `ios`, `android`                         |
-| `environment`          | `string`   |    ✔️    | `NULL`              | `development`, `staging`, `production`          |
-| `url`                  | `string`   |    ✔️    | `NULL`              | Page URL where error triggered                  |
-| `method`               | `string`   |    ✔️    | `NULL`              | Associated HTTP method                          |
-| `user_agent`           | `string`   |    ✔️    | `NULL`              | User Agent string                               |
-| `app_version`          | `string`   |    ✔️    | `NULL`              | Client build version                            |
-| `os`                   | `string`   |    ✔️    | `NULL`              | Operating system                                |
-| `os_version`           | `string`   |    ✔️    | `NULL`              | OS version number                               |
-| `browser`              | `string`   |    ✔️    | `NULL`              | Browser family                                  |
-| `device`               | `string`   |    ✔️    | `NULL`              | Hardware device info                            |
-| `request_id`           | `string`   |    ✔️    | `NULL`              | Correlating server request ID                   |
-| `occurrence_count`     | `integer`  |    ✔️    | `1`                 | Deduplicated occurrence count                   |
-| `last_occurred_at`     | `datetime` |    ✔️    | `NULL`              | Most recent occurrence timestamp                |
-| `resolved_at`          | `datetime` |    ✔️    | `NULL`              | Triage resolution timestamp                     |
-| `resolved_by_id`       | `uuid`     |    ✔️    | `NULL`              | FK to `users.id` who resolved                   |
-| `context`              | `jsonb`    |    ✔️    | `{}`                | Contextual data dictionary                      |
-| `cookies`              | `jsonb`    |    ✔️    | `{}`                | Cookie key snapshot                             |
-| `local_storage_keys`   | `jsonb`    |    ✔️    | `[]`                | LocalStorage keys present (GIN indexed)         |
-| `session_storage_keys` | `jsonb`    |    ✔️    | `[]`                | SessionStorage keys present (GIN indexed)       |
-| `stack_trace`          | `jsonb`    |    ✔️    | `[]`                | Structured stack trace frames                   |
-| `created_by_id`        | `uuid`     |    ✔️    | `NULL`              | Auditing: Creator                               |
-| `updated_by_id`        | `uuid`     |    ✔️    | `NULL`              | Auditing: Modifier                              |
-| `discarded_at`         | `datetime` |    ✔️    | `NULL`              | Soft delete timestamp                           |
-| `created_at`           | `datetime` |    ❌    | —                   | Timestamp                                       |
-| `updated_at`           | `datetime` |    ❌    | —                   | Timestamp                                       |
+| Column                 | Type       | Nullable | Default             | Description / Notes                                                                                                                                |
+| :--------------------- | :--------- | :------: | :------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                   | `uuid`     |    ❌    | `gen_random_uuid()` | Primary Key                                                                                                                                        |
+| `user_id`              | `uuid`     |    ✔️    | `NULL`              | Authenticated user (if logged in)                                                                                                                  |
+| `message`              | `string`   |    ❌    | —                   | Error message string                                                                                                                               |
+| `severity`             | `string`   |    ❌    | `"error"`           | `debug`, `info`, `warning`, `error`, `critical`                                                                                                    |
+| `platform`             | `string`   |    ✔️    | `NULL`              | `web`, `ios`, `android`                                                                                                                            |
+| `environment`          | `string`   |    ✔️    | `NULL`              | `development`, `staging`, `production`                                                                                                             |
+| `url`                  | `string`   |    ✔️    | `NULL`              | Page URL where error triggered                                                                                                                     |
+| `method`               | `string`   |    ✔️    | `NULL`              | Associated HTTP method                                                                                                                             |
+| `user_agent`           | `string`   |    ✔️    | `NULL`              | User Agent string                                                                                                                                  |
+| `version_id`           | `uuid`     |    ✔️    | `NULL`              | Matching `Client::Version` if ingest `app_version` matches `number`. API still accepts `app_version`; serializers derive it from `version.number`. |
+| `os`                   | `string`   |    ✔️    | `NULL`              | Operating system                                                                                                                                   |
+| `os_version`           | `string`   |    ✔️    | `NULL`              | OS version number                                                                                                                                  |
+| `browser`              | `string`   |    ✔️    | `NULL`              | Browser family                                                                                                                                     |
+| `device`               | `string`   |    ✔️    | `NULL`              | Hardware device info                                                                                                                               |
+| `request_id`           | `string`   |    ✔️    | `NULL`              | Correlating server request ID                                                                                                                      |
+| `occurrence_count`     | `integer`  |    ✔️    | `1`                 | Deduplicated occurrence count                                                                                                                      |
+| `last_occurred_at`     | `datetime` |    ✔️    | `NULL`              | Most recent occurrence timestamp                                                                                                                   |
+| `resolved_at`          | `datetime` |    ✔️    | `NULL`              | Triage resolution timestamp                                                                                                                        |
+| `resolved_by_id`       | `uuid`     |    ✔️    | `NULL`              | FK to `users.id` who resolved                                                                                                                      |
+| `context`              | `jsonb`    |    ✔️    | `{}`                | Contextual data dictionary                                                                                                                         |
+| `cookies`              | `jsonb`    |    ✔️    | `{}`                | Cookie key snapshot                                                                                                                                |
+| `local_storage_keys`   | `jsonb`    |    ✔️    | `[]`                | LocalStorage keys present (GIN indexed)                                                                                                            |
+| `session_storage_keys` | `jsonb`    |    ✔️    | `[]`                | SessionStorage keys present (GIN indexed)                                                                                                          |
+| `stack_trace`          | `jsonb`    |    ✔️    | `[]`                | Structured stack trace frames                                                                                                                      |
+| `created_by_id`        | `uuid`     |    ✔️    | `NULL`              | Auditing: Creator                                                                                                                                  |
+| `updated_by_id`        | `uuid`     |    ✔️    | `NULL`              | Auditing: Modifier                                                                                                                                 |
+| `discarded_at`         | `datetime` |    ✔️    | `NULL`              | Soft delete timestamp                                                                                                                              |
+| `created_at`           | `datetime` |    ❌    | —                   | Timestamp                                                                                                                                          |
+| `updated_at`           | `datetime` |    ❌    | —                   | Timestamp                                                                                                                                          |
 
 **Indexes & Foreign Keys**:
 
-- `index_log_clients_on_local_storage_keys` (GIN: `local_storage_keys`)
-- `index_log_clients_on_session_storage_keys` (GIN: `session_storage_keys`)
-- `index_log_clients_on_platform_and_severity` (`platform`, `severity`)
-- `index_log_clients_on_user_id_and_created_at` (`user_id`, `created_at`)
-- `index_log_clients_on_user_id` (`user_id`)
-- `index_log_clients_on_environment` (`environment`)
-- `index_log_clients_on_resolved_at` (`resolved_at`)
-- `index_log_clients_on_resolved_by_id` (`resolved_by_id`)
-- FKs to `users(id)` for `user_id`, `resolved_by_id`, `created_by_id`, `updated_by_id`.
+- `index_client_logs_on_local_storage_keys` (GIN: `local_storage_keys`)
+- `index_client_logs_on_session_storage_keys` (GIN: `session_storage_keys`)
+- `index_client_logs_on_platform_and_severity` (`platform`, `severity`)
+- `index_client_logs_on_user_id_and_created_at` (`user_id`, `created_at`)
+- `index_client_logs_on_user_id` (`user_id`)
+- `index_client_logs_on_environment` (`environment`)
+- `index_client_logs_on_resolved_at` (`resolved_at`)
+- `index_client_logs_on_resolved_by_id` (`resolved_by_id`)
+- `index_client_logs_on_version_id` (`version_id`)
+- FKs to `users(id)` for `user_id`, `resolved_by_id`, `created_by_id`, `updated_by_id`; FK to `versions(id)` `ON DELETE NULL`.
 
 ---
 
@@ -740,7 +753,82 @@ erDiagram
 
 ---
 
-## 11. Summary Matrix of Core Tables
+## 11. Versions & Installs
+
+### 11.1. `client_versions`
+
+- **Model**: [`Client::Version`](app/models/client/version.rb)
+- **Description**: Global mobile/web marketing versions. Force-update is stored per row (`is_force_update`). Only one kept row may be `published` at a time: saving a published version yanks every other kept published row. Public check computes `update_required` (client behind the live version) and `must_update` (the live version is force and greater than the client). Store listing URLs live in env (`AppConfig::IOS_STORE_URL`, `AppConfig::ANDROID_STORE_URL`), not on this table.
+
+| Column                 | Type       | Nullable | Default             | Description / Notes                                                                                           |
+| :--------------------- | :--------- | :------: | :------------------ | :------------------------------------------------------------------------------------------------------------ |
+| `id`                   | `uuid`     |    ❌    | `gen_random_uuid()` | Primary Key                                                                                                   |
+| `number`               | `string`   |    ❌    | —                   | Marketing semver `x.y.z`, unique among kept rows                                                              |
+| `title`                | `string`   |    ❌    | —                   | Release title                                                                                                 |
+| `description`          | `text`     |    ✔️    | `NULL`              | Release notes                                                                                                 |
+| `is_force_update`      | `boolean`  |    ❌    | `false`             | Client::Version flag; public check exposes computed `must_update`, not this column                            |
+| `status`               | `string`   |    ❌    | `"draft"`           | Frozen enum: `draft`, `published`, `yanked` (`VersionConstants::Status`). Unique among kept `published` rows. |
+| `released_at`          | `datetime` |    ✔️    | `NULL`              | Set on first publish if blank; future value = scheduled. UTC.                                                 |
+| `ios_build_number`     | `integer`  |    ✔️    | `NULL`              | Informational iOS `CFBundleVersion`; unique among kept when present. Not used for `must_update`.              |
+| `android_build_number` | `integer`  |    ✔️    | `NULL`              | Informational Android `versionCode`; unique among kept when present. Not used for `must_update`.              |
+| `created_by_id`        | `uuid`     |    ✔️    | `NULL`              | Auditing: Creator                                                                                             |
+| `updated_by_id`        | `uuid`     |    ✔️    | `NULL`              | Auditing: Modifier                                                                                            |
+| `discarded_by_id`      | `uuid`     |    ✔️    | `NULL`              | Auditing: Discarder                                                                                           |
+| `undiscarded_by_id`    | `uuid`     |    ✔️    | `NULL`              | Auditing: Restorer                                                                                            |
+| `discarded_at`         | `datetime` |    ✔️    | `NULL`              | Soft delete timestamp                                                                                         |
+| `undiscarded_at`       | `datetime` |    ✔️    | `NULL`              | Restore timestamp                                                                                             |
+| `created_at`           | `datetime` |    ❌    | —                   | Timestamp (UTC)                                                                                               |
+| `updated_at`           | `datetime` |    ❌    | —                   | Timestamp (UTC)                                                                                               |
+
+**Indexes & Foreign Keys**:
+
+- `index_client_versions_on_number_kept` (unique `number` where `discarded_at IS NULL`)
+- `index_client_versions_on_ios_build_number_kept` (unique `ios_build_number` where kept and not null)
+- `index_client_versions_on_android_build_number_kept` (unique `android_build_number` where kept and not null)
+- `index_client_versions_on_status` (`status`)
+- `index_client_versions_on_one_published_kept` (unique `status` where `status = 'published'` and `discarded_at IS NULL`)
+- `index_client_versions_on_released_at` (`released_at`)
+- `index_client_versions_on_discarded_at` (`discarded_at`)
+- FKs: audit columns → `users(id)`.
+
+**Live scope** (public check): kept + `status = published` + (`released_at` is `NULL` or `<= now`). At most one kept published row exists. Versions are discard/undiscard only (non-destroyable). `install_count` is computed (kept `client_user_versions` rows whose `version_id` matches); it is not a stored column. Feedback and client-log ingest send `app_version` (marketing semver); Core stores `version_id` when a kept `client_versions.number` matches, otherwise null.
+
+### 11.2. `client_user_versions`
+
+- **Model**: [`Client::UserVersion`](app/models/client/user_version.rb)
+- **Description**: Current client snapshot per user per platform (`web` / `android` / `ios`). One kept row per pair; repeat checks update `number`, `build_number`, and `last_seen_at`. `User#latest_user_version` is the kept row with the newest `last_seen_at` (Administrate user show).
+
+| Column              | Type       | Nullable | Default             | Description / Notes                                              |
+| :------------------ | :--------- | :------: | :------------------ | :--------------------------------------------------------------- |
+| `id`                | `uuid`     |    ❌    | `gen_random_uuid()` | Primary Key                                                      |
+| `user_id`           | `uuid`     |    ❌    | —                   | FK to `users.id`                                                 |
+| `platform`          | `string`   |    ❌    | —                   | Frozen enum: `web`, `android`, `ios` (`AuthConstants::Platform`) |
+| `number`            | `string`   |    ❌    | —                   | Client marketing semver last reported                            |
+| `build_number`      | `integer`  |    ✔️    | `NULL`              | Client `version_code` snapshot; informational only               |
+| `version_id`        | `uuid`     |    ✔️    | `NULL`              | Matching `Client::Version` if `number` matches a version         |
+| `last_seen_at`      | `datetime` |    ❌    | —                   | Last successful authenticated check (UTC)                        |
+| `created_by_id`     | `uuid`     |    ✔️    | `NULL`              | Auditing: Creator                                                |
+| `updated_by_id`     | `uuid`     |    ✔️    | `NULL`              | Auditing: Modifier                                               |
+| `discarded_by_id`   | `uuid`     |    ✔️    | `NULL`              | Auditing: Discarder                                              |
+| `undiscarded_by_id` | `uuid`     |    ✔️    | `NULL`              | Auditing: Restorer                                               |
+| `discarded_at`      | `datetime` |    ✔️    | `NULL`              | Soft delete timestamp                                            |
+| `undiscarded_at`    | `datetime` |    ✔️    | `NULL`              | Restore timestamp                                                |
+| `created_at`        | `datetime` |    ❌    | —                   | Timestamp (UTC)                                                  |
+| `updated_at`        | `datetime` |    ❌    | —                   | Timestamp (UTC)                                                  |
+
+**Indexes & Foreign Keys**:
+
+- `index_client_user_versions_on_user_id_and_platform_kept` (unique `[user_id, platform]` where `discarded_at IS NULL`)
+- `index_client_user_versions_on_number` (`number`)
+- `index_client_user_versions_on_last_seen_at` (`last_seen_at`)
+- `index_client_user_versions_on_discarded_at` (`discarded_at`)
+- `index_client_user_versions_on_user_id` (`user_id`)
+- `index_client_user_versions_on_version_id` (`version_id`)
+- FK to `users(id)`; FK to `versions(id)` `ON DELETE NULL`.
+
+---
+
+## 12. Summary Matrix of Core Tables
 
 | Table Name               | Model                                                                                                           | Domain         | Soft Deletion | Audited | Polymorphic Targets                  |
 | :----------------------- | :-------------------------------------------------------------------------------------------------------------- | :------------- | :-----------: | :-----: | :----------------------------------- |
@@ -758,13 +846,15 @@ erDiagram
 | `chat_messages`          | [`Chat::Message`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/chat/message.rb)                  | AI / Chat      |      ✔️       |   ✔️    | `assets` (`assetable`)               |
 | `assets`                 | [`Asset`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/asset.rb)                                 | Media          |      ✔️       |   ✔️    | Belongs to `assetable` (Polymorphic) |
 | `feedbacks`              | [`Feedback`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/feedback.rb)                           | Support        |      ✔️       |   ✔️    | —                                    |
-| `log_clients`            | [`Log::Client`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/log/client.rb)                      | Diagnostics    |      ✔️       |   ✔️    | —                                    |
+| `client_logs`            | [`Client::Log`](app/models/client/log.rb)                                                                       | Diagnostics    |      ✔️       |   ✔️    | —                                    |
 | `notifications`          | [`Notification`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/notification.rb)                   | Notifications  |      ✔️       |   ✔️    | —                                    |
 | `user_notifications`     | [`UserNotification`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/user_notification.rb)          | Notifications  |      ✔️       |   ✔️    | —                                    |
+| `client_versions`        | [`Client::Version`](app/models/client/version.rb)                                                               | Versions       |      ✔️       |   ✔️    | —                                    |
+| `client_user_versions`   | [`Client::UserVersion`](app/models/client/user_version.rb)                                                      | Versions       |      ✔️       |   ✔️    | —                                    |
 
 ---
 
-## 12. Excluded Infrastructure Tables
+## 13. Excluded Infrastructure Tables
 
 The following tables are managed automatically by backend engine gems and are excluded from core application business logic:
 

@@ -15,6 +15,8 @@ module SortConstants
     CHAT_ROOM   = %w[created_at title message_count discarded_at].freeze
     CHAT_MSG    = %w[created_at role discarded_at].freeze
     FEEDBACK    = %w[created_at user_name rating].freeze
+    VERSION     = %w[created_at number title status released_at discarded_at install_count].freeze
+    USER_VERSION = %w[last_seen_at number platform created_at].freeze
     CLIENT_LOG  = %w[created_at occurrence_count resolved_at].freeze
     NOTIF       = %w[created_at event].freeze
     ASSET       = %w[created_at name type format size_bytes duration_secs source discarded_at].freeze

@@ -1,7 +1,7 @@
 # app/controllers/concerns/application_helper.rb
 module ApplicationHelper
   def render_json_response(status_code:, message:, error: nil, data: nil, pagy: nil)
-    success = status_code == 200 || status_code == 201
+    success = status_code.between?(200, 299)
     response = {
       status: {
         code: status_code,
@@ -48,6 +48,7 @@ module ApplicationHelper
     case status_code
     when 200 then :ok
     when 201 then :created
+    when 202 then :accepted
     when 401 then :unauthorized
     when 403 then :forbidden
     when 429 then :too_many_requests

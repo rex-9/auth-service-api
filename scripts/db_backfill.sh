@@ -117,8 +117,8 @@ docker compose -f docker-compose.dev.yaml exec api bundle exec rails runner "
       access.update_columns(status: new_status)
     end
 
-    if defined?(Log::Client)
-      Log::Client.where(occurrence_count: nil).update_all(occurrence_count: 1)
+    if defined?(Client::Log)
+      Client::Log.where(occurrence_count: nil).update_all(occurrence_count: 1)
     end
     puts '  ✅ Accesses and client logs sanitized.'
 

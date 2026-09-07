@@ -10,9 +10,9 @@ module Openapi
     SECURITY = [ { bearerAuth: [] } ].freeze
     STATUSES = Chat::Message::STATUSES.values.freeze
     AI_ROLES = [ AiConstants::ChatRole::USER, AiConstants::ChatRole::ASSISTANT ].freeze
-    LOG_SEVERITIES = Log::Client.severities.keys.freeze
-    LOG_PLATFORMS = Log::Client.platforms.keys.freeze
-    LOG_ENVIRONMENTS = Log::Client.environments.keys.freeze
+    LOG_SEVERITIES = Client::Log.severities.keys.freeze
+    LOG_PLATFORMS = Client::Log.platforms.keys.freeze
+    LOG_ENVIRONMENTS = Client::Log.environments.keys.freeze
 
     def ref(name)
       { "$ref": "#/components/schemas/#{name}" }
@@ -213,6 +213,26 @@ module Openapi
           }
         )
       ),
+      user_version_request: object(
+        required: [ :user_version ],
+        user_version: object(
+          required: [ :version ],
+          version: { type: :string, example: "1.2.0", description: "Client marketing semver x.y.z" },
+          version_code: { type: :integer, minimum: 1, nullable: true, example: 84, description: "Optional client build number" }
+        )
+      ),
+      admin_version_request: object(
+        required: [ :version ],
+        version: object(
+          number: { type: :string, example: "1.2.0", description: "Marketing semver x.y.z" },
+          title: { type: :string, example: "Spring release" },
+          description: { type: :string, nullable: true, example: "Release notes" },
+          is_force_update: { type: :boolean, example: false },
+          status: { type: :string, enum: VersionConstants::Status::ALL, example: "draft" },
+          ios_build_number: { type: :integer, minimum: 1, nullable: true, example: 90 },
+          android_build_number: { type: :integer, minimum: 1, nullable: true, example: 84 }
+        )
+      ),
       admin_chat_room_request: object(
         required: [ :room ],
         room: object(
@@ -303,7 +323,12 @@ module Openapi
           category: { type: :string, nullable: true, example: "general" },
           priority: { type: :string, nullable: true, example: "normal" },
           platform: { type: :string, nullable: true, example: "web" },
-          app_version: { type: :string, nullable: true, example: "1.0.0" },
+          app_version: {
+            type: :string,
+            nullable: true,
+            example: "1.0.0",
+            description: "Client marketing semver. Looked up against versions.number and stored as version_id. Unknown or missing leaves version_id null."
+          },
           os: { type: :string, nullable: true, example: "mac" },
           device: { type: :string, nullable: true, example: "MacBookPro" },
           browser: { type: :string, nullable: true, example: "Chrome" },
@@ -366,7 +391,11 @@ module Openapi
           severity: { type: :string, enum: LOG_SEVERITIES, default: "error" },
           platform: { type: :string, enum: LOG_PLATFORMS, nullable: true },
           environment: { type: :string, enum: LOG_ENVIRONMENTS, nullable: true },
-          app_version: { type: :string, nullable: true },
+          app_version: {
+            type: :string,
+            nullable: true,
+            description: "Client marketing semver. Looked up against versions.number and stored as version_id. Unknown or missing leaves version_id null."
+          },
           browser: { type: :string, nullable: true },
           user_agent: { type: :string, nullable: true },
           os: { type: :string, nullable: true },
@@ -430,6 +459,10 @@ module Openapi
         assetable_id: UUID.merge(description: "UUID of the linked resource."),
         duration_secs: { type: :integer, description: "Duration in seconds for audio / video files." },
         size_bytes: { type: :integer, description: "Exact file size in bytes." }
+      ),
+      asset_thumbnail_upload_request: object(
+        required: [ :file ],
+        file: { type: :string, format: :binary }
       ),
       checkout_session_request: object(
         required: %i[product_id success_url cancel_url],
@@ -718,6 +751,17 @@ module Openapi
         status: { type: :string, enum: MediaConstants::Status::ALL },
         assetable_type: { type: :string, nullable: true, description: "Polymorphic owner model, e.g. chat_message or user." },
         assetable_id: UUID.merge(nullable: true),
+        parent_asset_id: UUID.merge(nullable: true),
+        thumbnail: {
+          type: :object,
+          nullable: true,
+          properties: {
+            id: UUID,
+            url: { type: :string, format: :uri },
+            status: { type: :string, enum: MediaConstants::Status::ALL },
+            size_bytes: { type: :integer, nullable: true }
+          }
+        },
         created_at: DATE_TIME,
         updated_at: DATE_TIME
       ),
@@ -832,6 +876,130 @@ module Openapi
             body: { type: :object, additionalProperties: true },
             parameters: [ { name: "Stripe-Signature", in: :header, required: true, schema: { type: :string } } ],
             errors: [ 400, 500, 503 ]
+          )
+        },
+        "/v1/client/versions/current" => {
+          get: operation(
+            tags: "Versions",
+            summary: "Check the latest live app version and whether the client should update",
+            description: "Public splash check. Query version (semver) drives update_required, must_update, and skip_premium. Missing or invalid JWT still returns 200. A valid JWT requires read_versions. Install tracking is POST /v1/client/versions/user-version.",
+            security: nil,
+            parameters: [
+              query_parameter(:version, description: "Client marketing semver x.y.z")
+            ],
+            errors: []
+          )
+        },
+        "/v1/client/versions/user-version" => {
+          post: operation(
+            tags: "Versions",
+            summary: "Record the current user's version for this platform",
+            description: "Authenticated upsert of Client::UserVersion for the current user and X-Platform. Requires create_user_versions. version is required marketing semver; version_code is optional.",
+            body: ref(:user_version_request),
+            success: 201,
+            errors: [ 401, 403, 422 ]
+          )
+        },
+        "/v1/admin/client/versions" => {
+          get: operation(
+            tags: "Admin / Versions",
+            summary: "List versions for the admin client",
+            description: "Super-admin only.",
+            parameters: [
+              query_parameter(:status, enum: VersionConstants::Status::ALL),
+              query_parameter(:page, type: :integer),
+              query_parameter(:limit, type: :integer),
+              query_parameter(:sort_by, type: :string),
+              query_parameter(:sort_order, enum: SortConstants::Order::ALL)
+            ],
+            errors: [ 401, 403 ]
+          ),
+          post: operation(
+            tags: "Admin / Versions",
+            summary: "Create a version",
+            description: "Super-admin only.",
+            success: 201,
+            body: ref(:admin_version_request),
+            errors: [ 401, 403, 422 ]
+          )
+        },
+        "/v1/admin/client/versions/discarded" => {
+          get: operation(
+            tags: "Admin / Versions",
+            summary: "List discarded versions",
+            description: "Super-admin only.",
+            parameters: [
+              query_parameter(:page, type: :integer),
+              query_parameter(:limit, type: :integer),
+              query_parameter(:sort_by, type: :string),
+              query_parameter(:sort_order, enum: SortConstants::Order::ALL)
+            ],
+            errors: [ 401, 403 ]
+          )
+        },
+        "/v1/admin/client/versions/{id}" => {
+          get: operation(
+            tags: "Admin / Versions",
+            summary: "Get a version",
+            description: "Super-admin only.",
+            parameters: [ path_parameter(:id) ],
+            errors: [ 401, 403, 404 ]
+          ),
+          put: operation(
+            tags: "Admin / Versions",
+            summary: "Update a version",
+            description: "Super-admin only.",
+            parameters: [ path_parameter(:id) ],
+            body: ref(:admin_version_request),
+            errors: [ 401, 403, 404, 422 ]
+          )
+        },
+        "/v1/admin/client/versions/{id}/discard" => {
+          post: operation(
+            tags: "Admin / Versions",
+            summary: "Discard a version",
+            description: "Super-admin only.",
+            parameters: [ path_parameter(:id) ],
+            errors: [ 401, 403, 404 ]
+          )
+        },
+        "/v1/admin/client/versions/{id}/undiscard" => {
+          post: operation(
+            tags: "Admin / Versions",
+            summary: "Restore a discarded version",
+            description: "Super-admin only.",
+            parameters: [ path_parameter(:id) ],
+            errors: [ 401, 403, 404 ]
+          )
+        },
+        "/v1/admin/client/versions/{id}/user_versions" => {
+          get: operation(
+            tags: "Admin / Versions",
+            summary: "List current user versions for a version",
+            description: "Super-admin only.",
+            parameters: [
+              path_parameter(:id),
+              query_parameter(:page, type: :integer),
+              query_parameter(:limit, type: :integer),
+              query_parameter(:sort_by, type: :string),
+              query_parameter(:sort_order, enum: SortConstants::Order::ALL)
+            ],
+            errors: [ 401, 403, 404 ]
+          )
+        },
+        "/v1/admin/client/versions/user_versions" => {
+          get: operation(
+            tags: "Admin / User Versions",
+            summary: "List current user versions",
+            description: "Super-admin only. All current user+platform snapshots under the versions admin namespace.",
+            parameters: [
+              query_parameter(:platform, enum: AuthConstants::Platform::ALL),
+              query_parameter(:page, type: :integer),
+              query_parameter(:limit, type: :integer),
+              query_parameter(:sort_by, type: :string),
+              query_parameter(:sort_order, enum: SortConstants::Order::ALL)
+            ],
+            errors: [ 401, 403 ]
           )
         },
         "/v1/users/current" => {
@@ -1036,7 +1204,7 @@ module Openapi
       log_filters = %i[severity platform environment unresolved resolved storage_issues].map do |name|
         query_parameter(name, type: name.in?(%i[unresolved resolved storage_issues]) ? :boolean : :string)
       end
-      paths["/v1/log/clients"] = {
+      paths["/v1/client/logs"] = {
         get: operation(tags: "Client Logs", summary: "List and filter client error reports",
                        parameters: log_filters + [
                          query_parameter(:limit, type: :integer, minimum: 1),
@@ -1047,14 +1215,14 @@ module Openapi
         post: operation(tags: "Client Logs", summary: "Report or increment a client error", success: 201,
                         security: nil, body: ref(:client_log_request), errors: [ 422 ])
       }
-      paths["/v1/log/clients/{id}"] = {
+      paths["/v1/client/logs/{id}"] = {
         get: operation(tags: "Client Logs", summary: "Get a client error report",
                        parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ]),
         delete: operation(tags: "Client Logs", summary: "Delete a client error report",
                           parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ])
       }
       %w[resolve unresolve].each do |action|
-        paths["/v1/log/clients/{id}/#{action}"] = {
+        paths["/v1/client/logs/{id}/#{action}"] = {
           put: operation(tags: "Client Logs", summary: "Mark a client error as #{action}d",
                          parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ])
         }
@@ -1243,6 +1411,26 @@ module Openapi
       paths["/v1/admin/assets/{id}/compress"] = {
         post: operation(tags: "Admin / Assets", summary: "Manually trigger background compression for an asset",
                         parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422 ])
+      }
+      paths["/v1/admin/assets/{id}/download"] = {
+        get: operation(tags: "Admin / Assets", summary: "Get a signed attachment URL for an asset",
+                       parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ])
+      }
+      paths["/v1/admin/assets/{id}/thumbnail/regenerate"] = {
+        post: operation(tags: "Admin / Assets", summary: "Queue video thumbnail regeneration",
+                        success: 202, parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422 ])
+      }
+      paths["/v1/admin/assets/{id}/thumbnail/upload"] = {
+        post: operation(tags: "Admin / Assets", summary: "Upload and replace a video thumbnail",
+                        parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422, 500 ])
+      }
+      paths["/v1/admin/assets/{id}/thumbnail/upload"][:post][:requestBody] = {
+        required: true,
+        content: {
+          "multipart/form-data" => {
+            schema: ref(:asset_thumbnail_upload_request)
+          }
+        }
       }
 
       paths["/v1/assets"] = {
