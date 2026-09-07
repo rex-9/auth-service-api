@@ -102,7 +102,7 @@ All tables use **UUID** primary keys (`gen_random_uuid()`), utilize **Discard** 
 | **Telemetry**        | `Log::Client`                                                                                | Frontend error ingest (stack traces, device, OS, browser, URL, severity, occurrences, local/session storage keys, cookies, resolution status).                                                                                                                                                         |
 | **Feedback**         | `Feedback`                                                                                   | Intelligent in-place feedback (1-10 rating, auto-inferred category: `bug`/`feature_request`/`improvement`/`general`, priority: `low`/`normal`/`high`/`urgent`, status, automated device/route telemetry).                                                                                              |
 | **Notifications**    | `Notification`, `UserNotification`                                                           | Multi-channel notification repository (In-App, Push, Email) with dynamic variable interpolation; persistent user in-app inbox receipts with immutable snapshots, read tracking, and Pagy pagination.                                                                                                   |
-| **App versions**     | `AppVersion`, `AppInstall`                                                                   | Global marketing versions (`draft` / `published` / `yanked`) and one current install snapshot per user per platform. Public `GET /v1/app_versions/current` computes `update_required` (client behind latest) and `must_update` (behind a live force row). Signed-in `POST /v1/app_installs` records the device. JSON admin `/v1/admin/app_versions` is super-admin only (discard/undiscard, `install_count`, `GET /v1/admin/app_versions/:id/installs`). Administrate `/admin/app_versions` is super-admin only; installs are `/admin/app_installs`. The user show page lists only `latest_app_install` (newest `last_seen_at`). |
+| **App versions**     | `Version`, `UserVersion`                                                                     | Global marketing versions (`draft` / `published` / `yanked`; publishing yanks every other kept published row) and one current user-version snapshot per user per platform. Public `GET /v1/versions/current` computes `update_required` (client behind the live version) and `must_update` (live version is force and greater than the client). Signed-in `POST /v1/versions/user-version` records the device. JSON admin `/v1/admin/versions` is super-admin only (discard/undiscard, `install_count`). `GET /v1/admin/versions/user_versions` lists all current snapshots (not nested under a version id). Administrate `/admin/versions` is super-admin only; user versions are `/admin/user_versions`. The user show page lists only `latest_user_version` (newest `last_seen_at`). |
 
 ### ⚙️ Services & Background Jobs (Solid Queue / Waka / Media)
 
@@ -144,7 +144,7 @@ The ecosystem employs a clean, unified Role-Based Access Control (RBAC) model ac
    - Web client renders **ALL** navigation items in the admin sidebar.
 2. **`admin` (Standard Administrator)**:
    - Full operational access across domain resources (`feedbacks`, `payments`, `ai`, `assets`, `logs`, `notifications`).
-   - **Strict Restriction**: Restricted from managing `users`, `iam`, and `app_versions`. The Web admin sidebar dynamically hides User Management, IAM, and App Versions navigation items.
+   - **Strict Restriction**: Restricted from managing `users`, `iam`, `versions`, and `user_versions`. The Web admin sidebar dynamically hides User Management, IAM, App Versions, and User Versions navigation items.
 3. **Partial Admin (`*_admin` Suffix Naming Law)**:
    - For scoped roles (e.g. `feedback_admin`, `payment_admin`, `ai_admin`), developers MUST name the role with the `_admin` suffix. Any role whose name contains `admin` is treated as an admin role.
    - Partial admins possess the base `user` role plus their specific `*_admin` role.
@@ -162,7 +162,8 @@ The `/v1/admin/` namespace provides comprehensive management capabilities protec
 - **IAM Management**: `GET/PATCH/DELETE /v1/admin/iam/roles` and `GET/POST/PATCH/DELETE /v1/admin/iam/permissions` (auto-named).
 - **Chat Moderation**: `GET/PATCH/DELETE /v1/admin/chat/rooms` and `/messages`.
 - **Product Management**: `GET/POST/PATCH/DELETE /v1/admin/payment/products` (Stripe sync, discard/undiscard).
-- **App Versions**: Super-admin only. `GET/POST /v1/admin/app_versions`, `GET/PATCH /v1/admin/app_versions/:id`, discard/undiscard, `GET /v1/admin/app_versions/discarded`, and `GET /v1/admin/app_versions/:id/installs`. Version payloads include `install_count`.
+- **App Versions**: Super-admin only. `GET/POST /v1/admin/versions`, `GET/PUT /v1/admin/versions/:id`, discard/undiscard, `GET /v1/admin/versions/discarded`, and `GET /v1/admin/versions/:id/user_versions`. Version payloads include `install_count`.
+- **User Versions**: Super-admin only. `GET /v1/admin/versions/user_versions` lists all current user+platform snapshots (optional `platform` filter).
 - **Asset Management**: `GET/PUT/DELETE /v1/admin/assets` (environment-agnostic CRUD + upload + discard/undiscard/destroy across the complete assets table, search, filter by type/format/source, Garage-owned storage partitioning, dynamic in-place S3 rename on type update, super-admin-only `GET /v1/admin/assets/storage_stats` with complete database totals, per-environment Garage object/byte usage, and bucket/VPS disk metrics, real-time ActionCable compression status updates, secondary compression pass trigger with 2-pass safeguard).
 - **Notification Broadcasts**: `GET /v1/admin/notifications`, `POST /v1/admin/notifications`, and `POST /v1/admin/notifications/dispatch` (audience targeting via roles/users/all, multi-channel fanout).
 
@@ -286,7 +287,7 @@ All three pillars of the Rexone platform are fully aligned at **100% feature par
   Accept-Language: en | my
   Content-Type: application/json
   ```
-- **App version splash check**: `GET /v1/app_versions/current?app_version=1.2.0` (no JWT required). Send `X-Platform: ios|android|web`. `update_required` is true when client semver is strictly less than the latest live number (optional update dialog). `must_update` is true when any live force row is greater than the client (hard block). `skip_premium` is true when client semver is strictly greater than the latest live version number. `store_url` comes from `IOS_STORE_URL` or `ANDROID_STORE_URL` env by `X-Platform` (web is null). This check does not write `AppInstall`. Unsigned or invalid JWT still returns 200. A valid JWT requires `read_app_versions`. After sign-in, `POST /v1/app_installs` with `{ app_install: { app_version, version_code } }` upserts one row per user per platform (`create_app_installs`). Clients show an update dialog when `update_required` is true and hard-block the app when `must_update` is true; mobile opens `store_url`. Clients skip the paywall when `skip_premium` is true.
+- **App version splash check**: `GET /v1/versions/current?version=1.2.0` (no JWT required). Send `X-Platform: ios|android|web`. `update_required` is true when client semver is strictly less than the live number (optional update dialog). `must_update` is true when the live version is a force update and greater than the client (hard block). `skip_premium` is true when client semver is strictly greater than the live version number. `store_url` comes from `IOS_STORE_URL` or `ANDROID_STORE_URL` env by `X-Platform` (web is null). This check does not write `UserVersion`. Unsigned or invalid JWT still returns 200. A valid JWT requires `read_versions`. After sign-in, `POST /v1/versions/user-version` with `{ user_version: { version, version_code } }` upserts one row per user per platform (`create_user_versions`). Publishing a version yanks every other kept published row. Clients show an update dialog when `update_required` is true and hard-block the app when `must_update` is true; mobile opens `store_url`. Clients skip the paywall when `skip_premium` is true.
 - **Standard JSON:API Response Envelope**:
   ```json
   {
@@ -344,7 +345,7 @@ Payload sent on uncaught errors in Web and Mobile:
     "severity": "error",
     "platform": "web" | "android" | "ios",
     "environment": "development" | "staging" | "production",
-    "app_version": "1.0.0",
+    "version": "1.0.0",
     "os": "Android",
     "os_version": "14",
     "device": "Pixel 8",
@@ -378,7 +379,7 @@ Payload sent on uncaught errors in Web and Mobile:
   - **Rails Pulse**: Server hardware, CPU load, memory usage, request latency, slow database queries.
   - **RED (Rails Error Dashboard)**: Server-side Ruby exceptions, 500 errors, and Rails backtraces.
   - **Solid UI / Solid Queue**: Background jobs, queue throughput, retry backoffs, cron schedules.
-  - **Rails Administrate**: Low-level database table CRUD for development and database inspection. App versions at `/admin/app_versions` is super-admin only; install snapshots are read-only at `/admin/app_installs`.
+  - **Rails Administrate**: Low-level database table CRUD for development and database inspection. App versions at `/admin/versions` is super-admin only; user-version snapshots are read-only at `/admin/user_versions`.
 - **Client Admin Panel (React SPA)**:
   - Focuses exclusively on **Business Growth, Governance, and End-User Operations**:
     - Operational Analytics & KPIs (Gross revenue, active subscriptions, user acquisition, AI chat usage — see [ANALYTICS.md](ANALYTICS.md)).

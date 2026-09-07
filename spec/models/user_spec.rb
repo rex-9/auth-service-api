@@ -136,21 +136,21 @@ RSpec.describe User, type: :model do
     end
   end
 
-  describe "latest_app_install" do
-    it "returns the install with the newest last_seen_at" do
+  describe "latest_user_version" do
+    it "returns the user version with the newest last_seen_at" do
       user = create(:user)
-      user.app_installs.create!(
+      user.user_versions.create!(
         platform: AuthConstants::Platform::WEB,
         number: "1.0.0",
         last_seen_at: 2.days.ago
       )
-      latest = user.app_installs.create!(
+      latest = user.user_versions.create!(
         platform: AuthConstants::Platform::IOS,
         number: "1.1.0",
         last_seen_at: 1.hour.ago
       )
 
-      expect(user.latest_app_install).to eq(latest)
+      expect(user.latest_user_version).to eq(latest)
     end
   end
 end

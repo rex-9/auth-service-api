@@ -1,5 +1,5 @@
-class AppVersionAdminSerializer < ApplicationSerializer
-  set_type :app_version
+class VersionAdminSerializer < ApplicationSerializer
+  set_type :version
 
   attributes :number,
              :title,

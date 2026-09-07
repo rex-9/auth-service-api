@@ -1,6 +1,0 @@
-en:
-  app_install:
-    created: "App install recorded successfully."
-    updated: "App install updated successfully."
-    create_failed: "Unable to record app install."
-    fetched: "App installs fetched successfully."

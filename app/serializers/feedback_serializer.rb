@@ -8,7 +8,7 @@ class FeedbackSerializer < ApplicationSerializer
              :priority,
              :status,
              :platform,
-             :app_version,
+             :version,
              :os,
              :device,
              :browser,

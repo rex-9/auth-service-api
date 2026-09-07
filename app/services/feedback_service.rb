@@ -88,7 +88,7 @@ class FeedbackService
         priority: priority,
         status: FeedbackConstants::Status::NEW,
         platform: platform,
-        app_version: params[:app_version],
+        version: params[:version],
         os: params[:os],
         device: params[:device],
         browser: params[:browser],

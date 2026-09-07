@@ -39,8 +39,10 @@ tags:
   description: Admin analytics overview metrics and KPIs.
 - name: Admin / Assets
   description: Admin asset management, upload, and media compression.
-- name: Admin / App Versions
-  description: Super-admin only app versions CRUD with discard and restore.
+- name: Admin / Versions
+  description: Super-admin only version CRUD with discard and restore.
+- name: Admin / User Versions
+  description: Super-admin only current user version snapshots.
 - name: IAM Permissions
   description: Super-admin permission management.
 - name: IAM Roles
@@ -51,7 +53,7 @@ tags:
   description: Products, checkout sessions, subscriptions, and transactions.
 - name: Accesses
   description: Product-access inspection and revocation.
-- name: App Versions
+- name: Versions
   description: Public force-update check and authenticated install recording.
 - name: Feedbacks
   description: User feedback submission and inspection.
@@ -258,8 +260,8 @@ components:
           - clients
           - feedbacks
           - analytics
-          - app_versions
-          - app_installs
+          - versions
+          - user_versions
           example: users
       required: []
     admin_user_request:
@@ -318,13 +320,13 @@ components:
           required: []
       required:
       - user
-    app_install_request:
+    user_version_request:
       type: object
       properties:
-        app_install:
+        user_version:
           type: object
           properties:
-            app_version:
+            version:
               type: string
               example: 1.2.0
               description: Client marketing semver x.y.z
@@ -335,13 +337,13 @@ components:
               example: 84
               description: Optional client build number
           required:
-          - app_version
+          - version
       required:
-      - app_install
-    admin_app_version_request:
+      - user_version
+    admin_version_request:
       type: object
       properties:
-        app_version:
+        version:
           type: object
           properties:
             number:
@@ -377,7 +379,7 @@ components:
               example: 84
           required: []
       required:
-      - app_version
+      - version
     admin_chat_room_request:
       type: object
       properties:
@@ -553,7 +555,7 @@ components:
               type: string
               nullable: true
               example: web
-            app_version:
+            version:
               type: string
               nullable: true
               example: 1.0.0
@@ -727,7 +729,7 @@ components:
               - staging
               - production
               nullable: true
-            app_version:
+            version:
               type: string
               nullable: true
             browser:
@@ -2377,10 +2379,10 @@ paths:
             schema:
               type: object
               additionalProperties: true
-  "/v1/app_versions/current":
+  "/v1/versions/current":
     get:
       tags:
-      - App Versions
+      - Versions
       summary: Check the latest live app version and whether the client should update
       parameters:
       - name: X-Locale
@@ -2403,7 +2405,7 @@ paths:
           - web
           - mobile
           default: web
-      - name: app_version
+      - name: version
         in: query
         required: false
         description: Client marketing semver x.y.z
@@ -2416,14 +2418,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/response"
-      description: Public splash check. Query app_version (semver) drives update_required,
+      description: Public splash check. Query version (semver) drives update_required,
         must_update, and skip_premium. Missing or invalid JWT still returns 200. A
-        valid JWT requires read_app_versions. Install tracking is POST /v1/app_installs.
-  "/v1/app_installs":
+        valid JWT requires read_versions. Install tracking is POST /v1/versions/user-version.
+  "/v1/versions/user-version":
     post:
       tags:
-      - App Versions
-      summary: Record the current user's app install for this platform
+      - Versions
+      summary: Record the current user's version for this platform
       parameters:
       - name: X-Locale
         in: header
@@ -2470,8 +2472,8 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/error_response"
-      description: Authenticated upsert of AppInstall for the current user and X-Platform.
-        Requires create_app_installs. app_version is required marketing semver; version_code
+      description: Authenticated upsert of UserVersion for the current user and X-Platform.
+        Requires create_user_versions. version is required marketing semver; version_code
         is optional.
       security:
       - bearerAuth: []
@@ -2480,12 +2482,12 @@ paths:
         content:
           application/json:
             schema:
-              "$ref": "#/components/schemas/app_install_request"
-  "/v1/admin/app_versions":
+              "$ref": "#/components/schemas/user_version_request"
+  "/v1/admin/versions":
     get:
       tags:
-      - Admin / App Versions
-      summary: List app versions for the admin client
+      - Admin / Versions
+      summary: List versions for the admin client
       parameters:
       - name: X-Locale
         in: header
@@ -2563,8 +2565,8 @@ paths:
       - bearerAuth: []
     post:
       tags:
-      - Admin / App Versions
-      summary: Create an app version
+      - Admin / Versions
+      summary: Create a version
       parameters:
       - name: X-Locale
         in: header
@@ -2619,12 +2621,12 @@ paths:
         content:
           application/json:
             schema:
-              "$ref": "#/components/schemas/admin_app_version_request"
-  "/v1/admin/app_versions/discarded":
+              "$ref": "#/components/schemas/admin_version_request"
+  "/v1/admin/versions/discarded":
     get:
       tags:
-      - Admin / App Versions
-      summary: List discarded app versions
+      - Admin / Versions
+      summary: List discarded versions
       parameters:
       - name: X-Locale
         in: header
@@ -2691,11 +2693,11 @@ paths:
       description: Super-admin only.
       security:
       - bearerAuth: []
-  "/v1/admin/app_versions/{id}":
+  "/v1/admin/versions/{id}":
     get:
       tags:
-      - Admin / App Versions
-      summary: Get an app version
+      - Admin / Versions
+      summary: Get a version
       parameters:
       - name: X-Locale
         in: header
@@ -2751,10 +2753,10 @@ paths:
       description: Super-admin only.
       security:
       - bearerAuth: []
-    patch:
+    put:
       tags:
-      - Admin / App Versions
-      summary: Update an app version
+      - Admin / Versions
+      summary: Update a version
       parameters:
       - name: X-Locale
         in: header
@@ -2821,12 +2823,12 @@ paths:
         content:
           application/json:
             schema:
-              "$ref": "#/components/schemas/admin_app_version_request"
-  "/v1/admin/app_versions/{id}/discard":
+              "$ref": "#/components/schemas/admin_version_request"
+  "/v1/admin/versions/{id}/discard":
     post:
       tags:
-      - Admin / App Versions
-      summary: Discard an app version
+      - Admin / Versions
+      summary: Discard a version
       parameters:
       - name: X-Locale
         in: header
@@ -2882,11 +2884,11 @@ paths:
       description: Super-admin only.
       security:
       - bearerAuth: []
-  "/v1/admin/app_versions/{id}/undiscard":
+  "/v1/admin/versions/{id}/undiscard":
     post:
       tags:
-      - Admin / App Versions
-      summary: Restore a discarded app version
+      - Admin / Versions
+      summary: Restore a discarded version
       parameters:
       - name: X-Locale
         in: header
@@ -2942,11 +2944,11 @@ paths:
       description: Super-admin only.
       security:
       - bearerAuth: []
-  "/v1/admin/app_versions/{id}/installs":
+  "/v1/admin/versions/{id}/user_versions":
     get:
       tags:
-      - Admin / App Versions
-      summary: List current installs for an app version
+      - Admin / Versions
+      summary: List current user versions for a version
       parameters:
       - name: X-Locale
         in: header
@@ -3023,6 +3025,87 @@ paths:
               schema:
                 "$ref": "#/components/schemas/error_response"
       description: Super-admin only.
+      security:
+      - bearerAuth: []
+  "/v1/admin/versions/user_versions":
+    get:
+      tags:
+      - Admin / User Versions
+      summary: List current user versions
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: platform
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - web
+          - android
+          - ios
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - asc
+          - desc
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      description: Super-admin only. All current user+platform snapshots under the
+        versions admin namespace.
       security:
       - bearerAuth: []
   "/v1/users/current":

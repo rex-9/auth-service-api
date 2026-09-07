@@ -1,6 +1,6 @@
-# app/serializers/app_version_serializer.rb
+# app/serializers/version_serializer.rb
 
-class AppVersionSerializer < ApplicationSerializer
+class VersionSerializer < ApplicationSerializer
   attributes :number,
              :title,
              :description,

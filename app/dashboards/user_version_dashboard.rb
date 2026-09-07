@@ -1,8 +1,8 @@
 require "administrate/base_dashboard"
 
-class AppInstallDashboard < Administrate::BaseDashboard
-  def display_resource(app_install)
-    "#{app_install.platform} #{app_install.number}"
+class UserVersionDashboard < Administrate::BaseDashboard
+  def display_resource(user_version)
+    "#{user_version.platform} #{user_version.number}"
   end
 
   ATTRIBUTE_TYPES = {
@@ -12,7 +12,7 @@ class AppInstallDashboard < Administrate::BaseDashboard
     number: Field::String,
     build_number: Field::Number,
     last_seen_at: Field::DateTime,
-    app_version: Field::BelongsTo,
+    version: Field::BelongsTo,
     created_by_id: Field::String,
     creator: Field::BelongsTo,
     discarded_at: Field::DateTime,
@@ -42,7 +42,7 @@ class AppInstallDashboard < Administrate::BaseDashboard
     number
     build_number
     last_seen_at
-    app_version
+    version
     created_at
     updated_at
   ].freeze

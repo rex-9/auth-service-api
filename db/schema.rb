@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_05_190002) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_07_170000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "uuid-ossp"
@@ -42,62 +42,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_190002) do
     t.index ["user_id", "product_id"], name: "index_accesses_on_user_id_and_product_id", unique: true
     t.index ["user_id", "status"], name: "index_accesses_on_user_id_and_status"
     t.index ["user_id"], name: "index_accesses_on_user_id"
-  end
-
-  create_table "app_installs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "app_version_id"
-    t.integer "build_number"
-    t.datetime "created_at", null: false
-    t.uuid "created_by_id"
-    t.datetime "discarded_at"
-    t.uuid "discarded_by_id"
-    t.datetime "last_seen_at", null: false
-    t.string "number", null: false
-    t.string "platform", null: false
-    t.datetime "undiscarded_at"
-    t.uuid "undiscarded_by_id"
-    t.datetime "updated_at", null: false
-    t.uuid "updated_by_id"
-    t.uuid "user_id", null: false
-    t.index ["app_version_id"], name: "index_app_installs_on_app_version_id"
-    t.index ["created_by_id"], name: "index_app_installs_on_created_by_id"
-    t.index ["discarded_at"], name: "index_app_installs_on_discarded_at"
-    t.index ["discarded_by_id"], name: "index_app_installs_on_discarded_by_id"
-    t.index ["last_seen_at"], name: "index_app_installs_on_last_seen_at"
-    t.index ["number"], name: "index_app_installs_on_number"
-    t.index ["undiscarded_by_id"], name: "index_app_installs_on_undiscarded_by_id"
-    t.index ["updated_by_id"], name: "index_app_installs_on_updated_by_id"
-    t.index ["user_id", "platform"], name: "index_app_installs_on_user_id_and_platform_kept", unique: true, where: "(discarded_at IS NULL)"
-    t.index ["user_id"], name: "index_app_installs_on_user_id"
-  end
-
-  create_table "app_versions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.integer "android_build_number"
-    t.datetime "created_at", null: false
-    t.uuid "created_by_id"
-    t.text "description"
-    t.datetime "discarded_at"
-    t.uuid "discarded_by_id"
-    t.integer "ios_build_number"
-    t.boolean "is_force_update", default: false, null: false
-    t.string "number", null: false
-    t.datetime "released_at"
-    t.string "status", default: "draft", null: false
-    t.string "title", null: false
-    t.datetime "undiscarded_at"
-    t.uuid "undiscarded_by_id"
-    t.datetime "updated_at", null: false
-    t.uuid "updated_by_id"
-    t.index ["android_build_number"], name: "index_app_versions_on_android_build_number_kept", unique: true, where: "((discarded_at IS NULL) AND (android_build_number IS NOT NULL))"
-    t.index ["created_by_id"], name: "index_app_versions_on_created_by_id"
-    t.index ["discarded_at"], name: "index_app_versions_on_discarded_at"
-    t.index ["discarded_by_id"], name: "index_app_versions_on_discarded_by_id"
-    t.index ["ios_build_number"], name: "index_app_versions_on_ios_build_number_kept", unique: true, where: "((discarded_at IS NULL) AND (ios_build_number IS NOT NULL))"
-    t.index ["number"], name: "index_app_versions_on_number_kept", unique: true, where: "(discarded_at IS NULL)"
-    t.index ["released_at"], name: "index_app_versions_on_released_at"
-    t.index ["status"], name: "index_app_versions_on_status"
-    t.index ["undiscarded_by_id"], name: "index_app_versions_on_undiscarded_by_id"
-    t.index ["updated_by_id"], name: "index_app_versions_on_updated_by_id"
   end
 
   create_table "assets", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -178,7 +122,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_190002) do
 
   create_table "feedbacks", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.text "admin_notes"
-    t.string "app_version"
     t.string "browser"
     t.string "category", default: "general", null: false
     t.text "content", null: false
@@ -198,6 +141,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_190002) do
     t.datetime "updated_at", null: false
     t.uuid "updated_by_id"
     t.uuid "user_id"
+    t.string "version"
     t.index ["category"], name: "index_feedbacks_on_category"
     t.index ["created_at"], name: "index_feedbacks_on_created_at"
     t.index ["created_by_id"], name: "index_feedbacks_on_created_by_id"
@@ -296,7 +240,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_190002) do
   end
 
   create_table "log_clients", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.string "app_version"
     t.string "browser"
     t.jsonb "context", default: {}
     t.jsonb "cookies", default: {}
@@ -324,6 +267,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_190002) do
     t.string "url"
     t.string "user_agent"
     t.uuid "user_id"
+    t.string "version"
     t.index ["created_at"], name: "index_log_clients_on_created_at"
     t.index ["created_by_id"], name: "index_log_clients_on_created_by_id"
     t.index ["discarded_at"], name: "index_log_clients_on_discarded_at"
@@ -1083,6 +1027,33 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_190002) do
     t.index ["user_id"], name: "index_user_notifications_on_user_id"
   end
 
+  create_table "user_versions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.integer "build_number"
+    t.datetime "created_at", null: false
+    t.uuid "created_by_id"
+    t.datetime "discarded_at"
+    t.uuid "discarded_by_id"
+    t.datetime "last_seen_at", null: false
+    t.string "number", null: false
+    t.string "platform", null: false
+    t.datetime "undiscarded_at"
+    t.uuid "undiscarded_by_id"
+    t.datetime "updated_at", null: false
+    t.uuid "updated_by_id"
+    t.uuid "user_id", null: false
+    t.uuid "version_id"
+    t.index ["created_by_id"], name: "index_user_versions_on_created_by_id"
+    t.index ["discarded_at"], name: "index_user_versions_on_discarded_at"
+    t.index ["discarded_by_id"], name: "index_user_versions_on_discarded_by_id"
+    t.index ["last_seen_at"], name: "index_user_versions_on_last_seen_at"
+    t.index ["number"], name: "index_user_versions_on_number"
+    t.index ["undiscarded_by_id"], name: "index_user_versions_on_undiscarded_by_id"
+    t.index ["updated_by_id"], name: "index_user_versions_on_updated_by_id"
+    t.index ["user_id", "platform"], name: "index_user_versions_on_user_id_and_platform_kept", unique: true, where: "(discarded_at IS NULL)"
+    t.index ["user_id"], name: "index_user_versions_on_user_id"
+    t.index ["version_id"], name: "index_user_versions_on_version_id"
+  end
+
   create_table "users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "confirmation_code"
     t.datetime "confirmation_sent_at"
@@ -1128,22 +1099,42 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_190002) do
     t.index ["username"], name: "index_users_on_username", unique: true
   end
 
+  create_table "versions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.integer "android_build_number"
+    t.datetime "created_at", null: false
+    t.uuid "created_by_id"
+    t.text "description"
+    t.datetime "discarded_at"
+    t.uuid "discarded_by_id"
+    t.integer "ios_build_number"
+    t.boolean "is_force_update", default: false, null: false
+    t.string "number", null: false
+    t.datetime "released_at"
+    t.string "status", default: "draft", null: false
+    t.string "title", null: false
+    t.datetime "undiscarded_at"
+    t.uuid "undiscarded_by_id"
+    t.datetime "updated_at", null: false
+    t.uuid "updated_by_id"
+    t.index ["android_build_number"], name: "index_versions_on_android_build_number_kept", unique: true, where: "((discarded_at IS NULL) AND (android_build_number IS NOT NULL))"
+    t.index ["created_by_id"], name: "index_versions_on_created_by_id"
+    t.index ["discarded_at"], name: "index_versions_on_discarded_at"
+    t.index ["discarded_by_id"], name: "index_versions_on_discarded_by_id"
+    t.index ["ios_build_number"], name: "index_versions_on_ios_build_number_kept", unique: true, where: "((discarded_at IS NULL) AND (ios_build_number IS NOT NULL))"
+    t.index ["number"], name: "index_versions_on_number_kept", unique: true, where: "(discarded_at IS NULL)"
+    t.index ["released_at"], name: "index_versions_on_released_at"
+    t.index ["status"], name: "index_versions_on_one_published_kept", unique: true, where: "(((status)::text = 'published'::text) AND (discarded_at IS NULL))"
+    t.index ["status"], name: "index_versions_on_status"
+    t.index ["undiscarded_by_id"], name: "index_versions_on_undiscarded_by_id"
+    t.index ["updated_by_id"], name: "index_versions_on_updated_by_id"
+  end
+
   add_foreign_key "accesses", "payment_products", column: "product_id"
   add_foreign_key "accesses", "users"
   add_foreign_key "accesses", "users", column: "created_by_id"
   add_foreign_key "accesses", "users", column: "discarded_by_id"
   add_foreign_key "accesses", "users", column: "undiscarded_by_id"
   add_foreign_key "accesses", "users", column: "updated_by_id"
-  add_foreign_key "app_installs", "app_versions", on_delete: :nullify
-  add_foreign_key "app_installs", "users"
-  add_foreign_key "app_installs", "users", column: "created_by_id"
-  add_foreign_key "app_installs", "users", column: "discarded_by_id"
-  add_foreign_key "app_installs", "users", column: "undiscarded_by_id"
-  add_foreign_key "app_installs", "users", column: "updated_by_id"
-  add_foreign_key "app_versions", "users", column: "created_by_id"
-  add_foreign_key "app_versions", "users", column: "discarded_by_id"
-  add_foreign_key "app_versions", "users", column: "undiscarded_by_id"
-  add_foreign_key "app_versions", "users", column: "updated_by_id"
   add_foreign_key "assets", "users", column: "created_by_id"
   add_foreign_key "assets", "users", column: "discarded_by_id"
   add_foreign_key "assets", "users", column: "undiscarded_by_id"
@@ -1232,8 +1223,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_190002) do
   add_foreign_key "user_notifications", "users", column: "discarded_by_id"
   add_foreign_key "user_notifications", "users", column: "undiscarded_by_id"
   add_foreign_key "user_notifications", "users", column: "updated_by_id"
+  add_foreign_key "user_versions", "users"
+  add_foreign_key "user_versions", "users", column: "created_by_id"
+  add_foreign_key "user_versions", "users", column: "discarded_by_id"
+  add_foreign_key "user_versions", "users", column: "undiscarded_by_id"
+  add_foreign_key "user_versions", "users", column: "updated_by_id"
+  add_foreign_key "user_versions", "versions", on_delete: :nullify
   add_foreign_key "users", "users", column: "created_by_id"
   add_foreign_key "users", "users", column: "discarded_by_id"
   add_foreign_key "users", "users", column: "undiscarded_by_id"
   add_foreign_key "users", "users", column: "updated_by_id"
+  add_foreign_key "versions", "users", column: "created_by_id"
+  add_foreign_key "versions", "users", column: "discarded_by_id"
+  add_foreign_key "versions", "users", column: "undiscarded_by_id"
+  add_foreign_key "versions", "users", column: "updated_by_id"
 end

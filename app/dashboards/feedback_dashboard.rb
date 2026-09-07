@@ -10,7 +10,7 @@ class FeedbackDashboard < Administrate::BaseDashboard
   ATTRIBUTE_TYPES = {
     id: Field::String,
     admin_notes: Field::Text,
-    app_version: Field::String,
+    version: Field::String,
     browser: Field::String,
     category: Field::Select.with_options(searchable: false, collection: ->(field) { field.resource.class.send(field.attribute.to_s.pluralize).keys }),
     content: Field::Text,
@@ -54,7 +54,7 @@ class FeedbackDashboard < Administrate::BaseDashboard
   SHOW_PAGE_ATTRIBUTES = %i[
     id
     admin_notes
-    app_version
+    version
     browser
     category
     content
@@ -85,7 +85,7 @@ class FeedbackDashboard < Administrate::BaseDashboard
   # on the model's form (`new` and `edit`) pages.
   FORM_ATTRIBUTES = %i[
     admin_notes
-    app_version
+    version
     browser
     category
     content

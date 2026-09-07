@@ -213,22 +213,22 @@ module Openapi
           }
         )
       ),
-      app_install_request: object(
-        required: [ :app_install ],
-        app_install: object(
-          required: [ :app_version ],
-          app_version: { type: :string, example: "1.2.0", description: "Client marketing semver x.y.z" },
+      user_version_request: object(
+        required: [ :user_version ],
+        user_version: object(
+          required: [ :version ],
+          version: { type: :string, example: "1.2.0", description: "Client marketing semver x.y.z" },
           version_code: { type: :integer, minimum: 1, nullable: true, example: 84, description: "Optional client build number" }
         )
       ),
-      admin_app_version_request: object(
-        required: [ :app_version ],
-        app_version: object(
+      admin_version_request: object(
+        required: [ :version ],
+        version: object(
           number: { type: :string, example: "1.2.0", description: "Marketing semver x.y.z" },
           title: { type: :string, example: "Spring release" },
           description: { type: :string, nullable: true, example: "Release notes" },
           is_force_update: { type: :boolean, example: false },
-          status: { type: :string, enum: AppVersionConstants::Status::ALL, example: "draft" },
+          status: { type: :string, enum: VersionConstants::Status::ALL, example: "draft" },
           ios_build_number: { type: :integer, minimum: 1, nullable: true, example: 90 },
           android_build_number: { type: :integer, minimum: 1, nullable: true, example: 84 }
         )
@@ -323,7 +323,7 @@ module Openapi
           category: { type: :string, nullable: true, example: "general" },
           priority: { type: :string, nullable: true, example: "normal" },
           platform: { type: :string, nullable: true, example: "web" },
-          app_version: { type: :string, nullable: true, example: "1.0.0" },
+          version: { type: :string, nullable: true, example: "1.0.0" },
           os: { type: :string, nullable: true, example: "mac" },
           device: { type: :string, nullable: true, example: "MacBookPro" },
           browser: { type: :string, nullable: true, example: "Chrome" },
@@ -386,7 +386,7 @@ module Openapi
           severity: { type: :string, enum: LOG_SEVERITIES, default: "error" },
           platform: { type: :string, enum: LOG_PLATFORMS, nullable: true },
           environment: { type: :string, enum: LOG_ENVIRONMENTS, nullable: true },
-          app_version: { type: :string, nullable: true },
+          version: { type: :string, nullable: true },
           browser: { type: :string, nullable: true },
           user_agent: { type: :string, nullable: true },
           os: { type: :string, nullable: true },
@@ -854,35 +854,35 @@ module Openapi
             errors: [ 400, 500, 503 ]
           )
         },
-        "/v1/app_versions/current" => {
+        "/v1/versions/current" => {
           get: operation(
-            tags: "App Versions",
+            tags: "Versions",
             summary: "Check the latest live app version and whether the client should update",
-            description: "Public splash check. Query app_version (semver) drives update_required, must_update, and skip_premium. Missing or invalid JWT still returns 200. A valid JWT requires read_app_versions. Install tracking is POST /v1/app_installs.",
+            description: "Public splash check. Query version (semver) drives update_required, must_update, and skip_premium. Missing or invalid JWT still returns 200. A valid JWT requires read_versions. Install tracking is POST /v1/versions/user-version.",
             security: nil,
             parameters: [
-              query_parameter(:app_version, description: "Client marketing semver x.y.z")
+              query_parameter(:version, description: "Client marketing semver x.y.z")
             ],
             errors: []
           )
         },
-        "/v1/app_installs" => {
+        "/v1/versions/user-version" => {
           post: operation(
-            tags: "App Versions",
-            summary: "Record the current user's app install for this platform",
-            description: "Authenticated upsert of AppInstall for the current user and X-Platform. Requires create_app_installs. app_version is required marketing semver; version_code is optional.",
-            body: ref(:app_install_request),
+            tags: "Versions",
+            summary: "Record the current user's version for this platform",
+            description: "Authenticated upsert of UserVersion for the current user and X-Platform. Requires create_user_versions. version is required marketing semver; version_code is optional.",
+            body: ref(:user_version_request),
             success: 201,
             errors: [ 401, 403, 422 ]
           )
         },
-        "/v1/admin/app_versions" => {
+        "/v1/admin/versions" => {
           get: operation(
-            tags: "Admin / App Versions",
-            summary: "List app versions for the admin client",
+            tags: "Admin / Versions",
+            summary: "List versions for the admin client",
             description: "Super-admin only.",
             parameters: [
-              query_parameter(:status, enum: AppVersionConstants::Status::ALL),
+              query_parameter(:status, enum: VersionConstants::Status::ALL),
               query_parameter(:page, type: :integer),
               query_parameter(:limit, type: :integer),
               query_parameter(:sort_by, type: :string),
@@ -891,18 +891,18 @@ module Openapi
             errors: [ 401, 403 ]
           ),
           post: operation(
-            tags: "Admin / App Versions",
-            summary: "Create an app version",
+            tags: "Admin / Versions",
+            summary: "Create a version",
             description: "Super-admin only.",
             success: 201,
-            body: ref(:admin_app_version_request),
+            body: ref(:admin_version_request),
             errors: [ 401, 403, 422 ]
           )
         },
-        "/v1/admin/app_versions/discarded" => {
+        "/v1/admin/versions/discarded" => {
           get: operation(
-            tags: "Admin / App Versions",
-            summary: "List discarded app versions",
+            tags: "Admin / Versions",
+            summary: "List discarded versions",
             description: "Super-admin only.",
             parameters: [
               query_parameter(:page, type: :integer),
@@ -913,45 +913,45 @@ module Openapi
             errors: [ 401, 403 ]
           )
         },
-        "/v1/admin/app_versions/{id}" => {
+        "/v1/admin/versions/{id}" => {
           get: operation(
-            tags: "Admin / App Versions",
-            summary: "Get an app version",
+            tags: "Admin / Versions",
+            summary: "Get a version",
             description: "Super-admin only.",
             parameters: [ path_parameter(:id) ],
             errors: [ 401, 403, 404 ]
           ),
-          patch: operation(
-            tags: "Admin / App Versions",
-            summary: "Update an app version",
+          put: operation(
+            tags: "Admin / Versions",
+            summary: "Update a version",
             description: "Super-admin only.",
             parameters: [ path_parameter(:id) ],
-            body: ref(:admin_app_version_request),
+            body: ref(:admin_version_request),
             errors: [ 401, 403, 404, 422 ]
           )
         },
-        "/v1/admin/app_versions/{id}/discard" => {
+        "/v1/admin/versions/{id}/discard" => {
           post: operation(
-            tags: "Admin / App Versions",
-            summary: "Discard an app version",
+            tags: "Admin / Versions",
+            summary: "Discard a version",
             description: "Super-admin only.",
             parameters: [ path_parameter(:id) ],
             errors: [ 401, 403, 404 ]
           )
         },
-        "/v1/admin/app_versions/{id}/undiscard" => {
+        "/v1/admin/versions/{id}/undiscard" => {
           post: operation(
-            tags: "Admin / App Versions",
-            summary: "Restore a discarded app version",
+            tags: "Admin / Versions",
+            summary: "Restore a discarded version",
             description: "Super-admin only.",
             parameters: [ path_parameter(:id) ],
             errors: [ 401, 403, 404 ]
           )
         },
-        "/v1/admin/app_versions/{id}/installs" => {
+        "/v1/admin/versions/{id}/user_versions" => {
           get: operation(
-            tags: "Admin / App Versions",
-            summary: "List current installs for an app version",
+            tags: "Admin / Versions",
+            summary: "List current user versions for a version",
             description: "Super-admin only.",
             parameters: [
               path_parameter(:id),
@@ -961,6 +961,21 @@ module Openapi
               query_parameter(:sort_order, enum: SortConstants::Order::ALL)
             ],
             errors: [ 401, 403, 404 ]
+          )
+        },
+        "/v1/admin/versions/user_versions" => {
+          get: operation(
+            tags: "Admin / User Versions",
+            summary: "List current user versions",
+            description: "Super-admin only. All current user+platform snapshots under the versions admin namespace.",
+            parameters: [
+              query_parameter(:platform, enum: AuthConstants::Platform::ALL),
+              query_parameter(:page, type: :integer),
+              query_parameter(:limit, type: :integer),
+              query_parameter(:sort_by, type: :string),
+              query_parameter(:sort_order, enum: SortConstants::Order::ALL)
+            ],
+            errors: [ 401, 403 ]
           )
         },
         "/v1/users/current" => {

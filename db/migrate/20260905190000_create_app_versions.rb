@@ -6,7 +6,7 @@ class CreateAppVersions < ActiveRecord::Migration[8.1]
       t.string :title, null: false
       t.text :description
       t.boolean :is_force_update, null: false, default: false
-      t.string :status, null: false, default: AppVersionConstants::Status::DRAFT
+      t.string :status, null: false, default: "draft"
       t.datetime :released_at
       t.integer :ios_build_number
       t.integer :android_build_number

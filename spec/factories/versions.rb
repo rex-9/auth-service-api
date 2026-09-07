@@ -1,17 +1,17 @@
 FactoryBot.define do
-  factory :app_version do
+  factory :version do
     sequence(:number) { |n| "1.0.#{n}" }
     title { "Release" }
     description { "Release notes" }
-    status { AppVersionConstants::Status::DRAFT }
+    status { VersionConstants::Status::DRAFT }
     is_force_update { false }
 
     trait :published do
-      status { AppVersionConstants::Status::PUBLISHED }
+      status { VersionConstants::Status::PUBLISHED }
     end
 
     trait :yanked do
-      status { AppVersionConstants::Status::YANKED }
+      status { VersionConstants::Status::YANKED }
       released_at { 1.day.ago }
     end
 

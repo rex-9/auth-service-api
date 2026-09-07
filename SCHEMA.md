@@ -72,8 +72,8 @@ erDiagram
   users ||--o{ user_notifications : "receives"
   notification_templates ||--o{ user_notifications : "templated_by"
 
-  users ||--o{ app_installs : "runs"
-  app_versions ||--o{ app_installs : "matches"
+  users ||--o{ user_versions : "runs"
+  versions ||--o{ user_versions : "matches"
 
   users ||--o{ assets : "assetable (polymorphic)"
   payment_products ||--o{ assets : "assetable (polymorphic)"
@@ -584,7 +584,7 @@ erDiagram
 | `status`            | `string`   |    ❌    | `"new"`             | Enum: `new`, `in_progress`, `resolved`, `closed`       |
 | `platform`          | `string`   |    ❌    | `"web"`             | Enum: `web`, `ios`, `android`                          |
 | `admin_notes`       | `text`     |    ✔️    | `NULL`              | Internal triage / resolver comments                    |
-| `app_version`       | `string`   |    ✔️    | `NULL`              | Client version                                         |
+| `version`           | `string`   |    ✔️    | `NULL`              | Client version                                         |
 | `browser`           | `string`   |    ✔️    | `NULL`              | Client browser                                         |
 | `os`                | `string`   |    ✔️    | `NULL`              | Operating system                                       |
 | `device`            | `string`   |    ✔️    | `NULL`              | Client hardware                                        |
@@ -630,7 +630,7 @@ erDiagram
 | `url`                  | `string`   |    ✔️    | `NULL`              | Page URL where error triggered                  |
 | `method`               | `string`   |    ✔️    | `NULL`              | Associated HTTP method                          |
 | `user_agent`           | `string`   |    ✔️    | `NULL`              | User Agent string                               |
-| `app_version`          | `string`   |    ✔️    | `NULL`              | Client build version                            |
+| `version`              | `string`   |    ✔️    | `NULL`              | Client build version                            |
 | `os`                   | `string`   |    ✔️    | `NULL`              | Operating system                                |
 | `os_version`           | `string`   |    ✔️    | `NULL`              | OS version number                               |
 | `browser`              | `string`   |    ✔️    | `NULL`              | Browser family                                  |
@@ -743,11 +743,11 @@ erDiagram
 
 ---
 
-## 11. App Versions & Installs
+## 11. Versions & Installs
 
-### 11.1. `app_versions`
-- **Model**: [`AppVersion`](app/models/app_version.rb)
-- **Description**: Global mobile/web marketing versions. Force-update is stored per row (`is_force_update`). Public check computes `update_required` (client behind latest live) and `must_update` (any live force row greater than the client). Store listing URLs live in env (`AppConfig::IOS_STORE_URL`, `AppConfig::ANDROID_STORE_URL`), not on this table.
+### 11.1. `versions`
+- **Model**: [`Version`](app/models/version.rb)
+- **Description**: Global mobile/web marketing versions. Force-update is stored per row (`is_force_update`). Only one kept row may be `published` at a time: saving a published version yanks every other kept published row. Public check computes `update_required` (client behind the live version) and `must_update` (the live version is force and greater than the client). Store listing URLs live in env (`AppConfig::IOS_STORE_URL`, `AppConfig::ANDROID_STORE_URL`), not on this table.
 
 | Column | Type | Nullable | Default | Description / Notes |
 | :--- | :--- | :---: | :--- | :--- |
@@ -756,7 +756,7 @@ erDiagram
 | `title` | `string` | ❌ | — | Release title |
 | `description` | `text` | ✔️ | `NULL` | Release notes |
 | `is_force_update` | `boolean` | ❌ | `false` | Version flag; public check exposes computed `must_update`, not this column |
-| `status` | `string` | ❌ | `"draft"` | Frozen enum: `draft`, `published`, `yanked` (`AppVersionConstants::Status`) |
+| `status` | `string` | ❌ | `"draft"` | Frozen enum: `draft`, `published`, `yanked` (`VersionConstants::Status`). Unique among kept `published` rows. |
 | `released_at` | `datetime` | ✔️ | `NULL` | Set on first publish if blank; future value = scheduled. UTC. |
 | `ios_build_number` | `integer` | ✔️ | `NULL` | Informational iOS `CFBundleVersion`; unique among kept when present. Not used for `must_update`. |
 | `android_build_number` | `integer` | ✔️ | `NULL` | Informational Android `versionCode`; unique among kept when present. Not used for `must_update`. |
@@ -770,19 +770,20 @@ erDiagram
 | `updated_at` | `datetime` | ❌ | — | Timestamp (UTC) |
 
 **Indexes & Foreign Keys**:
-- `index_app_versions_on_number_kept` (unique `number` where `discarded_at IS NULL`)
-- `index_app_versions_on_ios_build_number_kept` (unique `ios_build_number` where kept and not null)
-- `index_app_versions_on_android_build_number_kept` (unique `android_build_number` where kept and not null)
-- `index_app_versions_on_status` (`status`)
-- `index_app_versions_on_released_at` (`released_at`)
-- `index_app_versions_on_discarded_at` (`discarded_at`)
+- `index_versions_on_number_kept` (unique `number` where `discarded_at IS NULL`)
+- `index_versions_on_ios_build_number_kept` (unique `ios_build_number` where kept and not null)
+- `index_versions_on_android_build_number_kept` (unique `android_build_number` where kept and not null)
+- `index_versions_on_status` (`status`)
+- `index_versions_on_one_published_kept` (unique `status` where `status = 'published'` and `discarded_at IS NULL`)
+- `index_versions_on_released_at` (`released_at`)
+- `index_versions_on_discarded_at` (`discarded_at`)
 - FKs: audit columns → `users(id)`.
 
-**Live scope** (public check): kept + `status = published` + (`released_at` is `NULL` or `<= now`). Versions are discard/undiscard only (non-destroyable). `install_count` is computed (kept `app_installs` rows whose `app_version_id` matches); it is not a stored column.
+**Live scope** (public check): kept + `status = published` + (`released_at` is `NULL` or `<= now`). At most one kept published row exists. Versions are discard/undiscard only (non-destroyable). `install_count` is computed (kept `user_versions` rows whose `version_id` matches); it is not a stored column.
 
-### 11.2. `app_installs`
-- **Model**: [`AppInstall`](app/models/app_install.rb)
-- **Description**: Current client snapshot per user per platform (`web` / `android` / `ios`). One kept row per pair; repeat checks update `number`, `build_number`, and `last_seen_at`. `User#latest_app_install` is the kept row with the newest `last_seen_at` (Administrate user show).
+### 11.2. `user_versions`
+- **Model**: [`UserVersion`](app/models/user_version.rb)
+- **Description**: Current client snapshot per user per platform (`web` / `android` / `ios`). One kept row per pair; repeat checks update `number`, `build_number`, and `last_seen_at`. `User#latest_user_version` is the kept row with the newest `last_seen_at` (Administrate user show).
 
 | Column | Type | Nullable | Default | Description / Notes |
 | :--- | :--- | :---: | :--- | :--- |
@@ -791,7 +792,7 @@ erDiagram
 | `platform` | `string` | ❌ | — | Frozen enum: `web`, `android`, `ios` (`AuthConstants::Platform`) |
 | `number` | `string` | ❌ | — | Client marketing semver last reported |
 | `build_number` | `integer` | ✔️ | `NULL` | Client `version_code` snapshot; informational only |
-| `app_version_id` | `uuid` | ✔️ | `NULL` | Matching `AppVersion` if `number` matches a version |
+| `version_id` | `uuid` | ✔️ | `NULL` | Matching `Version` if `number` matches a version |
 | `last_seen_at` | `datetime` | ❌ | — | Last successful authenticated check (UTC) |
 | `created_by_id` | `uuid` | ✔️ | `NULL` | Auditing: Creator |
 | `updated_by_id` | `uuid` | ✔️ | `NULL` | Auditing: Modifier |
@@ -803,19 +804,18 @@ erDiagram
 | `updated_at` | `datetime` | ❌ | — | Timestamp (UTC) |
 
 **Indexes & Foreign Keys**:
-- `index_app_installs_on_user_id_and_platform_kept` (unique `[user_id, platform]` where `discarded_at IS NULL`)
-- `index_app_installs_on_number` (`number`)
-- `index_app_installs_on_last_seen_at` (`last_seen_at`)
-- `index_app_installs_on_discarded_at` (`discarded_at`)
-- `index_app_installs_on_user_id` (`user_id`)
-- `index_app_installs_on_app_version_id` (`app_version_id`)
-- FK to `users(id)`; FK to `app_versions(id)` `ON DELETE NULL`.
+- `index_user_versions_on_user_id_and_platform_kept` (unique `[user_id, platform]` where `discarded_at IS NULL`)
+- `index_user_versions_on_number` (`number`)
+- `index_user_versions_on_last_seen_at` (`last_seen_at`)
+- `index_user_versions_on_discarded_at` (`discarded_at`)
+- `index_user_versions_on_user_id` (`user_id`)
+- `index_user_versions_on_version_id` (`version_id`)
+- FK to `users(id)`; FK to `versions(id)` `ON DELETE NULL`.
 
 ---
 
 ## 12. Summary Matrix of Core Tables
 
-<<<<<<< HEAD
 | Table Name | Model | Domain | Soft Deletion | Audited | Polymorphic Targets |
 | :--- | :--- | :--- | :---: | :---: | :--- |
 | `users` | [`User`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/user.rb) | IAM | ✔️ | ✔️ | — |
@@ -835,29 +835,9 @@ erDiagram
 | `log_clients` | [`Log::Client`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/log/client.rb) | Diagnostics | ✔️ | ✔️ | — |
 | `notifications` | [`Notification`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/notification.rb) | Notifications | ✔️ | ✔️ | — |
 | `user_notifications` | [`UserNotification`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/user_notification.rb) | Notifications | ✔️ | ✔️ | — |
-| `app_versions` | [`AppVersion`](app/models/app_version.rb) | App versions | ✔️ | ✔️ | — |
-| `app_installs` | [`AppInstall`](app/models/app_install.rb) | App versions | ✔️ | ✔️ | — |
-=======
-| Table Name               | Model                                                                                                           | Domain         | Soft Deletion | Audited | Polymorphic Targets                  |
-| :----------------------- | :-------------------------------------------------------------------------------------------------------------- | :------------- | :-----------: | :-----: | :----------------------------------- |
-| `users`                  | [`User`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/user.rb)                                   | IAM            |      ✔️       |   ✔️    | —                                    |
-| `iam_roles`              | [`Iam::Role`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/iam/role.rb)                          | IAM            |      ✔️       |   ✔️    | —                                    |
-| `iam_permissions`        | [`Iam::Permission`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/iam/permission.rb)              | IAM            |      ✔️       |   ✔️    | —                                    |
-| `iam_user_roles`         | [`Iam::UserRole`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/iam/user_role.rb)                 | IAM            |      ✔️       |   ✔️    | —                                    |
-| `iam_role_permissions`   | [`Iam::RolePermission`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/iam/role_permission.rb)     | IAM            |      ✔️       |   ✔️    | —                                    |
-| `payment_products`       | [`Payment::Product`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/payment/product.rb)            | Billing        |      ✔️       |   ✔️    | `assets` (`assetable`)               |
-| `payment_subscriptions`  | [`Payment::Subscription`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/payment/subscription.rb)  | Billing        |      ✔️       |   ✔️    | —                                    |
-| `payment_transactions`   | [`Payment::Transaction`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/payment/transaction.rb)    | Billing        |      ✔️       |   ✔️    | —                                    |
-| `payment_webhook_events` | [`Payment::WebhookEvent`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/payment/webhook_event.rb) | Billing        |      ✔️       |   ✔️    | —                                    |
-| `accesses`               | [`Access`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/access.rb)                               | Access Control |      ✔️       |   ✔️    | —                                    |
-| `chat_rooms`             | [`Chat::Room`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/chat/room.rb)                        | AI / Chat      |      ✔️       |   ✔️    | —                                    |
-| `chat_messages`          | [`Chat::Message`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/chat/message.rb)                  | AI / Chat      |      ✔️       |   ✔️    | `assets` (`assetable`)               |
-| `assets`                 | [`Asset`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/asset.rb)                                 | Media          |      ✔️       |   ✔️    | Belongs to `assetable` (Polymorphic) |
-| `feedbacks`              | [`Feedback`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/feedback.rb)                           | Support        |      ✔️       |   ✔️    | —                                    |
-| `log_clients`            | [`Log::Client`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/log/client.rb)                      | Diagnostics    |      ✔️       |   ✔️    | —                                    |
-| `notifications`          | [`Notification`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/notification.rb)                   | Notifications  |      ✔️       |   ✔️    | —                                    |
-| `user_notifications`     | [`UserNotification`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/user_notification.rb)          | Notifications  |      ✔️       |   ✔️    | —                                    |
->>>>>>> 0a7eca5737551b1422d5bf60e72fad80974ba4b9
+| `versions` | [`Version`](app/models/version.rb) | Versions | ✔️ | ✔️ | — |
+| `user_versions` | [`UserVersion`](app/models/user_version.rb) | Versions | ✔️ | ✔️ | — |
+
 
 ---
 

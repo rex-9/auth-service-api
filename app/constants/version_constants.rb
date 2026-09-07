@@ -1,6 +1,6 @@
-# app/constants/app_version_constants.rb
+# app/constants/version_constants.rb
 
-module AppVersionConstants
+module VersionConstants
   module Status
     DRAFT     = "draft".freeze
     PUBLISHED = "published".freeze

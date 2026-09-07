@@ -1,8 +1,8 @@
 require "administrate/base_dashboard"
 
-class AppVersionDashboard < Administrate::BaseDashboard
-  def display_resource(app_version)
-    "#{app_version.number} — #{app_version.title}"
+class VersionDashboard < Administrate::BaseDashboard
+  def display_resource(version)
+    "#{version.number} — #{version.title}"
   end
 
   ATTRIBUTE_TYPES = {
@@ -15,7 +15,7 @@ class AppVersionDashboard < Administrate::BaseDashboard
     released_at: Field::DateTime,
     ios_build_number: Field::Number,
     android_build_number: Field::Number,
-    app_installs: Field::HasMany,
+    user_versions: Field::HasMany,
     created_by_id: Field::String,
     creator: Field::BelongsTo,
     discarded_at: Field::DateTime,
@@ -48,7 +48,7 @@ class AppVersionDashboard < Administrate::BaseDashboard
     released_at
     ios_build_number
     android_build_number
-    app_installs
+    user_versions
     creator
     updater
     discarder
@@ -71,4 +71,3 @@ class AppVersionDashboard < Administrate::BaseDashboard
 
   COLLECTION_FILTERS = {}.freeze
 end
-

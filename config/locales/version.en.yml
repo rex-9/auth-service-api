@@ -1,0 +1,12 @@
+en:
+  version:
+    current_fetched: "Version fetched successfully."
+    fetched: "Versions fetched successfully."
+    created: "Version created successfully."
+    create_failed: "Version could not be created."
+    updated: "Version updated successfully."
+    update_failed: "Version could not be updated."
+    discarded: "Version discarded successfully."
+    discarded_fetched: "Discarded versions fetched successfully."
+    restored: "Version restored successfully."
+    not_found: "Version not found."

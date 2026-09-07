@@ -2,7 +2,7 @@
 class Log::ClientSerializer < ApplicationSerializer
   attributes :id, :message, :severity, :context, :stack_trace,
              :local_storage_keys, :session_storage_keys, :cookies,
-             :platform, :environment, :app_version,
+             :platform, :environment, :version,
              :browser, :os, :os_version, :device, :user_agent,
              :url, :method, :request_id,
              :resolved_at, :occurrence_count, :last_occurred_at,
