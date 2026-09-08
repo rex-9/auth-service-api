@@ -196,8 +196,7 @@ module Openapi
           name: { type: :string, maxLength: 50, example: "Admin Created" },
           email: { type: :string, format: :email, example: "admin-created@example.com" },
           password: { type: :string, format: :password, minLength: 6, writeOnly: true },
-          password_confirmation: { type: :string, format: :password, minLength: 6, writeOnly: true },
-          role_ids: { type: :array, uniqueItems: true, items: UUID }
+          password_confirmation: { type: :string, format: :password, minLength: 6, writeOnly: true }
         )
       ),
       current_user_update_request: object(
@@ -443,6 +442,28 @@ module Openapi
           items: { type: :string, enum: NotificationService::Center::CHANNELS },
           description: "One or more delivery channels: socket, push, or email."
         }
+      ),
+      notification_template_request: object(
+        required: %i[event name category],
+        event: { type: :string },
+        name: { type: :string },
+        description: { type: :string, nullable: true },
+        category: { type: :string },
+        link: { type: :string, nullable: true },
+        admin: { type: :boolean },
+        in_app_title: { type: :string, nullable: true },
+        in_app_body: { type: :string, nullable: true },
+        in_app_data: { type: :object, additionalProperties: true },
+        push_title: { type: :string, nullable: true },
+        push_body: { type: :string, nullable: true },
+        push_template_id: { type: :string, nullable: true },
+        email_subject: { type: :string, nullable: true },
+        email_body: { type: :string, nullable: true },
+        email_template_id: { type: :string, nullable: true }
+      ),
+      id_batch_request: object(
+        required: [ :ids ],
+        ids: { type: :array, minItems: 1, uniqueItems: true, items: UUID }
       ),
       asset_upload_request: object(
         required: [ :file ],
@@ -1077,6 +1098,12 @@ module Openapi
         delete: operation(tags: "Admin / IAM Roles", summary: "Delete an admin-managed role",
                           parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422 ])
       }
+      %w[discard undiscard].each do |action|
+        paths["/v1/admin/iam/roles/{id}/#{action}"] = {
+          post: operation(tags: "Admin / IAM Roles", summary: "#{action.capitalize} an admin-managed role",
+                          parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422 ])
+        }
+      end
       paths["/v1/admin/iam/permissions/{id}"] = {
         get: operation(tags: "Admin / IAM Permissions", summary: "Get an admin-managed permission",
                        parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ]),
@@ -1120,6 +1147,14 @@ module Openapi
         delete: operation(tags: "Admin / Chat Messages", summary: "Delete an admin chat message",
                           parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ])
       }
+      [ [ "rooms", "room" ], [ "messages", "message" ] ].each do |collection, resource|
+        %w[discard undiscard].each do |action|
+          paths["/v1/admin/chat/#{collection}/{id}/#{action}"] = {
+            post: operation(tags: "Admin / Chat #{collection.capitalize}", summary: "#{action.capitalize} an admin chat #{resource}",
+                            parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422 ])
+          }
+        end
+      end
       paths["/v1/admin/payment/products"] = {
         get: operation(tags: "Admin / Payment Products", summary: "List Stripe-backed products for the admin client",
                        parameters: [
@@ -1205,8 +1240,8 @@ module Openapi
                           errors: [ 401, 403, 404, 422 ])
       }
 
-      log_filters = %i[severity platform environment unresolved resolved storage_issues].map do |name|
-        query_parameter(name, type: name.in?(%i[unresolved resolved storage_issues]) ? :boolean : :string)
+      log_filters = %i[severity platform environment discarded unresolved resolved storage_issues].map do |name|
+        query_parameter(name, type: name.in?(%i[discarded unresolved resolved storage_issues]) ? :boolean : :string)
       end
       paths["/v1/client/logs"] = {
         get: operation(tags: "Client Logs", summary: "List and filter client error reports",
@@ -1231,6 +1266,16 @@ module Openapi
                          parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ])
         }
       end
+      %w[discard undiscard].each do |action|
+        paths["/v1/client/logs/{id}/#{action}"] = {
+          post: operation(
+            tags: "Client Logs",
+            summary: action == "discard" ? "Move a client error to the recycle bin" : "Restore a discarded client error",
+            parameters: [ path_parameter(:id) ],
+            errors: [ 401, 403, 404 ]
+          )
+        }
+      end
 
       paths["/v1/media/upload"] = {
         post: operation(tags: "Media", summary: "Upload and persist an asset", success: 201,
@@ -1245,6 +1290,21 @@ module Openapi
         }
       }
       paths["/v1/admin/notifications"] = {
+        get: operation(
+          tags: "Admin / Notifications",
+          summary: "List notification templates",
+          parameters: [
+            query_parameter(:category), query_parameter(:search),
+            query_parameter(:page, type: :integer), query_parameter(:limit, type: :integer)
+          ],
+          errors: [ 401, 403 ]
+        ),
+        post: operation(
+          tags: "Admin / Notifications", summary: "Create a notification template", success: 201,
+          body: ref(:notification_template_request), errors: [ 401, 403, 422 ]
+        )
+      }
+      paths["/v1/admin/notifications/dispatch"] = {
         post: operation(
           tags: "Admin / Notifications",
           summary: "Queue an admin notification for selected users, selected roles, or all users",
@@ -1258,6 +1318,19 @@ module Openapi
           body: ref(:notification_request),
           errors: [ 401, 403, 422, 503 ]
         )
+      }
+      paths["/v1/admin/notifications/{id}"] = {
+        get: operation(tags: "Admin / Notifications", summary: "Get a notification template",
+                       parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ]),
+        put: operation(tags: "Admin / Notifications", summary: "Update a notification template",
+                       parameters: [ path_parameter(:id) ], body: ref(:notification_template_request),
+                       errors: [ 401, 403, 404, 422 ]),
+        delete: operation(tags: "Admin / Notifications", summary: "Discard a notification template",
+                          parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ])
+      }
+      paths["/v1/admin/notifications/{id}/undiscard"] = {
+        post: operation(tags: "Admin / Notifications", summary: "Restore a discarded notification template",
+                        parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422 ])
       }
       paths["/v1/admin/notifications/templates"] = {
         get: operation(
@@ -1385,6 +1458,20 @@ module Openapi
                          query_parameter(:sort_order, enum: SortConstants::Order::ALL)
                        ], errors: [ 401, 403 ])
       }
+      paths["/v1/admin/assets/storage_stats"] = {
+        get: operation(tags: "Admin / Assets", summary: "Get database, Garage partition, and host storage statistics",
+                       description: "Super-admin only.", errors: [ 401, 403, 503 ])
+      }
+      paths["/v1/admin/assets/bin"] = {
+        delete: operation(tags: "Admin / Assets", summary: "Permanently empty the asset recycle bin",
+                          errors: [ 401, 403, 422 ])
+      }
+      %w[discard_batch undiscard_batch destroy_batch].each do |action|
+        paths["/v1/admin/assets/#{action}"] = {
+          post: operation(tags: "Admin / Assets", summary: "#{action.humanize} assets",
+                          body: ref(:id_batch_request), errors: [ 401, 403, 404, 422 ])
+        }
+      end
       paths["/v1/admin/assets/upload"] = {
         post: operation(tags: "Admin / Assets", summary: "Upload and persist an asset via admin", success: 201,
                         body: ref(:asset_upload_request), errors: [ 401, 403, 422, 500 ])
@@ -1449,6 +1536,28 @@ module Openapi
                          parameters: [ path_parameter(:id) ], body: ref(:asset_update_request), errors: [ 401, 403, 404, 422 ]),
         delete: operation(tags: "Assets", summary: "Delete asset record",
                           parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ])
+      }
+
+      paths["/v1/notifications"] = {
+        get: operation(tags: "Notifications", summary: "List the current user's in-app notifications",
+                       parameters: [ query_parameter(:filter), query_parameter(:page, type: :integer),
+                                     query_parameter(:limit, type: :integer) ], errors: [ 401 ])
+      }
+      paths["/v1/notifications/unread_count"] = {
+        get: operation(tags: "Notifications", summary: "Get the current user's unread notification count",
+                       errors: [ 401 ])
+      }
+      paths["/v1/notifications/read_all"] = {
+        put: operation(tags: "Notifications", summary: "Mark all current-user notifications as read",
+                       errors: [ 401 ])
+      }
+      paths["/v1/notifications/{id}/read"] = {
+        put: operation(tags: "Notifications", summary: "Mark a current-user notification as read",
+                       parameters: [ path_parameter(:id) ], errors: [ 401, 404 ])
+      }
+      paths["/v1/notifications/{id}"] = {
+        delete: operation(tags: "Notifications", summary: "Remove a current-user notification",
+                          parameters: [ path_parameter(:id) ], errors: [ 401, 404 ])
       }
 
       room_parameter = query_parameter(:room_id, required: false, format: :uuid,

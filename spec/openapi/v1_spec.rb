@@ -6,9 +6,22 @@ RSpec.describe "OpenAPI V1 document" do
   subject(:document) { RSpec.configuration.openapi_specs.fetch("v1/swagger.yaml") }
 
   it "documents every intentional public API operation" do
-    operation_count = document[:paths].sum { |_path, methods| methods.size }
+    documented = document[:paths].flat_map do |path, methods|
+      methods.keys.map { |method| [ method.to_s.upcase, path ] }
+    end
+    routed = Rails.application.routes.routes.filter_map do |route|
+      path = route.path.spec.to_s.delete_suffix("(.:format)")
+      next unless path.start_with?("/v1")
 
-    expect(operation_count).to eq(132)
+      [ route.verb.to_s, path.gsub(/:([a-zA-Z_]+)/, '{\1}') ]
+    end.uniq
+    missing = routed.reject do |verb, path|
+      documented.include?([ verb, path ]) ||
+        (verb == "PUT" && documented.include?([ "PATCH", path ])) ||
+        (verb == "PATCH" && documented.include?([ "PUT", path ]))
+    end
+
+    expect(missing).to be_empty, "Missing OpenAPI operations:\n#{missing.sort.map { |pair| pair.join(' ') }.join("\n")}"
     expect(document[:paths]).to include(
       "/signup",
       "/v1/payment/session",
