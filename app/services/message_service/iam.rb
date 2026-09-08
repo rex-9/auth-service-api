@@ -24,6 +24,7 @@ module MessageService
     USER_ROLES_FETCHED = "iam.user_roles.fetched"
     ROLE_ASSIGNED = "iam.user_roles.assigned"
     ROLE_REMOVED = "iam.user_roles.removed"
+    LAST_SUPER_ADMIN_ROLE_PROTECTED = "iam.user_roles.last_super_admin_role_protected"
     USER_ROLE_NOT_FOUND = "iam.user_roles.not_found"
     USER_ROLE_MISSING = "iam.user_roles.missing"
   end

@@ -41,6 +41,7 @@ module NotificationConstants
     TTS_FAILED            = "tts_failed".freeze
     WELCOME               = "welcome".freeze
     SIGN_IN_ALERT         = "sign_in_alert".freeze
+    IAM_UPDATED           = "iam_updated".freeze
     NOTIFICATION          = "notification".freeze
   end
 

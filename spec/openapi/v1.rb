@@ -642,9 +642,16 @@ module Openapi
         name: { type: :string, nullable: true },
         provider: { type: :string, enum: %w[email google] },
         avatar_url: { type: :string, format: :uri, nullable: true },
-        role_ids: { type: :array, items: UUID },
-        role_names: { type: :array, items: { type: :string } },
-        permissions: { type: :object, additionalProperties: { type: :array, items: { type: :string } } },
+        iam: object(
+          is_admin: { type: :boolean },
+          is_super_admin: { type: :boolean },
+          roles: { type: :array, items: { type: :object } },
+          admin_roles: { type: :array, items: { type: :object } },
+          non_admin_roles: { type: :array, items: { type: :object } },
+          permissions: { type: :array, items: { type: :object } },
+          admin_permissions: { type: :array, items: { type: :object } },
+          non_admin_permissions: { type: :array, items: { type: :object } }
+        ),
         created_at: DATE_TIME,
         updated_at: DATE_TIME
       ),
@@ -1008,11 +1015,8 @@ module Openapi
             tags: "Users",
             summary: "Update the current user's name and username",
             body: ref(:current_user_update_request),
-            errors: [ 401, 403, 422 ]
+            errors: [ 401, 422 ]
           )
-        },
-        "/v1/users/current/iam" => {
-          get: operation(tags: "Users", summary: "Get the current user's roles and permissions", errors: [ 401 ])
         }
       }
 
@@ -1195,10 +1199,10 @@ module Openapi
           body: ref(:user_role_request), errors: [ 401, 403, 404, 422 ]
         )
       }
-      paths["/v1/iam/users/{user_id}/roles/{id}"] = {
+      paths["/v1/iam/users/{user_id}/roles/{role_id}"] = {
         delete: operation(tags: "IAM User Roles", summary: "Remove a role from a user",
-                          parameters: [ path_parameter(:user_id), path_parameter(:id, "Role ID") ],
-                          errors: [ 401, 403, 404 ])
+                          parameters: [ path_parameter(:user_id), path_parameter(:role_id, "Role ID") ],
+                          errors: [ 401, 403, 404, 422 ])
       }
 
       log_filters = %i[severity platform environment unresolved resolved storage_issues].map do |name|

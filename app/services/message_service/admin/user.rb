@@ -10,7 +10,7 @@ module MessageService
       DISCARDED_USERS_RETRIEVED = "admin.user.discarded_users_retrieved"
       USER_NOT_DISCARDED = "admin.user.user_not_discarded"
       SELF_LIFECYCLE_PROTECTED = "admin.user.self_lifecycle_protected"
-      LAST_SUPER_ADMIN_PROTECTED = "admin.user.last_super_admin_protected"
+      SUPER_ADMIN_LIFECYCLE_PROTECTED = "admin.user.super_admin_lifecycle_protected"
       USER_ROLES_RETRIEVED = "admin.user.user_roles_retrieved"
       USER_PERMISSIONS_RETRIEVED = "admin.user.user_permissions_retrieved"
       USER_CREATE_FAILED = "admin.user.user_create_failed"

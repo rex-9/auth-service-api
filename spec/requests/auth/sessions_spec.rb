@@ -175,7 +175,7 @@ RSpec.describe "Authentication sessions", type: :request do
       )
     end
 
-    it "allows current IAM lookup after signing in with an assigned users role" do
+    it "returns current IAM with the serialized user after signing in" do
       user = create(:user, email: "role-user@example.com")
       role = create(:role, name: "current_user_reader")
       permission = create(:permission, name: "read_users", action: "read", resource: "users")
@@ -189,11 +189,11 @@ RSpec.describe "Authentication sessions", type: :request do
 
       allow(CacheService).to receive(:read).and_return(token)
 
-      get "/v1/users/current/iam", headers: authorization_headers(token)
+      get "/v1/users/current", headers: authorization_headers(token)
 
       expect(response).to have_http_status(:ok)
-      expect(response_data.dig("user", "role_names")).to include("current_user_reader")
-      expect(response_data.dig("user", "permissions", "users")).to include("read")
+      expect(response_data.dig("user", "iam", "roles").map { |role_data| role_data.dig("attributes", "name") }).to include("current_user_reader")
+      expect(response_data.dig("user", "iam", "permissions").map { |permission_data| permission_data.dig("attributes", "name") }).to include("read_users")
     end
 
     it "rejects a missing or replaced active session" do

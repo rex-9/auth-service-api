@@ -1294,21 +1294,38 @@ components:
           type: string
           format: uri
           nullable: true
-        role_ids:
-          type: array
-          items:
-            type: string
-            format: uuid
-        role_names:
-          type: array
-          items:
-            type: string
-        permissions:
+        iam:
           type: object
-          additionalProperties:
-            type: array
-            items:
-              type: string
+          properties:
+            is_admin:
+              type: boolean
+            is_super_admin:
+              type: boolean
+            roles:
+              type: array
+              items:
+                type: object
+            admin_roles:
+              type: array
+              items:
+                type: object
+            non_admin_roles:
+              type: array
+              items:
+                type: object
+            permissions:
+              type: array
+              items:
+                type: object
+            admin_permissions:
+              type: array
+              items:
+                type: object
+            non_admin_permissions:
+              type: array
+              items:
+                type: object
+          required: []
         created_at:
           type: string
           format: date-time
@@ -3224,12 +3241,6 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/error_response"
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/error_response"
         '422':
           description: Unprocessable Content
           content:
@@ -3244,47 +3255,6 @@ paths:
           application/json:
             schema:
               "$ref": "#/components/schemas/current_user_update_request"
-  "/v1/users/current/iam":
-    get:
-      tags:
-      - Users
-      summary: Get the current user's roles and permissions
-      parameters:
-      - name: X-Locale
-        in: header
-        required: false
-        description: Response language. Accepts en or my; Accept-Language is also
-          supported.
-        schema:
-          type: string
-          enum:
-          - en
-          - my
-      - name: X-Platform
-        in: header
-        required: false
-        description: Active-session namespace.
-        schema:
-          type: string
-          enum:
-          - web
-          - mobile
-          default: web
-      responses:
-        '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/response"
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/error_response"
-      security:
-      - bearerAuth: []
   "/v1/admin/users":
     get:
       tags:
@@ -5886,7 +5856,7 @@ paths:
           application/json:
             schema:
               "$ref": "#/components/schemas/user_role_request"
-  "/v1/iam/users/{user_id}/roles/{id}":
+  "/v1/iam/users/{user_id}/roles/{role_id}":
     delete:
       tags:
       - IAM User Roles
@@ -5918,7 +5888,7 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: id
+      - name: role_id
         in: path
         required: true
         description: Role ID
@@ -5946,6 +5916,12 @@ paths:
                 "$ref": "#/components/schemas/error_response"
         '404':
           description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '422':
+          description: Unprocessable Content
           content:
             application/json:
               schema:

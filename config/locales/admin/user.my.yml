@@ -10,7 +10,7 @@ my:
       discarded_users_retrieved: "ပယ်ဖျက်ထားသော အသုံးပြုသူများ ရယူပြီးပါပြီ။"
       user_not_discarded: "ပယ်ဖျက်ထားသော အသုံးပြုသူကိုသာ အပြီးဖျက်နိုင်ပါသည်။"
       self_lifecycle_protected: "မိမိအကောင့်ကို ပယ်ဖျက်ခြင်း သို့မဟုတ် အပြီးဖျက်ခြင်း မပြုနိုင်ပါ။"
-      last_super_admin_protected: "နောက်ဆုံး super admin ကို ပယ်ဖျက်ခြင်း မပြုနိုင်ပါ။"
+      super_admin_lifecycle_protected: "Super admin အကောင့်များကို ပယ်ဖျက်ခြင်း သို့မဟုတ် အပြီးဖျက်ခြင်း မပြုနိုင်ပါ။"
       user_roles_retrieved: "ရာထူးများ ရယူပြီးပါပြီ။"
       user_permissions_retrieved: "ခွင့်ပြုချက်များ ရယူပြီးပါပြီ။"
       user_create_failed: "အသုံးပြုသူ ဖန်တီး၍ မရပါ။"

@@ -60,8 +60,6 @@ class V1::Admin::UsersController < V1::ApplicationController
     end
 
     if user.save
-      assign_roles(user) if role_ids_param_provided?
-
       render_json_response(
         status_code: 201,
         message: admin_user_message(MessageService::Admin::User::USER_CREATED),
@@ -79,7 +77,6 @@ class V1::Admin::UsersController < V1::ApplicationController
   # PATCH/PUT /v1/admin/users/:id
   def update
     if @user.update(user_params)
-      assign_roles(@user) if role_ids_param_provided?
       assign_avatar(@user) if avatar_param_provided?
 
       render_json_response(
@@ -151,11 +148,10 @@ class V1::Admin::UsersController < V1::ApplicationController
     end
 
     return false unless @user.super_admin?
-    return false if User.joins(:roles).where(iam_roles: { name: "super_admin" }).count > 1
 
     render_json_response(
       status_code: 422,
-      message: admin_user_message(MessageService::Admin::User::LAST_SUPER_ADMIN_PROTECTED)
+      message: admin_user_message(MessageService::Admin::User::SUPER_ADMIN_LIFECYCLE_PROTECTED)
     )
     true
   end
@@ -166,24 +162,6 @@ class V1::Admin::UsersController < V1::ApplicationController
       :name,
       :email
     )
-  end
-
-  def role_ids_param
-    params.dig(:user, :role_ids)
-  end
-
-  def role_ids_param_provided?
-    params[:user].respond_to?(:key?) && params[:user].key?(:role_ids)
-  end
-
-  def assign_roles(user)
-    role_ids = Array(role_ids_param).reject(&:blank?)
-    roles = Iam::Role.where(id: role_ids)
-
-    user.user_roles.destroy_all
-    roles.each do |role|
-      user.user_roles.find_or_create_by!(role: role)
-    end
   end
 
   def avatar_param_provided?
