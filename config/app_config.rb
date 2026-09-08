@@ -105,8 +105,8 @@ module AppConfig
   # Media Compression & Worker Pipeline
   MEDIA_CONTAINER_ENABLED = env_or.call("MEDIA_CONTAINER_ENABLED", "true") == "true"
   GARAGE_CONTAINER_ENABLED = env_or.call("GARAGE_CONTAINER_ENABLED", "true") == "true"
-  MEDIA_MAX_VIDEO_SIZE_MB = env_or.call("MEDIA_MAX_VIDEO_SIZE_MB", MEDIA_CONTAINER_ENABLED ? "100" : "10").to_i
-  MEDIA_MAX_NON_VIDEO_SIZE_MB = env_or.call("MEDIA_MAX_NON_VIDEO_SIZE_MB", MEDIA_CONTAINER_ENABLED ? "10" : "1").to_i
+  MEDIA_MAX_VIDEO_SIZE_MB = env_or.call("MEDIA_MAX_VIDEO_SIZE_MB", MEDIA_CONTAINER_ENABLED ? "300" : "10").to_i
+  MEDIA_MAX_NON_VIDEO_SIZE_MB = env_or.call("MEDIA_MAX_NON_VIDEO_SIZE_MB", MEDIA_CONTAINER_ENABLED ? "30" : "1").to_i
   MEDIA_VIDEO_CRF = env_or.call("MEDIA_VIDEO_CRF", "23").to_i
   MEDIA_VIDEO_PRESET = env_or.call("MEDIA_VIDEO_PRESET", "medium").freeze
   MEDIA_VIDEO_MAX_WIDTH = env_or.call("MEDIA_VIDEO_MAX_WIDTH", "1920").to_i
