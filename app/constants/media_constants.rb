@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # app/constants/media_constants.rb
 module MediaConstants
   # Feature flags

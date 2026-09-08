@@ -27,5 +27,6 @@ en:
       fetched: "User roles fetched"
       assigned: "Role assigned"
       removed: "Role removed"
+      last_super_admin_role_protected: "The last super admin role cannot be removed"
       not_found: "User role not found"
       missing: "User does not have this role"

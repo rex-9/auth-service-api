@@ -8,10 +8,10 @@ module Iam
 
     # ===== ENUMS =====
     enum :action, {
-      read: "read",
-      create: "create",
-      update: "update",
-      delete: "delete"
+      read: IamConstants::Action::READ,
+      create: IamConstants::Action::CREATE,
+      update: IamConstants::Action::UPDATE,
+      delete: IamConstants::Action::DELETE
     }, prefix: true, validate: true
 
     enum :resource, RESOURCES.index_with(&:itself), prefix: true, validate: true

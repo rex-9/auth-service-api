@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+# app/constants/sort_constants.rb
 module SortConstants
   module Order
     ASC = "asc".freeze

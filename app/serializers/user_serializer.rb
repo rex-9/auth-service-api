@@ -11,31 +11,16 @@ class UserSerializer < ApplicationSerializer
     user.assets.find_by(type: AssetConstants::AssetType::AVATAR)&.id
   end
 
-  attribute :role_ids do |user|
-    user.roles.pluck(:id)
-  end
-
-  attribute :role_names do |user|
-    user.roles.pluck(:name)
-  end
-
-  attribute :permissions do |user|
-    user.permissions.group_by(&:resource).transform_values { |p| p.pluck(:action) }
-  end
-
-  attribute :admin_permissions do |user|
-    user.admin_permissions.group_by(&:resource).transform_values { |p| p.pluck(:action) }
-  end
-
-  attribute :non_admin_permissions do |user|
-    user.non_admin_permissions.group_by(&:resource).transform_values { |p| p.pluck(:action) }
-  end
-
-  attribute :is_admin do |user|
-    user.admin?
-  end
-
-  attribute :is_super_admin do |user|
-    user.super_admin?
+  attribute :iam do |user|
+    {
+      is_admin: user.admin?,
+      is_super_admin: user.super_admin?,
+      roles: Iam::RoleSerializer.new(user.roles).serializable_hash[:data],
+      admin_roles: Iam::RoleSerializer.new(user.admin_roles).serializable_hash[:data],
+      non_admin_roles: Iam::RoleSerializer.new(user.non_admin_roles).serializable_hash[:data],
+      permissions: Iam::PermissionSerializer.new(user.permissions).serializable_hash[:data],
+      admin_permissions: Iam::PermissionSerializer.new(user.admin_permissions).serializable_hash[:data],
+      non_admin_permissions: Iam::PermissionSerializer.new(user.non_admin_permissions).serializable_hash[:data]
+    }
   end
 end

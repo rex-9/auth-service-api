@@ -292,12 +292,6 @@ components:
               format: password
               minLength: 6
               writeOnly: true
-            role_ids:
-              type: array
-              uniqueItems: true
-              items:
-                type: string
-                format: uuid
           required: []
       required:
       - user
@@ -849,6 +843,66 @@ components:
       - event
       - audience
       - channels
+    notification_template_request:
+      type: object
+      properties:
+        event:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        category:
+          type: string
+        link:
+          type: string
+          nullable: true
+        admin:
+          type: boolean
+        in_app_title:
+          type: string
+          nullable: true
+        in_app_body:
+          type: string
+          nullable: true
+        in_app_data:
+          type: object
+          additionalProperties: true
+        push_title:
+          type: string
+          nullable: true
+        push_body:
+          type: string
+          nullable: true
+        push_template_id:
+          type: string
+          nullable: true
+        email_subject:
+          type: string
+          nullable: true
+        email_body:
+          type: string
+          nullable: true
+        email_template_id:
+          type: string
+          nullable: true
+      required:
+      - event
+      - name
+      - category
+    id_batch_request:
+      type: object
+      properties:
+        ids:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+      required:
+      - ids
     asset_upload_request:
       type: object
       properties:
@@ -1294,21 +1348,38 @@ components:
           type: string
           format: uri
           nullable: true
-        role_ids:
-          type: array
-          items:
-            type: string
-            format: uuid
-        role_names:
-          type: array
-          items:
-            type: string
-        permissions:
+        iam:
           type: object
-          additionalProperties:
-            type: array
-            items:
-              type: string
+          properties:
+            is_admin:
+              type: boolean
+            is_super_admin:
+              type: boolean
+            roles:
+              type: array
+              items:
+                type: object
+            admin_roles:
+              type: array
+              items:
+                type: object
+            non_admin_roles:
+              type: array
+              items:
+                type: object
+            permissions:
+              type: array
+              items:
+                type: object
+            admin_permissions:
+              type: array
+              items:
+                type: object
+            non_admin_permissions:
+              type: array
+              items:
+                type: object
+          required: []
         created_at:
           type: string
           format: date-time
@@ -3224,12 +3295,6 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/error_response"
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/error_response"
         '422':
           description: Unprocessable Content
           content:
@@ -3244,47 +3309,6 @@ paths:
           application/json:
             schema:
               "$ref": "#/components/schemas/current_user_update_request"
-  "/v1/users/current/iam":
-    get:
-      tags:
-      - Users
-      summary: Get the current user's roles and permissions
-      parameters:
-      - name: X-Locale
-        in: header
-        required: false
-        description: Response language. Accepts en or my; Accept-Language is also
-          supported.
-        schema:
-          type: string
-          enum:
-          - en
-          - my
-      - name: X-Platform
-        in: header
-        required: false
-        description: Active-session namespace.
-        schema:
-          type: string
-          enum:
-          - web
-          - mobile
-          default: web
-      responses:
-        '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/response"
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/error_response"
-      security:
-      - bearerAuth: []
   "/v1/admin/users":
     get:
       tags:
@@ -4167,6 +4191,136 @@ paths:
                 "$ref": "#/components/schemas/error_response"
       security:
       - bearerAuth: []
+  "/v1/admin/iam/roles/{id}/discard":
+    post:
+      tags:
+      - Admin / IAM Roles
+      summary: Discard an admin-managed role
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '422':
+          description: Unprocessable Content
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+  "/v1/admin/iam/roles/{id}/undiscard":
+    post:
+      tags:
+      - Admin / IAM Roles
+      summary: Undiscard an admin-managed role
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '422':
+          description: Unprocessable Content
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
   "/v1/admin/iam/permissions/{id}":
     get:
       tags:
@@ -4854,6 +5008,266 @@ paths:
                 "$ref": "#/components/schemas/error_response"
         '404':
           description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+  "/v1/admin/chat/rooms/{id}/discard":
+    post:
+      tags:
+      - Admin / Chat Rooms
+      summary: Discard an admin chat room
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '422':
+          description: Unprocessable Content
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+  "/v1/admin/chat/rooms/{id}/undiscard":
+    post:
+      tags:
+      - Admin / Chat Rooms
+      summary: Undiscard an admin chat room
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '422':
+          description: Unprocessable Content
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+  "/v1/admin/chat/messages/{id}/discard":
+    post:
+      tags:
+      - Admin / Chat Messages
+      summary: Discard an admin chat message
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '422':
+          description: Unprocessable Content
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+  "/v1/admin/chat/messages/{id}/undiscard":
+    post:
+      tags:
+      - Admin / Chat Messages
+      summary: Undiscard an admin chat message
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '422':
+          description: Unprocessable Content
           content:
             application/json:
               schema:
@@ -5886,7 +6300,7 @@ paths:
           application/json:
             schema:
               "$ref": "#/components/schemas/user_role_request"
-  "/v1/iam/users/{user_id}/roles/{id}":
+  "/v1/iam/users/{user_id}/roles/{role_id}":
     delete:
       tags:
       - IAM User Roles
@@ -5918,7 +6332,7 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: id
+      - name: role_id
         in: path
         required: true
         description: Role ID
@@ -5946,6 +6360,12 @@ paths:
                 "$ref": "#/components/schemas/error_response"
         '404':
           description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '422':
+          description: Unprocessable Content
           content:
             application/json:
               schema:
@@ -5993,6 +6413,11 @@ paths:
         required: false
         schema:
           type: string
+      - name: discarded
+        in: query
+        required: false
+        schema:
+          type: boolean
       - name: unresolved
         in: query
         required: false
@@ -6327,6 +6752,124 @@ paths:
                 "$ref": "#/components/schemas/error_response"
       security:
       - bearerAuth: []
+  "/v1/client/logs/{id}/discard":
+    post:
+      tags:
+      - Client Logs
+      summary: Move a client error to the recycle bin
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+  "/v1/client/logs/{id}/undiscard":
+    post:
+      tags:
+      - Client Logs
+      summary: Restore a discarded client error
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
   "/v1/media/upload":
     post:
       tags:
@@ -6387,6 +6930,131 @@ paths:
             schema:
               "$ref": "#/components/schemas/asset_upload_request"
   "/v1/admin/notifications":
+    get:
+      tags:
+      - Admin / Notifications
+      summary: List notification templates
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: category
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+    post:
+      tags:
+      - Admin / Notifications
+      summary: Create a notification template
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '422':
+          description: Unprocessable Content
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/notification_template_request"
+  "/v1/admin/notifications/dispatch":
     post:
       tags:
       - Admin / Notifications
@@ -6457,6 +7125,258 @@ paths:
           application/json:
             schema:
               "$ref": "#/components/schemas/notification_request"
+  "/v1/admin/notifications/{id}":
+    get:
+      tags:
+      - Admin / Notifications
+      summary: Get a notification template
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+    put:
+      tags:
+      - Admin / Notifications
+      summary: Update a notification template
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '422':
+          description: Unprocessable Content
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/notification_template_request"
+    delete:
+      tags:
+      - Admin / Notifications
+      summary: Discard a notification template
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+  "/v1/admin/notifications/{id}/undiscard":
+    post:
+      tags:
+      - Admin / Notifications
+      summary: Restore a discarded notification template
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '422':
+          description: Unprocessable Content
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
   "/v1/admin/notifications/templates":
     get:
       tags:
@@ -7968,6 +8888,308 @@ paths:
                 "$ref": "#/components/schemas/error_response"
       security:
       - bearerAuth: []
+  "/v1/admin/assets/storage_stats":
+    get:
+      tags:
+      - Admin / Assets
+      summary: Get database, Garage partition, and host storage statistics
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      description: Super-admin only.
+      security:
+      - bearerAuth: []
+  "/v1/admin/assets/bin":
+    delete:
+      tags:
+      - Admin / Assets
+      summary: Permanently empty the asset recycle bin
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '422':
+          description: Unprocessable Content
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+  "/v1/admin/assets/discard_batch":
+    post:
+      tags:
+      - Admin / Assets
+      summary: Discard batch assets
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '422':
+          description: Unprocessable Content
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/id_batch_request"
+  "/v1/admin/assets/undiscard_batch":
+    post:
+      tags:
+      - Admin / Assets
+      summary: Undiscard batch assets
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '422':
+          description: Unprocessable Content
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/id_batch_request"
+  "/v1/admin/assets/destroy_batch":
+    post:
+      tags:
+      - Admin / Assets
+      summary: Destroy batch assets
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '422':
+          description: Unprocessable Content
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/id_batch_request"
   "/v1/admin/assets/upload":
     post:
       tags:
@@ -8896,6 +10118,250 @@ paths:
                 "$ref": "#/components/schemas/error_response"
         '403':
           description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+  "/v1/notifications":
+    get:
+      tags:
+      - Notifications
+      summary: List the current user's in-app notifications
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: filter
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+  "/v1/notifications/unread_count":
+    get:
+      tags:
+      - Notifications
+      summary: Get the current user's unread notification count
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+  "/v1/notifications/read_all":
+    put:
+      tags:
+      - Notifications
+      summary: Mark all current-user notifications as read
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+  "/v1/notifications/{id}/read":
+    put:
+      tags:
+      - Notifications
+      summary: Mark a current-user notification as read
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+  "/v1/notifications/{id}":
+    delete:
+      tags:
+      - Notifications
+      summary: Remove a current-user notification
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
           content:
             application/json:
               schema:

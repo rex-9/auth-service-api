@@ -1,5 +1,6 @@
-# app/constants/version_constants.rb
+# frozen_string_literal: true
 
+# app/constants/version_constants.rb
 module VersionConstants
   module Status
     DRAFT     = "draft".freeze

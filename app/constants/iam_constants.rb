@@ -1,5 +1,6 @@
-# app/constants/iam_constants.rb
+# frozen_string_literal: true
 
+# app/constants/iam_constants.rb
 module IamConstants
   module Role
     SUPER_ADMIN = "super_admin".freeze
