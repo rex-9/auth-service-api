@@ -204,7 +204,7 @@ RSpec.describe "V1 Admin Versions API", type: :request do
       expect(response_data.map { |record| record.dig("attributes", "id") }).to include(active.id)
       expect(response_data.map { |record| record.dig("attributes", "id") }).not_to include(discarded.id)
 
-      get "/v1/admin/client/versions/discarded", headers: headers
+      get "/v1/admin/client/versions", params: { discarded: true }, headers: headers
 
       expect(response).to have_http_status(:ok)
       expect(response_status["message"]).to eq(I18n.t("version.discarded_fetched"))

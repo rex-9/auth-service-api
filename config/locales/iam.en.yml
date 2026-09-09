@@ -13,6 +13,7 @@ en:
       restored: "Permission restored"
       not_discarded: "Permission must be in the recycle bin before permanent deletion"
       deleted: "Permission permanently deleted"
+      delete_failed: "Permission could not be permanently deleted"
     roles:
       fetched: "Roles fetched"
       fetched_one: "Role fetched"

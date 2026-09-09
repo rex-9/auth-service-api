@@ -938,7 +938,8 @@ module Openapi
               query_parameter(:page, type: :integer),
               query_parameter(:limit, type: :integer),
               query_parameter(:sort_by, type: :string),
-              query_parameter(:sort_order, enum: SortConstants::Order::ALL)
+              query_parameter(:sort_order, enum: SortConstants::Order::ALL),
+              query_parameter(:discarded, type: :boolean)
             ],
             errors: [ 401, 403 ]
           ),
@@ -949,20 +950,6 @@ module Openapi
             success: 201,
             body: ref(:admin_version_request),
             errors: [ 401, 403, 422 ]
-          )
-        },
-        "/v1/admin/client/versions/discarded" => {
-          get: operation(
-            tags: "Admin / Versions",
-            summary: "List discarded versions",
-            description: "Super-admin only.",
-            parameters: [
-              query_parameter(:page, type: :integer),
-              query_parameter(:limit, type: :integer),
-              query_parameter(:sort_by, type: :string),
-              query_parameter(:sort_order, enum: SortConstants::Order::ALL)
-            ],
-            errors: [ 401, 403 ]
           )
         },
         "/v1/admin/client/versions/{id}" => {
@@ -1047,18 +1034,11 @@ module Openapi
                          query_parameter(:limit, type: :integer, minimum: 1),
                          query_parameter(:search, type: :string),
                          query_parameter(:sort_by, type: :string),
-                         query_parameter(:sort_order, enum: SortConstants::Order::ALL)
+                         query_parameter(:sort_order, enum: SortConstants::Order::ALL),
+                         query_parameter(:discarded, type: :boolean)
                        ], errors: [ 401, 403 ]),
         post: operation(tags: "Admin / Users", summary: "Create an admin-managed user", success: 201,
                         body: ref(:admin_user_request), errors: [ 401, 403, 422 ])
-      }
-      paths["/v1/admin/users/discarded"] = {
-        get: operation(tags: "Admin / Users", summary: "List discarded users in the recycle bin",
-                       parameters: [
-                         query_parameter(:limit, type: :integer, minimum: 1),
-                         query_parameter(:sort_by, type: :string),
-                         query_parameter(:sort_order, enum: SortConstants::Order::ALL)
-                       ], errors: [ 401, 403 ])
       }
       paths["/v1/admin/users/{id}"] = {
         get: operation(tags: "Admin / Users", summary: "Get an admin-managed user",
@@ -1078,14 +1058,18 @@ module Openapi
                        parameters: [
                          query_parameter(:limit, type: :integer, minimum: 1),
                          query_parameter(:sort_by, type: :string),
-                         query_parameter(:sort_order, enum: SortConstants::Order::ALL)
+                         query_parameter(:sort_order, enum: SortConstants::Order::ALL),
+                         query_parameter(:discarded, type: :boolean)
                        ], errors: [ 401, 403 ]),
         post: operation(tags: "Admin / IAM Roles", summary: "Create an admin-managed role", success: 201,
                         body: ref(:role_request), errors: [ 401, 403, 422 ])
       }
       paths["/v1/admin/iam/permissions"] = {
         get: operation(tags: "Admin / IAM Permissions", summary: "List permissions for the admin client",
-                       parameters: [ query_parameter(:limit, type: :integer, minimum: 1) ], errors: [ 401, 403 ]),
+                       parameters: [
+                         query_parameter(:limit, type: :integer, minimum: 1),
+                         query_parameter(:discarded, type: :boolean)
+                       ], errors: [ 401, 403 ]),
         post: operation(tags: "Admin / IAM Permissions", summary: "Create an admin-managed permission", success: 201,
                         body: ref(:permission_request), errors: [ 401, 403, 422 ])
       }
@@ -1111,8 +1095,14 @@ module Openapi
                          parameters: [ path_parameter(:id) ], body: ref(:permission_request),
                          errors: [ 401, 403, 404, 422 ]),
         delete: operation(tags: "Admin / IAM Permissions", summary: "Delete an admin-managed permission",
-                          parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ])
+                          parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422 ])
       }
+      %w[discard undiscard].each do |action|
+        paths["/v1/admin/iam/permissions/{id}/#{action}"] = {
+          post: operation(tags: "Admin / IAM Permissions", summary: "#{action.capitalize} an admin-managed permission",
+                          parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422 ])
+        }
+      end
       paths["/v1/admin/chat/rooms"] = {
         get: operation(tags: "Admin / Chat Rooms", summary: "List chat rooms for the admin client",
                        parameters: [
@@ -1164,14 +1154,6 @@ module Openapi
                        ], errors: [ 401, 403 ]),
         post: operation(tags: "Admin / Payment Products", summary: "Create a Stripe-backed product", success: 201,
                         body: ref(:admin_product_request), errors: [ 401, 403, 422 ])
-      }
-      paths["/v1/admin/payment/products/discarded"] = {
-        get: operation(tags: "Admin / Payment Products", summary: "List discarded Stripe-backed products for the recycle bin",
-                       parameters: [
-                         query_parameter(:limit, type: :integer, minimum: 1),
-                         query_parameter(:sort_by, type: :string),
-                         query_parameter(:sort_order, enum: SortConstants::Order::ALL)
-                       ], errors: [ 401, 403 ])
       }
       paths["/v1/admin/payment/products/{id}"] = {
         get: operation(tags: "Admin / Payment Products", summary: "Get a Stripe-backed product",
@@ -1445,18 +1427,10 @@ module Openapi
         get: operation(tags: "Admin / Assets", summary: "List and filter assets for admins",
                        parameters: asset_filters + [
                          query_parameter(:page, type: :integer),
-                         query_parameter(:limit, type: :integer)
+                         query_parameter(:limit, type: :integer),
+                         query_parameter(:discarded, type: :boolean)
                        ],
                        errors: [ 401, 403 ])
-      }
-      paths["/v1/admin/assets/discarded"] = {
-        get: operation(tags: "Admin / Assets", summary: "List discarded assets in the recycle bin",
-                       parameters: [
-                         query_parameter(:limit, type: :integer),
-                         query_parameter(:page, type: :integer),
-                         query_parameter(:sort_by, type: :string),
-                         query_parameter(:sort_order, enum: SortConstants::Order::ALL)
-                       ], errors: [ 401, 403 ])
       }
       paths["/v1/admin/assets/storage_stats"] = {
         get: operation(tags: "Admin / Assets", summary: "Get database, Garage partition, and host storage statistics",

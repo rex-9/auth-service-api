@@ -202,6 +202,11 @@ erDiagram
 - `index_iam_permissions_on_resource_and_action` (UNIQUE: `resource`, `action`)
 - Auditing indexes on `created_by_id`, `updated_by_id`, `discarded_by_id`, `undiscarded_by_id`, `discarded_at`.
 
+**Mutation invariants**:
+
+- Permissions must be discarded before permanent deletion and may be restored from the recycle bin.
+- A role-permission assignment belonging to `super_admin` cannot be updated or removed.
+
 ---
 
 ### 3.4. `iam_user_roles`
@@ -234,6 +239,8 @@ erDiagram
 
 - Role membership is changed only through the dedicated IAM user-role resource; admin user create/update does not accept role IDs.
 - The final remaining `super_admin` assignment cannot be removed.
+- System roles cannot be discarded or permanently deleted.
+- The `super_admin` role's permission assignments cannot be updated or removed; newly introduced permissions may still be assigned automatically.
 
 ---
 

@@ -70,7 +70,7 @@ RSpec.describe "Admin users", type: :request do
     grant_admin_user_permission(:read)
     user.discard!
 
-    get "/v1/admin/users/discarded", headers: headers
+    get "/v1/admin/users", params: { discarded: true }, headers: headers
 
     expect(response).to have_http_status(:ok)
     expect(response_data).to include(hash_including("id" => user.id))

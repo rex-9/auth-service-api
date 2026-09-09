@@ -9,33 +9,27 @@ class V1::Admin::UsersController < V1::ApplicationController
     update
     discard
     undiscard
-    read_discarded
   ]
+  before_action :super_admin_required_for_discarded_index!, only: :index
 
   # GET /users?page=2&limit=25
   def index
-    users = search_users(User.includes(:roles))
-    users = sort(users, columns: SortConstants::Columns::USER)
+    discarded = params[:discarded].to_s == "true"
+    scope = discarded ? User.with_discarded.discarded.includes(:roles) : User.includes(:roles)
+    users = search_users(scope)
+    users = if discarded
+      sort(users, columns: SortConstants::Columns::USER, default_column: :discarded_at)
+    else
+      sort(users, columns: SortConstants::Columns::USER)
+    end
     Rails.logger.info("#{LOG_PREFIX} Query: #{users.to_sql}")
 
     pagy, records = pagy(users)
     render_json_response(
       status_code: 200,
-      message: admin_user_message(MessageService::Admin::User::USERS_RETRIEVED),
-      data: UserSerializer.paginated(records, pagy),
-      pagy: pagy
-    )
-  end
-
-  # GET /v1/admin/users/discarded?page=1&limit=25
-  def read_discarded
-    users = search_users(User.with_discarded.discarded.includes(:roles))
-    users = sort(users, columns: SortConstants::Columns::USER, default_column: :discarded_at)
-    pagy, records = pagy(users)
-
-    render_json_response(
-      status_code: 200,
-      message: admin_user_message(MessageService::Admin::User::DISCARDED_USERS_RETRIEVED),
+      message: admin_user_message(
+        discarded ? MessageService::Admin::User::DISCARDED_USERS_RETRIEVED : MessageService::Admin::User::USERS_RETRIEVED
+      ),
       data: UserSerializer.paginated(records, pagy),
       pagy: pagy
     )
@@ -118,6 +112,10 @@ class V1::Admin::UsersController < V1::ApplicationController
   end
 
   private
+
+  def super_admin_required_for_discarded_index!
+    super_admin_required! if params[:discarded].to_s == "true"
+  end
 
   def set_active_user
     @user = User.find(params[:id])

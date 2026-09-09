@@ -7,14 +7,22 @@ class V1::Admin::AssetsController < V1::ApplicationController
 
   # GET /v1/admin/assets
   def index
-    assets = search_assets(Asset.kept)
+    discarded = params[:discarded].to_s == "true"
+    scope = discarded ? Asset.with_discarded.discarded : Asset.kept
+    assets = search_assets(scope)
     assets = filter_assets(assets)
-    assets = sort(assets, columns: SortConstants::Columns::ASSET)
+    assets = if discarded
+      sort(assets, columns: SortConstants::Columns::ASSET, default_column: "discarded_at")
+    else
+      sort(assets, columns: SortConstants::Columns::ASSET)
+    end
     pagy, records = pagy(:offset, assets, limit: params[:limit])
 
     render_json_response(
       status_code: 200,
-      message: admin_asset_message(MessageService::Admin::Asset::ASSETS_RETRIEVED),
+      message: admin_asset_message(
+        discarded ? MessageService::Admin::Asset::DISCARDED_ASSETS_RETRIEVED : MessageService::Admin::Asset::ASSETS_RETRIEVED
+      ),
       data: AssetSerializer.paginated(records, pagy),
       pagy: pagy
     )
@@ -216,21 +224,6 @@ class V1::Admin::AssetsController < V1::ApplicationController
       data: {
         asset: AssetSerializer.new(@asset).serializable_hash[:data][:attributes]
       }
-    )
-  end
-
-  # GET /v1/admin/assets/discarded
-  def read_discarded
-    assets = search_assets(Asset.with_discarded.discarded)
-    assets = filter_assets(assets)
-    assets = sort(assets, columns: SortConstants::Columns::ASSET, default_column: "discarded_at")
-    pagy, records = pagy(:offset, assets, limit: params[:limit])
-
-    render_json_response(
-      status_code: 200,
-      message: admin_asset_message(MessageService::Admin::Asset::DISCARDED_ASSETS_RETRIEVED),
-      data: AssetSerializer.paginated(records, pagy),
-      pagy: pagy
     )
   end
 
