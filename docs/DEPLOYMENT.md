@@ -1,5 +1,10 @@
 # Production Deployment Guide: Contabo VPS + Coolify
 
+> [!IMPORTANT]
+> Complete the edge, proxy, origin-firewall, and rate-limit steps in
+> [Production DDoS and API Abuse Protection](DDOS.md) before exposing a
+> production API.
+
 > **Target Platform:** Contabo Cloud VPS (Ubuntu 22.04 / 24.04 LTS)  
 > **Deployment Orchestrator:** Coolify (Self-hosted PaaS)  
 > **Project Scope:** `rexone` (isolated namespaces for UAT and Production)  
