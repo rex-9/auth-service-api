@@ -48,6 +48,39 @@ RSpec.describe "Admin IAM roles", type: :request do
     expect(response_status["message"]).to eq(I18n.t("iam.roles.deleted", locale: :my))
   end
 
+  it "notifies assigned users when role permissions change" do
+    role = create(:role, name: "product_admin")
+    assigned_user = create(:user)
+    create(:user_role, user: assigned_user, role: role)
+    create(:user)
+    permission = create(:permission, action: "read", resource: "products")
+    allow(NotificationService::Center).to receive(:iam_updated)
+
+    patch "/v1/admin/iam/roles/#{role.id}",
+          params: { permission_ids: [ permission.id ] },
+          headers: headers
+
+    expect(response).to have_http_status(:ok)
+    expect(NotificationService::Center).to have_received(:iam_updated).with(assigned_user).once
+    expect(NotificationService::Center).to have_received(:iam_updated).once
+  end
+
+  it "does not notify assigned users when role permissions are unchanged" do
+    permission = create(:permission, action: "read", resource: "products")
+    role = create(:role, name: "product_admin")
+    create(:role_permission, role: role, permission: permission)
+    assigned_user = create(:user)
+    create(:user_role, user: assigned_user, role: role)
+    allow(NotificationService::Center).to receive(:iam_updated)
+
+    patch "/v1/admin/iam/roles/#{role.id}",
+          params: { permission_ids: [ permission.id ] },
+          headers: headers
+
+    expect(response).to have_http_status(:ok)
+    expect(NotificationService::Center).not_to have_received(:iam_updated)
+  end
+
   it "rejects system role deletion with i18n messages" do
     role = create(:role, name: "system_admin", system: true)
 
