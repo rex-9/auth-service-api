@@ -8354,7 +8354,8 @@ paths:
     post:
       tags:
       - Admin / Assets
-      summary: Manually trigger background compression for an asset
+      summary: Manually trigger background compression for an image, video, or audio
+        asset
       parameters:
       - name: X-Locale
         in: header
@@ -8543,7 +8544,7 @@ paths:
     post:
       tags:
       - Admin / Assets
-      summary: Upload and replace a video thumbnail
+      summary: Upload and replace a thumbnail for a compressible video or audio asset
       parameters:
       - name: X-Locale
         in: header

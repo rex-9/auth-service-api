@@ -86,7 +86,7 @@ class Asset < ApplicationRecord
   end
 
   def compressible?
-    !max_compressed? && (compressible_video? || compressible_image?)
+    !max_compressed? && (compressible_video? || compressible_image? || compressible_audio?)
   end
 
   def compressible_video?
@@ -95,6 +95,14 @@ class Asset < ApplicationRecord
 
   def compressible_image?
     MediaConstants::COMPRESSIBLE_IMAGE_EXTENSIONS.include?(extension&.downcase)
+  end
+
+  def compressible_audio?
+    MediaConstants::COMPRESSIBLE_AUDIO_EXTENSIONS.include?(extension&.downcase)
+  end
+
+  def thumbnail_attachable?
+    compressible_video? || compressible_audio?
   end
 
   def pending?

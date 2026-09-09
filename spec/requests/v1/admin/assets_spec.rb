@@ -146,11 +146,13 @@ RSpec.describe "V1 Admin Assets API", type: :request do
   describe "POST /v1/admin/assets/:id/compress" do
     let(:image_asset) { create(:asset, extension: "png", status: "ready") }
     let(:video_asset) { create(:asset, extension: "mp4", status: "ready") }
+    let(:audio_asset) { create(:asset, extension: "wav", format: "audio", type: "audio", status: "ready") }
     let(:pdf_asset) { create(:asset, extension: "pdf", status: "ready") }
 
     before do
       allow(Media::CompressImageJob).to receive(:perform_later)
       allow(Media::CompressVideoJob).to receive(:perform_later)
+      allow(Media::CompressAudioJob).to receive(:perform_later)
     end
 
     it "enqueues image compression for compressible image assets" do
@@ -162,6 +164,16 @@ RSpec.describe "V1 Admin Assets API", type: :request do
       expect(Media::CompressImageJob).to have_received(:perform_later).with(asset_id: image_asset.id)
     end
 
+    it "enqueues image compression for webp assets" do
+      webp_asset = create(:asset, extension: "webp", format: "image", status: "ready")
+
+      post "/v1/admin/assets/#{webp_asset.id}/compress", headers: headers
+
+      expect(response).to have_http_status(:ok)
+      expect(webp_asset.reload.status).to eq("pending")
+      expect(Media::CompressImageJob).to have_received(:perform_later).with(asset_id: webp_asset.id)
+    end
+
     it "enqueues video compression for compressible video assets" do
       post "/v1/admin/assets/#{video_asset.id}/compress", headers: headers
 
@@ -171,6 +183,15 @@ RSpec.describe "V1 Admin Assets API", type: :request do
       expect(Media::CompressVideoJob).to have_received(:perform_later).with(asset_id: video_asset.id)
     end
 
+    it "enqueues audio compression for compressible audio assets" do
+      post "/v1/admin/assets/#{audio_asset.id}/compress", headers: headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response_data.dig("asset", "status")).to eq("pending")
+      expect(audio_asset.reload.status).to eq("pending")
+      expect(Media::CompressAudioJob).to have_received(:perform_later).with(asset_id: audio_asset.id)
+    end
+
     it "rejects compression for non-compressible assets with 422" do
       post "/v1/admin/assets/#{pdf_asset.id}/compress", headers: headers
 
@@ -178,6 +199,7 @@ RSpec.describe "V1 Admin Assets API", type: :request do
       expect(response_status["success"]).to be(false)
       expect(Media::CompressImageJob).not_to have_received(:perform_later)
       expect(Media::CompressVideoJob).not_to have_received(:perform_later)
+      expect(Media::CompressAudioJob).not_to have_received(:perform_later)
     end
 
     it "rejects compression for already optimal assets with 422" do
@@ -302,6 +324,44 @@ RSpec.describe "V1 Admin Assets API", type: :request do
 
       post "/v1/admin/assets/#{video_asset.id}/thumbnail/upload",
            params: { file: document },
+           headers: headers
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response_status["success"]).to be(false)
+      expect(StorageService::Client).not_to have_received(:upload)
+    end
+
+    it "attaches a thumbnail to a type=audio parent" do
+      audio_asset = create(:asset, type: "audio", format: "audio", extension: "wav")
+
+      post "/v1/admin/assets/#{audio_asset.id}/thumbnail/upload",
+           params: { file: image_file },
+           headers: headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response_status["success"]).to be(true)
+      expect(audio_asset.reload.thumbnail.storage_key).to eq("dev/admin/thumbnail_replacement.webp")
+      expect(response_data.dig("asset", "thumbnail", "url")).to include("dev/admin/thumbnail_replacement.webp")
+    end
+
+    it "attaches a thumbnail to a compressible audio parent regardless of type" do
+      general_wav = create(:asset, type: "general", format: "audio", extension: "wav")
+
+      post "/v1/admin/assets/#{general_wav.id}/thumbnail/upload",
+           params: { file: image_file },
+           headers: headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response_status["success"]).to be(true)
+      expect(general_wav.reload.thumbnail.storage_key).to eq("dev/admin/thumbnail_replacement.webp")
+      expect(StorageService::Client).to have_received(:upload)
+    end
+
+    it "rejects a non-audio, non-video parent" do
+      pdf_asset = create(:asset, type: "general", format: "doc", extension: "pdf")
+
+      post "/v1/admin/assets/#{pdf_asset.id}/thumbnail/upload",
+           params: { file: image_file },
            headers: headers
 
       expect(response).to have_http_status(:unprocessable_content)

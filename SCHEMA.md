@@ -544,7 +544,7 @@ erDiagram
 | `status`            | `string`   |    ❌    | `"pending"`         | Pipeline status: `pending`, `processing`, `ready`, `optimal`, `failed` |
 | `assetable_type`    | `string`   |    ✔️    | `NULL`              | Polymorphic owner type (`User`, `Chat::Message`, etc.)                 |
 | `assetable_id`      | `uuid`     |    ✔️    | `NULL`              | Polymorphic owner ID                                                   |
-| `parent_asset_id`   | `uuid`     |    ✔️    | `NULL`              | Original video for a generated thumbnail asset                         |
+| `parent_asset_id`   | `uuid`     |    ✔️    | `NULL`              | Source asset for a thumbnail (compressible video or audio parent)      |
 | `created_by_id`     | `uuid`     |    ✔️    | `NULL`              | Auditing: Creator                                                      |
 | `updated_by_id`     | `uuid`     |    ✔️    | `NULL`              | Auditing: Modifier                                                     |
 | `discarded_by_id`   | `uuid`     |    ✔️    | `NULL`              | Auditing: Discarder                                                    |
@@ -570,7 +570,11 @@ erDiagram
 
 **Generated Video Thumbnails**:
 
-- A video may own one generated thumbnail through the unique self-reference `assets.parent_asset_id`. Thumbnail generation runs asynchronously on the `media` queue, stores a WebP object beside its source video, and preserves the original asset's polymorphic owner.
+- A video may own one generated thumbnail through the unique self-reference `assets.parent_asset_id`. Thumbnail generation runs asynchronously on the `media` queue, stores a WebP object beside its source video, and preserves the original asset's polymorphic owner. Admin may also upload an image thumbnail for a compressible video or audio parent.
+
+**Audio Compression**:
+
+- Compressible audio extensions (`mp3`, `wav`, `m4a`, `aac`, `ogg`, `flac`) follow the same optimal-first `media` queue pipeline as images and videos. WAV, FLAC, and OGG are remuxed to `m4a` (AAC); the asset `extension` is updated to `m4a` while `storage_key` is overwritten in place.
 
 ---
 

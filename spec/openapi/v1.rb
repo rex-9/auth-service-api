@@ -1409,7 +1409,7 @@ module Openapi
         }
       end
       paths["/v1/admin/assets/{id}/compress"] = {
-        post: operation(tags: "Admin / Assets", summary: "Manually trigger background compression for an asset",
+        post: operation(tags: "Admin / Assets", summary: "Manually trigger background compression for an image, video, or audio asset",
                         parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422 ])
       }
       paths["/v1/admin/assets/{id}/download"] = {
@@ -1421,7 +1421,7 @@ module Openapi
                         success: 202, parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422 ])
       }
       paths["/v1/admin/assets/{id}/thumbnail/upload"] = {
-        post: operation(tags: "Admin / Assets", summary: "Upload and replace a video thumbnail",
+        post: operation(tags: "Admin / Assets", summary: "Upload and replace a thumbnail for a compressible video or audio asset",
                         parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422, 500 ])
       }
       paths["/v1/admin/assets/{id}/thumbnail/upload"][:post][:requestBody] = {

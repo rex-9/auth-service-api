@@ -276,6 +276,9 @@ class V1::AssetsController < V1::ApplicationController
     elsif asset.compressible_image?
       Media::CompressImageJob.perform_later(asset_id: asset.id)
       Rails.logger.info("[AssetsController] Enqueued image compression for asset #{asset.id}")
+    elsif asset.compressible_audio?
+      Media::CompressAudioJob.perform_later(asset_id: asset.id)
+      Rails.logger.info("[AssetsController] Enqueued audio compression for asset #{asset.id}")
     end
   end
 
@@ -283,6 +286,7 @@ class V1::AssetsController < V1::ApplicationController
     filename = file.respond_to?(:original_filename) ? file.original_filename : file.to_s
     ext = File.extname(filename).delete(".").downcase
     MediaConstants::COMPRESSIBLE_VIDEO_EXTENSIONS.include?(ext) ||
-      MediaConstants::COMPRESSIBLE_IMAGE_EXTENSIONS.include?(ext)
+      MediaConstants::COMPRESSIBLE_IMAGE_EXTENSIONS.include?(ext) ||
+      MediaConstants::COMPRESSIBLE_AUDIO_EXTENSIONS.include?(ext)
   end
 end

@@ -395,6 +395,8 @@ class V1::Admin::AssetsController < V1::ApplicationController
       Media::CompressVideoJob.perform_later(asset_id: @asset.id)
     elsif @asset.compressible_image?
       Media::CompressImageJob.perform_later(asset_id: @asset.id)
+    elsif @asset.compressible_audio?
+      Media::CompressAudioJob.perform_later(asset_id: @asset.id)
     end
 
     render_json_response(
@@ -432,7 +434,7 @@ class V1::Admin::AssetsController < V1::ApplicationController
 
   def update_thumbnail_upload
     file = params[:file]
-    unless @asset.compressible_video? && file.present? && file.content_type.to_s.start_with?("image/")
+    unless @asset.thumbnail_attachable? && file.present? && file.content_type.to_s.start_with?("image/")
       message = admin_asset_message(MessageService::Admin::Asset::THUMBNAIL_IMAGE_REQUIRED)
       render_json_response(status_code: 422, message: message, error: message)
       return
@@ -548,6 +550,9 @@ class V1::Admin::AssetsController < V1::ApplicationController
     elsif asset.compressible_image?
       Media::CompressImageJob.perform_later(asset_id: asset.id)
       Rails.logger.info("[AssetsController] Enqueued image compression for asset #{asset.id}")
+    elsif asset.compressible_audio?
+      Media::CompressAudioJob.perform_later(asset_id: asset.id)
+      Rails.logger.info("[AssetsController] Enqueued audio compression for asset #{asset.id}")
     end
   end
 
@@ -555,6 +560,7 @@ class V1::Admin::AssetsController < V1::ApplicationController
     filename = file.respond_to?(:original_filename) ? file.original_filename : file.to_s
     ext = File.extname(filename).delete(".").downcase
     MediaConstants::COMPRESSIBLE_VIDEO_EXTENSIONS.include?(ext) ||
-      MediaConstants::COMPRESSIBLE_IMAGE_EXTENSIONS.include?(ext)
+      MediaConstants::COMPRESSIBLE_IMAGE_EXTENSIONS.include?(ext) ||
+      MediaConstants::COMPRESSIBLE_AUDIO_EXTENSIONS.include?(ext)
   end
 end

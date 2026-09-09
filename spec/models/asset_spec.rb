@@ -121,16 +121,31 @@ RSpec.describe Asset, type: :model do
     it "identifies compressible formats accurately" do
       video = build(:asset, extension: "mp4")
       image = build(:asset, extension: "png")
+      audio = build(:asset, extension: "wav", type: "audio")
       doc = build(:asset, extension: "pdf")
       optimal_image = build(:asset, extension: "png", status: "optimal")
 
       expect(video.compressible_video?).to be(true)
       expect(video.compressible_image?).to be(false)
+      expect(video.compressible_audio?).to be(false)
       expect(video.compressible?).to be(true)
 
       expect(image.compressible_video?).to be(false)
       expect(image.compressible_image?).to be(true)
+      expect(image.compressible_audio?).to be(false)
       expect(image.compressible?).to be(true)
+
+      webp = build(:asset, extension: "webp", format: "image")
+      expect(webp.compressible_image?).to be(true)
+      expect(webp.compressible?).to be(true)
+
+      svg = build(:asset, extension: "svg", format: "image")
+      expect(svg.compressible_image?).to be(false)
+      expect(svg.compressible?).to be(false)
+
+      expect(audio.compressible_audio?).to be(true)
+      expect(audio.compressible_video?).to be(false)
+      expect(audio.compressible?).to be(true)
 
       expect(doc.compressible?).to be(false)
       expect(optimal_image.compressible?).to be(false)

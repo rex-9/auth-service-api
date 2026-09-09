@@ -131,7 +131,7 @@ The foundation currently queues work where it benefits from durability, isolatio
 | -------------------------------- | --------------- | --------------------------------------------------------------- |
 | Stripe webhook processing        | `payments`      | Durable ingestion, idempotency, retries, and concurrency safety |
 | Socket, push, and email delivery | `notifications` | Provider latency must not delay the originating request         |
-| Image & video compression        | `media`         | Dedicated worker (libvips/FFmpeg) isolating heavy media compute |
+| Image, video & audio compression | `media`         | Dedicated worker (libvips/FFmpeg) isolating heavy media compute |
 
 Production workers are separated by workload in [`config/queue.yml`](config/queue.yml), and recurring maintenance lives in [`config/recurring.yml`](config/recurring.yml).
 
@@ -266,14 +266,15 @@ The storage abstraction defaults to **Garage** (self-hosted S3-compatible distri
 
 When the media container is enabled (`MEDIA_CONTAINER_ENABLED=true`), uploaded assets run through an isolated, background media optimization pipeline:
 
-- **Isolated Worker (`media` container)**: CPU- and memory-intensive media processing runs on a dedicated Solid Queue worker (`config/queue.media.yml`), completely isolating image/video compression and canonical FFmpeg video-thumbnail generation from API requests and transactional jobs.
+- **Isolated Worker (`media` container)**: CPU- and memory-intensive media processing runs on a dedicated Solid Queue worker (`config/queue.media.yml`), completely isolating image/video/audio compression and canonical FFmpeg video-thumbnail generation from API requests and transactional jobs.
 - **Image Compression (`Media::CompressImageJob`)**: Powered by `libvips` with smart palette quantization (`palette: true`, dynamic Q factor), dimension constraints (`IMAGE_MAX_WIDTH`, `IMAGE_MAX_HEIGHT`), and format-specific optimizations across JPEG, PNG, and WebP.
 - **Video Compression (`Media::CompressVideoJob`)**: Powered by `ffmpeg` (`libx264`, `aac`) with adaptive CRF tuning, dimension constraints, bitrate caps (`VIDEO_MAX_BITRATE`), and audio stream optimization.
+- **Audio Compression (`Media::CompressAudioJob`)**: Powered by `ffmpeg` (`aac` / `libmp3lame`, `AUDIO_BITRATE`) with `-vn`, stereo 44.1 kHz. WAV, FLAC, and OGG remux to M4A because those containers cannot host AAC; MP3, M4A, and AAC keep their original extension.
 - **Optimal-First Flow**:
   - If initial compression yields no improvement or reduction is negligible (`< 3%`), the pipeline immediately marks the asset as `optimal` without incrementing cache counters or scheduling redundant passes.
   - If meaningful reduction is achieved, the pass counter increments with a fallback safety cap of 2 passes (`MAX_COMPRESSION_PASSES = 2`).
 - **Real-Time Cable Broadcasts**: Status changes (`pending` $\rightarrow$ `processing` $\rightarrow$ `ready` or `optimal`), updated file sizes, and compression ratios broadcast in real-time over ActionCable (`NotificationChannel`) to connected clients.
-- **Canonical Video Thumbnails**: Every uploaded compressible video queues independent FFmpeg thumbnail generation. The resulting WebP is stored beside the original, represented by its own `Asset` linked through `parent_asset_id`, serialized on the source asset, and broadcast as `asset_thumbnail_generated` so Web and Mobile can update without waiting. Admin clients can also regenerate or upload a replacement thumbnail; replacement commits the new asset before the superseded Garage object is cleaned up.
+- **Canonical Video Thumbnails**: Every uploaded compressible video queues independent FFmpeg thumbnail generation. The resulting WebP is stored beside the original, represented by its own `Asset` linked through `parent_asset_id`, serialized on the source asset, and broadcast as `asset_thumbnail_generated` so Web and Mobile can update without waiting. Admin clients can regenerate a video thumbnail or upload an image replacement for a compressible video or audio parent; replacement commits the new asset before the superseded Garage object is cleaned up.
 - **Upload Boundaries (`MAX_NON_VIDEO_SIZE_MB` & `MAX_VIDEO_SIZE_MB`)**:
   - Dynamically conditioned on `MEDIA_CONTAINER_ENABLED` and configurable via `MEDIA_MAX_NON_VIDEO_SIZE_MB` and `MEDIA_MAX_VIDEO_SIZE_MB`.
   - **With Media Container** (`MEDIA_CONTAINER_ENABLED=true`): Defaults to **10 MB** for images/non-videos and **100 MB** for videos.
@@ -513,7 +514,7 @@ The important groups are:
 - DeepSeek AI API URL, key, and model.
 - Speech services: Azure Speech (key, region) and Nova Speech (key, endpoint) for TTS/STT.
 - Storage & S3: `STORAGE_PROVIDER` (`garage`, `cloudinary`, `local`), S3 endpoints, credentials, and bucket.
-- Media compression: `MEDIA_CONTAINER_ENABLED`, upload size limits (`MEDIA_MAX_VIDEO_SIZE_MB`, `MEDIA_MAX_NON_VIDEO_SIZE_MB`), video profile (CRF, preset, bitrate, resolution), and image profile (JPEG/PNG/WebP quality, compression).
+- Media compression: `MEDIA_CONTAINER_ENABLED`, upload size limits (`MEDIA_MAX_VIDEO_SIZE_MB`, `MEDIA_MAX_NON_VIDEO_SIZE_MB`), video profile (CRF, preset, bitrate, resolution), audio profile (`MEDIA_AUDIO_CODEC`, `MEDIA_AUDIO_BITRATE`), and image profile (JPEG/PNG/WebP quality, compression).
 - Solid Queue process, supervisors (`SOLID_QUEUE_IN_PUMA`), and shutdown settings (`SOLID_QUEUE_SHUTDOWN_TIMEOUT`).
 - Observability & Error Dashboard: `DASHBOARD_BASE_URL`, `APP_VERSION`, `GIT_SHA`.
 - App store listings for force-update: `IOS_STORE_URL`, `ANDROID_STORE_URL` (returned as `store_url` on `GET /v1/client/versions/current`, chosen from `X-Platform`).
