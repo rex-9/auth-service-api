@@ -9,6 +9,8 @@ cd "$PROJECT_ROOT"
 COMPOSE_FILE="docker-compose.dev.yaml"
 MODE="${1:-all}"
 DB_STARTED_BY_CI=false
+HOST_UID="$(id -u)"
+HOST_GID="$(id -g)"
 
 if [[ "$MODE" != "all" && "$MODE" != "contracts" ]]; then
   echo "Usage: ./scripts/ci.sh [all|contracts]" >&2
@@ -39,5 +41,9 @@ else
   TEST_COMMAND="bin/rails db:test:prepare && bin/rails zeitwerk:check && bundle exec rake rswag:specs:swaggerize && bundle exec rspec --tag ~type:system --tag ~e2e"
 fi
 
-docker compose -f "$COMPOSE_FILE" run --rm -T -e RAILS_ENV=test api \
+docker compose -f "$COMPOSE_FILE" run --rm -T \
+  --user "$HOST_UID:$HOST_GID" \
+  -e HOME=/tmp \
+  -e RAILS_ENV=test \
+  api \
   sh -c "$TEST_COMMAND"
