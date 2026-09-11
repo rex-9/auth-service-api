@@ -356,6 +356,10 @@ Clients call `GET /v1/client/versions/current?version=1.2.0` on splash. `update_
 
 Backend, frontend, synchronous, and asynchronous failures leave different clues. Rexone Core gives each one a proper home.
 
+Behavioral marketing analytics stays in Firebase/GA4 rather than the primary database. Core constantizes the shared Web/Mobile `action_noun` event vocabulary while remaining the authoritative source for users, access, payments, subscriptions, and operational business aggregates.
+
+Every push delivery also creates or updates its canonical persisted in-app `UserNotification`; clients use that record ID as `open_notification.notification_id`, never a provider-specific OneSignal identifier.
+
 - **Rails Pulse** tracks request, query, and background-job performance with configurable thresholds.
 - **Rails Error Dashboard** captures, groups, analyzes, and retains backend exceptions. Optional Slack, email, Discord, PagerDuty, and webhook alerts are supported but disabled by default.
 - **Client Logs** accept structured errors from web and mobile clients, including stack traces, platform/device context, severity, occurrences, and resolution state. Ingest still sends `app_version`; Core stores nullable `version_id` when that number matches a kept version. Feedback ingest uses the same lookup.
