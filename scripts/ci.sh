@@ -17,6 +17,29 @@ if [[ "$MODE" != "all" && "$MODE" != "contracts" ]]; then
   exit 2
 fi
 
+run_native_ci() {
+  bin/rails db:test:prepare
+
+  if [[ "$MODE" == "all" ]]; then
+    bin/rails zeitwerk:check
+  fi
+
+  bundle exec rake rswag:specs:swaggerize
+
+  if [[ "$MODE" == "contracts" ]]; then
+    bundle exec rspec spec/openapi spec/channels spec/services/socket_service
+  else
+    bundle exec rspec --tag ~type:system --tag ~e2e
+  fi
+}
+
+# GitHub Actions provides Ruby, cached gems, and PostgreSQL directly. Local
+# development keeps using Compose for parity with the application stack.
+if [[ "${CI:-false}" == "true" ]]; then
+  run_native_ci
+  exit 0
+fi
+
 [[ -f .env ]] || cp .env.example .env
 
 cleanup() {

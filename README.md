@@ -502,6 +502,8 @@ bin/brakeman
 bin/rubocop
 ```
 
+The same `scripts/ci.sh` entry point serves both environments: local runs use Docker Compose, while GitHub Actions runs Rails natively against its PostgreSQL service and restores gems from Bundler's `Gemfile.lock` cache.
+
 ## Configuration
 
 The checked-in [`.env.example`](.env.example) documents the available settings.

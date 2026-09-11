@@ -13,9 +13,38 @@ jobs:
     name: Build & Tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      RAILS_ENV: test
+      RAILS_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/rexone_core_test
+      RAILS_SECRET_KEY_BASE: ci-secret-key-base
+      RAILS_JWT_SECRET_KEY: ci-jwt-secret-key
+      STORAGE_PROVIDER: local
+      MEDIA_CONTAINER_ENABLED: "false"
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: rexone_core_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d rexone_core_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install --yes libvips libpq-dev ffmpeg
+
+      - name: Set up Ruby and cache gems
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
 
       - name: Run Core CI
         run: ./scripts/ci.sh
