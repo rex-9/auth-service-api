@@ -1070,6 +1070,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_100002) do
     t.string "link"
     t.text "message", null: false
     t.uuid "notification_id"
+    t.string "operation_id"
+    t.string "operation_status"
+    t.string "operation_type"
     t.datetime "read_at"
     t.string "title", null: false
     t.datetime "undiscarded_at"
@@ -1084,6 +1087,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_100002) do
     t.index ["undiscarded_by_id"], name: "index_user_notifications_on_undiscarded_by_id"
     t.index ["updated_by_id"], name: "index_user_notifications_on_updated_by_id"
     t.index ["user_id", "created_at"], name: "index_user_notifications_on_user_id_and_created_at"
+    t.index ["user_id", "operation_id"], name: "index_user_notifications_on_user_id_and_operation_id", unique: true, where: "(operation_id IS NOT NULL)"
     t.index ["user_id", "read_at"], name: "index_user_notifications_on_user_id_and_read_at"
     t.index ["user_id"], name: "index_user_notifications_on_user_id"
   end

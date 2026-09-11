@@ -22,6 +22,11 @@ class Ai::ProcessChatJob < ApplicationJob
     return if user_message.ai_status == Chat::Message::STATUSES[:completed]
 
     update_status!(user_message, Chat::Message::STATUSES[:processing])
+    notify_operation(
+      user_message,
+      NotificationConstants::OperationStatus::PROCESSING,
+      ai_message(MessageService::Ai::RESPONSE_QUEUED)
+    )
 
     result = AiService::Client.chat(
       messages: conversation_for(user_message),
@@ -102,6 +107,10 @@ class Ai::ProcessChatJob < ApplicationJob
       title: message,
       message: message,
       data: data,
+      operation_id: operation_id(user_message),
+      operation_type: NotificationConstants::OperationType::AI_RESPONSE,
+      operation_status: NotificationConstants::OperationStatus::COMPLETED,
+      link: "/ai?room_id=#{room.id}",
       send_push: false,
       send_socket: true,
       send_email: false
@@ -128,6 +137,10 @@ class Ai::ProcessChatJob < ApplicationJob
       title: message,
       message: message,
       data: data,
+      operation_id: operation_id(user_message),
+      operation_type: NotificationConstants::OperationType::AI_RESPONSE,
+      operation_status: NotificationConstants::OperationStatus::FAILED,
+      link: "/ai?room_id=#{room.id}",
       send_push: false,
       send_socket: true,
       send_email: false
@@ -149,6 +162,22 @@ class Ai::ProcessChatJob < ApplicationJob
     message.ai_error = error unless error == :unchanged
     message.ai_assistant_message_id = assistant_message_id unless assistant_message_id == :unchanged
     message.save!
+  end
+
+  def notify_operation(user_message, status, message)
+    NotificationService::Center.operation(
+      user_id: user_message.room.user_id,
+      operation_id: operation_id(user_message),
+      operation_type: NotificationConstants::OperationType::AI_RESPONSE,
+      operation_status: status,
+      message: message,
+      link: "/ai?room_id=#{user_message.room_id}",
+      data: { room_id: user_message.room_id, message_id: user_message.id }
+    )
+  end
+
+  def operation_id(user_message)
+    "#{NotificationConstants::OperationType::AI_RESPONSE}:#{user_message.id}"
   end
 
   def default_room_title?(room, message)

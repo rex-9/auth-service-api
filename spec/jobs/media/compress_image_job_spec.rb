@@ -68,25 +68,26 @@ RSpec.describe Media::CompressImageJob, type: :job do
     expect(MediaService::ImageCompressor).not_to have_received(:compress)
   end
 
-  it "broadcasts notification to user who created the asset" do
+  it "persists a completed operation notification for the user who created the asset" do
     user = create(:user)
     asset.update!(created_by_id: user.id)
-    allow(SocketService::Client).to receive(:broadcast)
 
     described_class.perform_now(asset_id: asset.id)
 
-    expect(SocketService::Client).to have_received(:broadcast).with(
-      user_id: user.id,
-      message: anything,
-      data: hash_including(type: MediaConstants::SocketEvent::ASSET_COMPRESSED, status: "ready")
+    notification = user.user_notifications.find_by!(operation_type: NotificationConstants::OperationType::ASSET_COMPRESSION)
+    expect(notification).to have_attributes(
+      operation_status: NotificationConstants::OperationStatus::COMPLETED,
+      link: "/admin/assets/#{asset.id}"
     )
+    expect(notification.data).to include("type" => MediaConstants::SocketEvent::ASSET_COMPRESSED, "status" => "ready")
   end
 
-  it "marks asset as failed when compression fails" do
+  it "retries without publishing a terminal failure on the first attempt" do
     allow(MediaService::ImageCompressor).to receive(:compress).and_raise(MediaService::CompressionError, "corrupt image")
 
     described_class.perform_now(asset_id: asset.id)
 
-    expect(asset.reload.status).to eq("failed")
+    expect(asset.reload.status).to eq("processing")
+    expect(UserNotification.where(operation_status: NotificationConstants::OperationStatus::FAILED)).to be_empty
   end
 end

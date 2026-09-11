@@ -119,4 +119,19 @@ RSpec.describe "OpenAPI V1 document" do
     expect(metadata.dig(:status, :enum)).to eq(Chat::Message::STATUSES.values)
     expect(metadata.dig(:tts_status, :enum)).to eq(Chat::Message::STATUSES.values)
   end
+
+  it "uses explicit response contracts for current-user and queued-operation endpoints" do
+    expected = {
+      [ "/v1/users/current", :get ] => :current_user_response,
+      [ "/v1/users/current", :put ] => :current_user_response,
+      [ "/v1/admin/assets/{id}/compress", :post ] => :asset_operation_response,
+      [ "/v1/admin/assets/{id}/thumbnail/regenerate", :post ] => :asset_operation_response,
+      [ "/v1/ai/chat", :post ] => :ai_chat_response
+    }
+
+    expected.each do |(path, method), schema|
+      success_response = document.dig(:paths, path, method, :responses).values_at("200", "202").compact.first
+      expect(success_response.dig(:content, Openapi::V1::JSON_CONTENT, :schema)).to eq(Openapi::V1.ref(schema))
+    end
+  end
 end

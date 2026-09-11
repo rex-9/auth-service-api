@@ -18,8 +18,6 @@ RSpec.describe Media::GenerateVideoThumbnailJob, type: :job do
       bytes: 512,
       format: MediaConstants::IMAGE_EXT_WEBP
     )
-    allow(SocketService::Client).to receive(:broadcast)
-
     expect do
       described_class.perform_now(asset_id: video.id)
     end.to change(Asset, :count).by(1)
@@ -32,13 +30,15 @@ RSpec.describe Media::GenerateVideoThumbnailJob, type: :job do
       size_bytes: 512,
       assetable: video.assetable
     )
-    expect(SocketService::Client).to have_received(:broadcast).with(
-      user_id: creator.id,
+    notification = creator.user_notifications.find_by!(operation_type: NotificationConstants::OperationType::VIDEO_THUMBNAIL)
+    expect(notification).to have_attributes(
       message: I18n.t("admin.asset.thumbnail_generated", name: video.name),
-      data: hash_including(
-        type: MediaConstants::SocketEvent::ASSET_THUMBNAIL_GENERATED,
-        asset_id: video.id
-      )
+      operation_status: NotificationConstants::OperationStatus::COMPLETED,
+      link: "/admin/assets/#{video.id}"
+    )
+    expect(notification.data).to include(
+      "type" => MediaConstants::SocketEvent::ASSET_THUMBNAIL_GENERATED,
+      "asset_id" => video.id
     )
   end
 

@@ -1,7 +1,9 @@
 # app/serializers/user_notification_serializer.rb
 
 class UserNotificationSerializer < ApplicationSerializer
-  attributes :id, :title, :message, :link, :data, :read_at, :created_at, :updated_at
+  attributes :id, :title, :message, :link, :data, :operation_id,
+             :operation_type, :operation_status,
+             :read_at, :created_at, :updated_at
 
   attribute :read do |record|
     record.read?
