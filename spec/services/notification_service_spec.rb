@@ -22,6 +22,29 @@ RSpec.describe NotificationService::Center do
     end.not_to have_enqueued_job(Notification::DeliverJob)
   end
 
+  it "persists every push and sends its user notification id to the client" do
+    user = create(:user)
+
+    expect do
+      described_class.notify(
+        user_id: user.id,
+        title: "Title",
+        message: "Body",
+        send_push: true
+      )
+    end.to change(user.user_notifications, :count).by(1)
+
+    notification = user.user_notifications.last
+    expect(Notification::DeliverJob).to have_been_enqueued.with(
+      channel: :push,
+      payload: hash_including(
+        data: hash_including(
+          AnalyticsConstants::Parameter::NOTIFICATION_ID => notification.id
+        )
+      )
+    )
+  end
+
   it "resolves an email address lazily and applies plain defaults" do
     user = create(:user)
     described_class.notify(user_id: user.id, send_email: true)

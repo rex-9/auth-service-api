@@ -5,6 +5,8 @@ source "https://rubygems.org"
 # ============================================================
 
 gem "psych", "~> 5.5.0"
+# json 3.0 made JSON.parse keyword-only; Rails 8.1.3 still passes a positional options hash.
+gem "json", "~> 2.13"
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
 gem "rails", "~> 8.1.3"
 # Use postgresql as the database for Active Record
@@ -57,7 +59,7 @@ gem "sassc-rails", "~> 2.1"
 gem "csv", "~> 3.3"
 
 gem "rails_pulse", "~> 0.3.3"
-gem "rails_error_dashboard", "~> 0.11.1" # Alternatives: rails_error_dashboard, faultline, https://github.com/dkam/splat
+gem "rails_error_dashboard", "~> 0.11.8" # Alternatives: rails_error_dashboard, faultline, https://github.com/dkam/splat
 gem "solid_web_ui", "~> 0.4.0" # Alternatives: mission_control-jobs, solid_observer, solid_queue_monitor
 
 # ============================================================
