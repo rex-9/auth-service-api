@@ -5,9 +5,9 @@ class CreatePaymentProducts < ActiveRecord::Migration[8.1]
       t.string :name, null: false
       t.text :description
 
-      t.integer :price_unit_amount, null: false
+      t.integer :unit_amount, null: false
       t.string :currency, null: false
-      t.string :cycle
+      t.string :interval
 
       t.string :stripe_product_id, null: false
       t.string :stripe_price_id, null: false

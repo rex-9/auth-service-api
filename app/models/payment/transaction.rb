@@ -21,22 +21,14 @@ class Payment::Transaction < ApplicationRecord
     succeeded: PaymentConstants::TransactionStatus::SUCCEEDED
   }
 
-  enum :payment_method_type, {
-    card: PaymentConstants::PaymentMethodType::CARD,
-    google_pay: PaymentConstants::PaymentMethodType::GOOGLE_PAY,
-    apple_pay: PaymentConstants::PaymentMethodType::APPLE_PAY,
-    bank_transfer: PaymentConstants::PaymentMethodType::BANK_TRANSFER,
-    other: PaymentConstants::PaymentMethodType::OTHER
-  }, prefix: true
-
   # ===== VALIDATIONS =====
   validates :stripe_payment_intent_id, presence: true, uniqueness: true
-  validates :price_unit_amount, numericality: { greater_than: 0 }
+  validates :unit_amount, numericality: { greater_than: 0 }
 
   # ===== SCOPES =====
   scope :successful, -> { where(status: PaymentConstants::TransactionStatus::SUCCEEDED) }
-  scope :pending, -> { where(status: [PaymentConstants::TransactionStatus::PROCESSING, PaymentConstants::TransactionStatus::REQUIRES_ACTION, PaymentConstants::TransactionStatus::REQUIRES_CONFIRMATION, PaymentConstants::TransactionStatus::REQUIRES_PAYMENT_METHOD]) }
-  scope :failed, -> { where(status: [PaymentConstants::TransactionStatus::CANCELED]) }
+  scope :pending, -> { where(status: [ PaymentConstants::TransactionStatus::PROCESSING, PaymentConstants::TransactionStatus::REQUIRES_ACTION, PaymentConstants::TransactionStatus::REQUIRES_CONFIRMATION, PaymentConstants::TransactionStatus::REQUIRES_PAYMENT_METHOD ]) }
+  scope :failed, -> { where(status: [ PaymentConstants::TransactionStatus::CANCELED ]) }
   scope :recent, -> { order(created_at: :desc).limit(10) }
   scope :by_user, ->(user_id) { where(user_id: user_id) }
 
@@ -65,6 +57,8 @@ class Payment::Transaction < ApplicationRecord
   def sync_with_payment_intent(payment_intent)
     assign_attributes(
       status: payment_intent.status,
+      unit_amount: payment_intent.amount,
+      currency: payment_intent.currency,
       amount_received: payment_intent.amount_received,
       amount_capturable: payment_intent.amount_capturable,
       client_secret: payment_intent.client_secret,
@@ -101,7 +95,7 @@ class Payment::Transaction < ApplicationRecord
 
   # Display price with currency
   def display_price
-    format("%s %.2f", currency.upcase, price_unit_amount / 100.0)
+    format("%s %.2f", currency.upcase, unit_amount / 100.0)
   end
 
   # Payment method display

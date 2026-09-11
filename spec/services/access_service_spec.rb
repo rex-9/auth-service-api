@@ -4,7 +4,7 @@ RSpec.describe AccessService do
   let(:user) { create(:user) }
   let(:product) { create(:payment_product) }
 
-  it "grants recurring access using the product cycle" do
+  it "grants recurring access using the product interval" do
     travel_to(Time.zone.parse("2026-01-01 12:00:00")) do
       access = described_class.grant(user_id: user.id, product_id: product.id)
       expect(access).to have_attributes(status: "active", expires_at: 30.days.from_now)
@@ -12,7 +12,7 @@ RSpec.describe AccessService do
   end
 
   it "grants one-time access without expiration" do
-    product.update!(cycle: nil)
+    product.update!(interval: nil)
     expect(described_class.grant(user_id: user.id, product_id: product.id).expires_at).to be_nil
   end
 

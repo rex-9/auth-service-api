@@ -8,10 +8,16 @@ class CreatePaymentSubscriptions < ActiveRecord::Migration[8.1]
       # Stripe fields that actually exist in the object
       t.string :stripe_subscription_id, null: false
       t.string :stripe_customer_id
+      t.string :stripe_subscription_item_id, null: false
+      t.string :stripe_price_id, null: false
       t.jsonb :metadata, default: {}
 
       t.string :status, null: false, default: "incomplete"
-      t.string :cycle, null: false  # "month" or "year"
+      t.string :currency, null: false
+      t.integer :unit_amount, null: false
+      t.integer :quantity, null: false, default: 1
+      t.string :interval, null: false
+      t.integer :interval_count, null: false, default: 1
 
       # Payment method
       t.string :payment_method_id
@@ -19,9 +25,9 @@ class CreatePaymentSubscriptions < ActiveRecord::Migration[8.1]
       t.jsonb :payment_method_details, default: {}
 
       # These fields exist in the Stripe object
-      t.datetime :current_period_start
-      t.datetime :current_period_end
-      t.datetime :started_at
+      t.datetime :current_period_start, null: false
+      t.datetime :current_period_end, null: false
+      t.datetime :started_at, null: false
       t.datetime :ended_at
       t.datetime :canceled_at
       t.datetime :cancel_at
@@ -52,6 +58,8 @@ class CreatePaymentSubscriptions < ActiveRecord::Migration[8.1]
     end
 
     add_index :payment_subscriptions, :stripe_subscription_id, unique: true
+    add_index :payment_subscriptions, :stripe_subscription_item_id
+    add_index :payment_subscriptions, :stripe_price_id
     add_index :payment_subscriptions, :status
     add_index :payment_subscriptions, :current_period_end
     add_index :payment_subscriptions, [ :user_id, :status ]

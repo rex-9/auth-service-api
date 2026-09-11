@@ -11,7 +11,9 @@ module SortConstants
   module Columns
     USER        = %w[created_at name username email discarded_at].freeze
     ROLE        = %w[created_at name].freeze
-    PRODUCT     = %w[created_at name price_unit_amount cycle discarded_at].freeze
+    PRODUCT     = %w[created_at name unit_amount interval discarded_at].freeze
+    TRANSACTION = %w[created_at paid_at unit_amount status currency].freeze
+    SUBSCRIPTION = %w[created_at started_at current_period_end unit_amount status interval].freeze
     ACCESS      = %w[created_at user_name product_name expires_at revoked_at].freeze
     CHAT_ROOM   = %w[created_at title message_count discarded_at].freeze
     CHAT_MSG    = %w[created_at role discarded_at].freeze

@@ -107,7 +107,7 @@ class V1::Admin::Payment::ProductsController < V1::ApplicationController
 
   def product_params
     values = params.require(:product)
-                   .permit(:code, :name, :description, :price_unit_amount, :currency, :cycle, :active)
+                   .permit(:code, :name, :description, :unit_amount, :currency, :interval, :active)
                    .to_h
                    .symbolize_keys
 

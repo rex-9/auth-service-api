@@ -43,7 +43,7 @@ RSpec.describe "Admin payment products", type: :request do
 
   it "creates a Stripe-backed product with localized messages" do
     grant_admin_product_permission(:create)
-    product = build(:payment_product, name: "Premium", price_unit_amount: 2_500)
+    product = build(:payment_product, name: "Premium", unit_amount: 2_500)
 
     allow(PaymentService::Client).to receive(:create_product).and_return(data: product)
 
@@ -56,21 +56,21 @@ RSpec.describe "Admin payment products", type: :request do
     expect(response_status["message"]).to eq(I18n.t("payment.products.created", locale: :my))
     expect(response_data.fetch("name")).to eq("Premium")
     expect(PaymentService::Client).to have_received(:create_product).with(
-      hash_including(name: "Premium", price_unit_amount: 2_500, currency: "usd", cycle: "month", active: true)
+      hash_including(name: "Premium", unit_amount: 2_500, currency: "usd", interval: "month", active: true)
     )
   end
 
   it "creates a free product with localized messages" do
     grant_admin_product_permission(:create)
-    product = build(:payment_product, name: "Free", price_unit_amount: 0, cycle: nil)
+    product = build(:payment_product, name: "Free", unit_amount: 0, interval: nil)
 
     allow(PaymentService::Client).to receive(:create_product).and_return(data: product)
 
     post "/v1/admin/payment/products",
          params: {
-           product: valid_product_params.except(:cycle).merge(
+           product: valid_product_params.except(:interval).merge(
              name: "Free",
-             price_unit_amount: 0
+             unit_amount: 0
            )
          },
          headers: headers,
@@ -80,26 +80,26 @@ RSpec.describe "Admin payment products", type: :request do
     expect(response_data.fetch("free")).to eq(true)
     expect(response_data.fetch("price")).to eq("Free")
     expect(PaymentService::Client).to have_received(:create_product).with(
-      hash_including(name: "Free", price_unit_amount: 0, currency: "usd", active: true)
+      hash_including(name: "Free", unit_amount: 0, currency: "usd", active: true)
     )
   end
 
-  it "creates a one-time paid product without requiring cycle" do
+  it "creates a one-time paid product without requiring interval" do
     grant_admin_product_permission(:create)
-    product = build(:payment_product, name: "One Time", price_unit_amount: 2_500, cycle: nil)
+    product = build(:payment_product, name: "One Time", unit_amount: 2_500, interval: nil)
 
     allow(PaymentService::Client).to receive(:create_product).and_return(data: product)
 
     post "/v1/admin/payment/products",
          params: {
-           product: valid_product_params.except(:cycle).merge(name: "One Time")
+           product: valid_product_params.except(:interval).merge(name: "One Time")
          },
          headers: headers,
          as: :json
 
     expect(response).to have_http_status(:created)
     expect(PaymentService::Client).to have_received(:create_product).with(
-      hash_including(name: "One Time", price_unit_amount: 2_500, currency: "usd", active: true)
+      hash_including(name: "One Time", unit_amount: 2_500, currency: "usd", active: true)
     )
   end
 
@@ -203,9 +203,9 @@ RSpec.describe "Admin payment products", type: :request do
     {
       name: "Premium",
       description: "Premium access",
-      price_unit_amount: 2_500,
+      unit_amount: 2_500,
       currency: "usd",
-      cycle: "month",
+      interval: "month",
       active: true
     }
   end

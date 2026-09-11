@@ -9,6 +9,7 @@ module PaymentService
 
     def initialize
       Stripe.api_key = AppConfig::STRIPE_SECRET_KEY
+      Stripe.api_version = PaymentConstants::StripeApi::VERSION
       Stripe.max_network_retries = 2
       Stripe.log_level = "info" if Rails.env.development?
       @webhook_secret = AppConfig::STRIPE_WEBHOOK_SECRET
@@ -153,7 +154,7 @@ module PaymentService
         product = Payment::Product.with_discarded.find(product_id)
         attributes = product_update_attributes(product, attributes)
 
-        if product.free? && attributes[:price_unit_amount].to_i.positive?
+        if product.free? && attributes[:unit_amount].to_i.positive?
           return { error: "Free products cannot be converted to premium products" }
         end
 
@@ -353,9 +354,9 @@ module PaymentService
         stripe_price_id: stripe_price.id,
         name: attributes.fetch(:name),
         description: attributes[:description],
-        price_unit_amount: attributes.fetch(:price_unit_amount),
+        unit_amount: attributes.fetch(:unit_amount),
         currency: attributes.fetch(:currency),
-        cycle: attributes[:cycle],
+        interval: attributes[:interval],
         active: attributes.fetch(:active, true)
       }
       attrs[:code] = attributes[:code] if attributes[:code].present?
@@ -370,32 +371,32 @@ module PaymentService
     def stripe_price_params(stripe_product_id, attributes)
       params = {
         product: stripe_product_id,
-        unit_amount: attributes.fetch(:price_unit_amount),
+        unit_amount: attributes.fetch(:unit_amount),
         currency: attributes.fetch(:currency)
       }
 
-      cycle = stripe_cycle_interval(attributes[:cycle])
-      params[:recurring] = { interval: cycle } if cycle.present?
+      interval = stripe_billing_interval(attributes[:interval])
+      params[:recurring] = { interval: interval } if interval.present?
       params
     end
 
     def price_changed?(product, attributes)
       (
-        attributes.key?(:price_unit_amount) &&
-          attributes[:price_unit_amount] != product.price_unit_amount
+        attributes.key?(:unit_amount) &&
+          attributes[:unit_amount] != product.unit_amount
       ) ||
         (attributes.key?(:currency) && attributes[:currency] != product.currency) ||
         (
-          attributes.key?(:cycle) &&
-            stripe_cycle_interval(attributes[:cycle]) != stripe_cycle_interval(product.cycle)
+          attributes.key?(:interval) &&
+            stripe_billing_interval(attributes[:interval]) != stripe_billing_interval(product.interval)
         )
     end
 
     def product_update_attributes(product, attributes)
       normalize_product_attributes(
-        price_unit_amount: attributes.fetch(:price_unit_amount, product.price_unit_amount),
+        unit_amount: attributes.fetch(:unit_amount, product.unit_amount),
         currency: attributes.fetch(:currency, product.currency),
-        cycle: attributes.fetch(:cycle, product.cycle),
+        interval: attributes.fetch(:interval, product.interval),
         name: attributes.fetch(:name, product.name),
         description: attributes.key?(:description) ? attributes[:description] : product.description,
         active: attributes.key?(:active) ? attributes[:active] : product.active
@@ -404,19 +405,19 @@ module PaymentService
 
     def normalize_product_attributes(attributes)
       attributes = attributes.dup
-      attributes[:price_unit_amount] = attributes[:price_unit_amount].to_i
-      attributes[:cycle] = normalized_product_cycle(attributes[:price_unit_amount], attributes[:cycle])
+      attributes[:unit_amount] = attributes[:unit_amount].to_i
+      attributes[:interval] = normalized_product_interval(attributes[:unit_amount], attributes[:interval])
       attributes
     end
 
-    def normalized_product_cycle(price_unit_amount, cycle)
-      price_unit_amount.to_i.zero? ? nil : cycle.presence
+    def normalized_product_interval(unit_amount, interval)
+      unit_amount.to_i.zero? ? nil : interval.presence
     end
 
-    def stripe_cycle_interval(cycle)
-      return nil if cycle.blank?
+    def stripe_billing_interval(interval)
+      return nil if interval.blank?
 
-      Payment::Product.cycles.fetch(cycle.to_s, cycle.to_s)
+      Payment::Product.intervals.fetch(interval.to_s, interval.to_s)
     end
 
     def stripe_time(timestamp)
@@ -425,16 +426,14 @@ module PaymentService
       Time.at(timestamp).utc
     end
 
+    def stripe_object_id(value)
+      value.respond_to?(:id) ? value.id : value
+    end
+
     def subscription_period(subscription)
-      subscription_item = subscription.items&.data&.first
-
-      period_start_timestamp =
-        subscription[:current_period_start] ||
-        subscription_item&.current_period_start
-
-      period_end_timestamp =
-        subscription[:current_period_end] ||
-        subscription_item&.current_period_end
+      subscription_item = subscription_item!(subscription)
+      period_start_timestamp = subscription_item.current_period_start
+      period_end_timestamp = subscription_item.current_period_end
 
       if period_start_timestamp.blank? || period_end_timestamp.blank?
         raise PaymentService::Error,
@@ -447,11 +446,34 @@ module PaymentService
       }
     end
 
-    def subscription_started_at(subscription)
-      stripe_time(
-        subscription[:start_date] ||
-        subscription[:created]
-      )
+    def subscription_item!(subscription)
+      items = subscription.items&.data || []
+      return items.first if items.one?
+
+      # NOTE: Can Improve Later for one subscription with multiple products, but better keep one subs one product
+      raise PaymentService::Error,
+            "Stripe subscription #{subscription.id} must have exactly one subscription item"
+    end
+
+    def subscription_item_attributes(subscription)
+      item = subscription_item!(subscription)
+      price = item.price
+      recurring = price&.recurring
+
+      if price.blank? || recurring.blank? || price.unit_amount.nil?
+        raise PaymentService::Error,
+              "Stripe subscription #{subscription.id} has no fixed recurring price"
+      end
+
+      {
+        stripe_subscription_item_id: item.id,
+        stripe_price_id: price.id,
+        currency: subscription.currency || price.currency,
+        unit_amount: price.unit_amount,
+        quantity: item.quantity || 1,
+        interval: recurring.interval,
+        interval_count: recurring.interval_count
+      }
     end
 
     def subscription_cancellation_state(subscription)
@@ -477,9 +499,10 @@ module PaymentService
       period = subscription_period(stripe_subscription)
 
       subscription.update!(
-        stripe_customer_id: stripe_subscription.customer,
+        **subscription_item_attributes(stripe_subscription),
+        stripe_customer_id: stripe_object_id(stripe_subscription.customer),
         status: stripe_subscription.status,
-        started_at: subscription_started_at(stripe_subscription),
+        started_at: stripe_time(stripe_subscription.start_date),
         current_period_start: period[:starts_at],
         current_period_end: period[:ends_at],
         cancel_at_period_end: stripe_subscription.cancel_at_period_end,
@@ -546,9 +569,9 @@ module PaymentService
         stripe_price_id: price.id,
         name: stripe_product&.name || "Product #{price.product}",
         description: stripe_product&.description,
-        price_unit_amount: price.unit_amount,
+        unit_amount: price.unit_amount,
         currency: price.currency,
-        cycle: normalized_product_cycle(price.unit_amount, price.recurring&.interval),
+        interval: normalized_product_interval(price.unit_amount, price.recurring&.interval),
         active: record.discarded? ? false : !inactive_in_stripe
       )
 
@@ -600,11 +623,7 @@ module PaymentService
 
         period = subscription_period(stripe_sub)
 
-        payment_method_id = stripe_sub.default_payment_method
-
-        # An expanded Stripe payment method is an object; otherwise it is an ID.
-        payment_method_id =
-          payment_method_id.id if payment_method_id.respond_to?(:id)
+        payment_method_id = stripe_object_id(stripe_sub.default_payment_method)
 
         payment_info = extract_payment_method_info(payment_method_id)
 
@@ -614,12 +633,12 @@ module PaymentService
         new_subscription = subscription.new_record?
 
         subscription.assign_attributes(
+          **subscription_item_attributes(stripe_sub),
           user_id: user_id,
           product_id: product_id,
-          stripe_customer_id: stripe_sub.customer,
+          stripe_customer_id: stripe_object_id(stripe_sub.customer),
           status: stripe_sub.status,
-          cycle: product.cycle,
-          started_at: subscription_started_at(stripe_sub),
+          started_at: stripe_time(stripe_sub.start_date),
           current_period_start: period[:starts_at],
           current_period_end: period[:ends_at],
           cancel_at_period_end: stripe_sub.cancel_at_period_end,
@@ -664,7 +683,8 @@ module PaymentService
         pi = Stripe::PaymentIntent.retrieve(payment_intent_id)
 
         # Get payment method details
-        payment_info = extract_payment_method_info(pi.payment_method)
+        payment_method_id = stripe_object_id(pi.payment_method)
+        payment_info = extract_payment_method_info(payment_method_id)
 
         # Create or update transaction from Payment Intent
         transaction = Payment::Transaction.find_or_initialize_by(
@@ -675,19 +695,19 @@ module PaymentService
         transaction.assign_attributes(
           user_id: user_id,
           product_id: product_id,
-          price_unit_amount: pi.amount,
+          unit_amount: pi.amount,
           currency: pi.currency,
           status: pi.status,
-          stripe_charge_id: pi.latest_charge,
-          stripe_customer_id: pi.customer,
+          stripe_charge_id: stripe_object_id(pi.latest_charge),
+          stripe_customer_id: stripe_object_id(pi.customer),
           client_secret: pi.client_secret,
           amount_received: pi.amount_received,
           amount_capturable: pi.amount_capturable,
           paid_at: pi.amount_received > 0 ? Time.at(pi.created) : nil,
-          payment_method_id: pi.payment_method,
+          payment_method_id: payment_method_id,
           payment_method_type: payment_info[:type],
           payment_method_details: payment_info[:details],
-          metadata: pi.metadata
+          metadata: pi.metadata&.to_h || {}
         )
 
         transaction.save!

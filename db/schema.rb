@@ -386,16 +386,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_100002) do
     t.datetime "created_at", null: false
     t.uuid "created_by_id"
     t.string "currency", null: false
-    t.string "cycle"
     t.text "description"
     t.datetime "discarded_at"
     t.uuid "discarded_by_id"
+    t.string "interval"
     t.string "name", null: false
-    t.integer "price_unit_amount", null: false
     t.string "stripe_price_id", null: false
     t.string "stripe_product_id", null: false
     t.datetime "undiscarded_at"
     t.uuid "undiscarded_by_id"
+    t.integer "unit_amount", null: false
     t.datetime "updated_at", null: false
     t.uuid "updated_by_id"
     t.index ["code"], name: "index_payment_products_on_code", unique: true
@@ -414,23 +414,29 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_100002) do
     t.datetime "canceled_at"
     t.datetime "created_at", null: false
     t.uuid "created_by_id"
-    t.datetime "current_period_end"
-    t.datetime "current_period_start"
-    t.string "cycle", null: false
+    t.string "currency", null: false
+    t.datetime "current_period_end", null: false
+    t.datetime "current_period_start", null: false
     t.datetime "discarded_at"
     t.uuid "discarded_by_id"
     t.datetime "ended_at"
+    t.string "interval", null: false
+    t.integer "interval_count", default: 1, null: false
     t.jsonb "metadata", default: {}
     t.jsonb "payment_method_details", default: {}
     t.string "payment_method_id"
     t.string "payment_method_type"
     t.uuid "product_id", null: false
-    t.datetime "started_at"
+    t.integer "quantity", default: 1, null: false
+    t.datetime "started_at", null: false
     t.string "status", default: "incomplete", null: false
     t.string "stripe_customer_id"
+    t.string "stripe_price_id", null: false
     t.string "stripe_subscription_id", null: false
+    t.string "stripe_subscription_item_id", null: false
     t.datetime "undiscarded_at"
     t.uuid "undiscarded_by_id"
+    t.integer "unit_amount", null: false
     t.datetime "updated_at", null: false
     t.uuid "updated_by_id"
     t.uuid "user_id", null: false
@@ -440,7 +446,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_100002) do
     t.index ["discarded_by_id"], name: "index_payment_subscriptions_on_discarded_by_id"
     t.index ["product_id"], name: "index_payment_subscriptions_on_product_id"
     t.index ["status"], name: "index_payment_subscriptions_on_status"
+    t.index ["stripe_price_id"], name: "index_payment_subscriptions_on_stripe_price_id"
     t.index ["stripe_subscription_id"], name: "index_payment_subscriptions_on_stripe_subscription_id", unique: true
+    t.index ["stripe_subscription_item_id"], name: "index_payment_subscriptions_on_stripe_subscription_item_id"
     t.index ["undiscarded_by_id"], name: "index_payment_subscriptions_on_undiscarded_by_id"
     t.index ["updated_by_id"], name: "index_payment_subscriptions_on_updated_by_id"
     t.index ["user_id", "status"], name: "index_payment_subscriptions_on_user_id_and_status"
@@ -462,7 +470,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_100002) do
     t.jsonb "payment_method_details", default: {}
     t.string "payment_method_id"
     t.string "payment_method_type"
-    t.integer "price_unit_amount", null: false
     t.datetime "processing_at"
     t.uuid "product_id", null: false
     t.datetime "refunded_at"
@@ -472,6 +479,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_100002) do
     t.string "stripe_payment_intent_id", null: false
     t.datetime "undiscarded_at"
     t.uuid "undiscarded_by_id"
+    t.integer "unit_amount", null: false
     t.datetime "updated_at", null: false
     t.uuid "updated_by_id"
     t.uuid "user_id", null: false
