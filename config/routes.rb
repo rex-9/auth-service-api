@@ -65,6 +65,7 @@ Rails.application.routes.draw do
     end
 
     resources :notifications, only: %i[index show new create edit update destroy]
+    resources :user_notifications, only: %i[index show new create edit update destroy]
 
     root to: "users#index"
   end

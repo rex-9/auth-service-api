@@ -9,6 +9,10 @@ class UserNotification < ApplicationRecord
   # ===== VALIDATIONS =====
   validates :title, presence: true
   validates :message, presence: true
+  validates :operation_id, uniqueness: { scope: :user_id }, allow_nil: true
+  validates :operation_type, inclusion: { in: NotificationConstants::OperationType::ALL }, allow_nil: true
+  validates :operation_status, inclusion: { in: NotificationConstants::OperationStatus::ALL }, allow_nil: true
+  validate :complete_operation_metadata
 
   # ===== SCOPES =====
   scope :unread, -> { where(read_at: nil) }
@@ -29,6 +33,13 @@ class UserNotification < ApplicationRecord
   end
 
   private
+
+  def complete_operation_metadata
+    fields = [ operation_id, operation_type, operation_status ]
+    return if fields.all?(&:blank?) || fields.all?(&:present?)
+
+    errors.add(:operation_id, "operation metadata must be supplied together")
+  end
 
   def increment_notification_sent_count
     Notification.unscoped.where(id: notification_id).update_all("sent_count = COALESCE(sent_count, 0) + 1")

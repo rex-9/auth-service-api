@@ -71,6 +71,35 @@ tags:
   description: Provider-signed inbound webhooks.
 components:
   schemas:
+    async_operation:
+      type: object
+      properties:
+        operation_id:
+          type: string
+          description: Stable identifier shared by every lifecycle update.
+        operation_type:
+          type: string
+          enum:
+          - ai_response
+          - asset_compression
+          - video_thumbnail
+          - notification_delivery
+          - payment_webhook
+        operation_status:
+          type: string
+          enum:
+          - queued
+          - processing
+          - completed
+          - failed
+        link:
+          type: string
+          description: Client route for the affected resource.
+      required:
+      - operation_id
+      - operation_type
+      - operation_status
+      - link
     signup_request:
       type: object
       properties:
@@ -490,7 +519,7 @@ components:
                 access.
             expires_at:
               type: string
-              format: date_time
+              format: date-time
               nullable: true
               description: Explicit expiration timestamp. Calculated from days if
                 omitted.
@@ -510,7 +539,7 @@ components:
               example: 30
             expires_at:
               type: string
-              format: date_time
+              format: date-time
               nullable: true
             status:
               type: string
@@ -1255,24 +1284,124 @@ components:
           nullable: true
           description: Last TTS failure message when tts_status is failed or retrying.
       required: []
+    response_status:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+      required:
+      - code
+      - success
+      - message
+    current_user_response:
+      type: object
+      properties:
+        status:
+          "$ref": "#/components/schemas/response_status"
+        data:
+          type: object
+          properties:
+            user:
+              "$ref": "#/components/schemas/user"
+          required:
+          - user
+      required:
+      - status
+      - data
+    asset_operation_response:
+      type: object
+      properties:
+        status:
+          "$ref": "#/components/schemas/response_status"
+        data:
+          type: object
+          properties:
+            asset:
+              "$ref": "#/components/schemas/asset"
+            operation_id:
+              type: string
+            operation_type:
+              type: string
+              enum:
+              - ai_response
+              - asset_compression
+              - video_thumbnail
+              - notification_delivery
+              - payment_webhook
+            operation_status:
+              type: string
+              enum:
+              - queued
+              - processing
+              - completed
+              - failed
+            link:
+              type: string
+          required:
+          - asset
+          - operation_id
+          - operation_type
+          - operation_status
+          - link
+      required:
+      - status
+      - data
+    ai_chat_response:
+      type: object
+      properties:
+        status:
+          "$ref": "#/components/schemas/response_status"
+        data:
+          type: object
+          properties:
+            message:
+              "$ref": "#/components/schemas/message"
+            room_id:
+              type: string
+              format: uuid
+            status:
+              type: string
+              enum:
+              - queued
+              - processing
+              - completed
+              - failed
+            operation_id:
+              type: string
+            operation_type:
+              type: string
+              enum:
+              - ai_response
+              - asset_compression
+              - video_thumbnail
+              - notification_delivery
+              - payment_webhook
+            link:
+              type: string
+            job_id:
+              type: string
+          required:
+          - message
+          - room_id
+          - status
+          - operation_id
+          - operation_type
+          - link
+          - job_id
+      required:
+      - status
+      - data
     response:
       type: object
       properties:
         status:
-          type: object
-          properties:
-            code:
-              type: integer
-              example: 200
-            success:
-              type: boolean
-              example: true
-            message:
-              type: string
-          required:
-          - code
-          - success
-          - message
+          "$ref": "#/components/schemas/response_status"
         data:
           nullable: true
         meta:
@@ -2649,6 +2778,11 @@ paths:
           enum:
           - asc
           - desc
+      - name: discarded
+        in: query
+        required: false
+        schema:
+          type: boolean
       responses:
         '200':
           description: Successful response
@@ -2730,77 +2864,6 @@ paths:
           application/json:
             schema:
               "$ref": "#/components/schemas/admin_version_request"
-  "/v1/admin/client/versions/discarded":
-    get:
-      tags:
-      - Admin / Versions
-      summary: List discarded versions
-      parameters:
-      - name: X-Locale
-        in: header
-        required: false
-        description: Response language. Accepts en or my; Accept-Language is also
-          supported.
-        schema:
-          type: string
-          enum:
-          - en
-          - my
-      - name: X-Platform
-        in: header
-        required: false
-        description: Active-session namespace.
-        schema:
-          type: string
-          enum:
-          - web
-          - mobile
-          default: web
-      - name: page
-        in: query
-        required: false
-        schema:
-          type: integer
-      - name: limit
-        in: query
-        required: false
-        schema:
-          type: integer
-      - name: sort_by
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: sort_order
-        in: query
-        required: false
-        schema:
-          type: string
-          enum:
-          - asc
-          - desc
-      responses:
-        '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/response"
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/error_response"
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/error_response"
-      description: Super-admin only.
-      security:
-      - bearerAuth: []
   "/v1/admin/client/versions/{id}":
     get:
       tags:
@@ -3248,7 +3311,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/response"
+                "$ref": "#/components/schemas/current_user_response"
         '401':
           description: Unauthorized
           content:
@@ -3288,7 +3351,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/response"
+                "$ref": "#/components/schemas/current_user_response"
         '401':
           description: Unauthorized
           content:
@@ -3359,6 +3422,11 @@ paths:
           enum:
           - asc
           - desc
+      - name: discarded
+        in: query
+        required: false
+        schema:
+          type: boolean
       responses:
         '200':
           description: Successful response
@@ -3438,72 +3506,6 @@ paths:
           application/json:
             schema:
               "$ref": "#/components/schemas/admin_user_request"
-  "/v1/admin/users/discarded":
-    get:
-      tags:
-      - Admin / Users
-      summary: List discarded users in the recycle bin
-      parameters:
-      - name: X-Locale
-        in: header
-        required: false
-        description: Response language. Accepts en or my; Accept-Language is also
-          supported.
-        schema:
-          type: string
-          enum:
-          - en
-          - my
-      - name: X-Platform
-        in: header
-        required: false
-        description: Active-session namespace.
-        schema:
-          type: string
-          enum:
-          - web
-          - mobile
-          default: web
-      - name: limit
-        in: query
-        required: false
-        schema:
-          type: integer
-          minimum: 1
-      - name: sort_by
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: sort_order
-        in: query
-        required: false
-        schema:
-          type: string
-          enum:
-          - asc
-          - desc
-      responses:
-        '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/response"
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/error_response"
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/error_response"
-      security:
-      - bearerAuth: []
   "/v1/admin/users/{id}":
     get:
       tags:
@@ -3808,6 +3810,11 @@ paths:
           enum:
           - asc
           - desc
+      - name: discarded
+        in: query
+        required: false
+        schema:
+          type: boolean
       responses:
         '200':
           description: Successful response
@@ -3919,6 +3926,11 @@ paths:
         schema:
           type: integer
           minimum: 1
+      - name: discarded
+        in: query
+        required: false
+        schema:
+          type: boolean
       responses:
         '200':
           description: Successful response
@@ -4502,6 +4514,142 @@ paths:
                 "$ref": "#/components/schemas/error_response"
         '404':
           description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '422':
+          description: Unprocessable Content
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+  "/v1/admin/iam/permissions/{id}/discard":
+    post:
+      tags:
+      - Admin / IAM Permissions
+      summary: Discard an admin-managed permission
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '422':
+          description: Unprocessable Content
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+  "/v1/admin/iam/permissions/{id}/undiscard":
+    post:
+      tags:
+      - Admin / IAM Permissions
+      summary: Undiscard an admin-managed permission
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '422':
+          description: Unprocessable Content
           content:
             application/json:
               schema:
@@ -5398,72 +5546,6 @@ paths:
           application/json:
             schema:
               "$ref": "#/components/schemas/admin_product_request"
-  "/v1/admin/payment/products/discarded":
-    get:
-      tags:
-      - Admin / Payment Products
-      summary: List discarded Stripe-backed products for the recycle bin
-      parameters:
-      - name: X-Locale
-        in: header
-        required: false
-        description: Response language. Accepts en or my; Accept-Language is also
-          supported.
-        schema:
-          type: string
-          enum:
-          - en
-          - my
-      - name: X-Platform
-        in: header
-        required: false
-        description: Active-session namespace.
-        schema:
-          type: string
-          enum:
-          - web
-          - mobile
-          default: web
-      - name: limit
-        in: query
-        required: false
-        schema:
-          type: integer
-          minimum: 1
-      - name: sort_by
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: sort_order
-        in: query
-        required: false
-        schema:
-          type: string
-          enum:
-          - asc
-          - desc
-      responses:
-        '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/response"
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/error_response"
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/error_response"
-      security:
-      - bearerAuth: []
   "/v1/admin/payment/products/{id}":
     get:
       tags:
@@ -8797,76 +8879,11 @@ paths:
         required: false
         schema:
           type: integer
-      responses:
-        '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/response"
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/error_response"
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/error_response"
-      security:
-      - bearerAuth: []
-  "/v1/admin/assets/discarded":
-    get:
-      tags:
-      - Admin / Assets
-      summary: List discarded assets in the recycle bin
-      parameters:
-      - name: X-Locale
-        in: header
-        required: false
-        description: Response language. Accepts en or my; Accept-Language is also
-          supported.
-        schema:
-          type: string
-          enum:
-          - en
-          - my
-      - name: X-Platform
-        in: header
-        required: false
-        description: Active-session namespace.
-        schema:
-          type: string
-          enum:
-          - web
-          - mobile
-          default: web
-      - name: limit
+      - name: discarded
         in: query
         required: false
         schema:
-          type: integer
-      - name: page
-        in: query
-        required: false
-        schema:
-          type: integer
-      - name: sort_by
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: sort_order
-        in: query
-        required: false
-        schema:
-          type: string
-          enum:
-          - asc
-          - desc
+          type: boolean
       responses:
         '200':
           description: Successful response
@@ -9610,7 +9627,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/response"
+                "$ref": "#/components/schemas/asset_operation_response"
         '401':
           description: Unauthorized
           content:
@@ -9734,7 +9751,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/response"
+                "$ref": "#/components/schemas/asset_operation_response"
         '401':
           description: Unauthorized
           content:
@@ -10406,7 +10423,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/response"
+                "$ref": "#/components/schemas/ai_chat_response"
         '401':
           description: Unauthorized
           content:

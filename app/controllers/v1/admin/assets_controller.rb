@@ -383,18 +383,41 @@ class V1::Admin::AssetsController < V1::ApplicationController
     end
 
     @asset.update!(status: MediaConstants::Status::PENDING)
+    operation_id = "#{NotificationConstants::OperationType::ASSET_COMPRESSION}:#{@asset.id}:#{SecureRandom.uuid}"
 
     if @asset.compressible_video?
-      Media::CompressVideoJob.perform_later(asset_id: @asset.id)
+      Media::CompressVideoJob.perform_later(
+        asset_id: @asset.id,
+        notification_user_id: current_user.id,
+        operation_id: operation_id
+      )
     elsif @asset.compressible_image?
-      Media::CompressImageJob.perform_later(asset_id: @asset.id)
+      Media::CompressImageJob.perform_later(
+        asset_id: @asset.id,
+        notification_user_id: current_user.id,
+        operation_id: operation_id
+      )
     end
+
+    NotificationService::Center.operation(
+      user_id: current_user.id,
+      operation_id: operation_id,
+      operation_type: NotificationConstants::OperationType::ASSET_COMPRESSION,
+      operation_status: NotificationConstants::OperationStatus::QUEUED,
+      message: admin_asset_message(MessageService::Admin::Asset::COMPRESSION_ENQUEUED),
+      link: "/admin/assets/#{@asset.id}",
+      data: { asset_id: @asset.id }
+    )
 
     render_json_response(
       status_code: 200,
       message: admin_asset_message(MessageService::Admin::Asset::COMPRESSION_ENQUEUED),
       data: {
-        asset: AssetSerializer.new(@asset.reload).serializable_hash[:data][:attributes]
+        asset: AssetSerializer.new(@asset.reload).serializable_hash[:data][:attributes],
+        operation_id: operation_id,
+        operation_type: NotificationConstants::OperationType::ASSET_COMPRESSION,
+        operation_status: NotificationConstants::OperationStatus::QUEUED,
+        link: "/admin/assets/#{@asset.id}"
       }
     )
   end
@@ -415,11 +438,32 @@ class V1::Admin::AssetsController < V1::ApplicationController
       return
     end
 
-    Media::GenerateVideoThumbnailJob.perform_later(asset_id: @asset.id, replace: true)
+    operation_id = "#{NotificationConstants::OperationType::VIDEO_THUMBNAIL}:#{@asset.id}:#{SecureRandom.uuid}"
+    Media::GenerateVideoThumbnailJob.perform_later(
+      asset_id: @asset.id,
+      replace: true,
+      notification_user_id: current_user.id,
+      operation_id: operation_id
+    )
+    NotificationService::Center.operation(
+      user_id: current_user.id,
+      operation_id: operation_id,
+      operation_type: NotificationConstants::OperationType::VIDEO_THUMBNAIL,
+      operation_status: NotificationConstants::OperationStatus::QUEUED,
+      message: admin_asset_message(MessageService::Admin::Asset::THUMBNAIL_REGENERATION_QUEUED),
+      link: "/admin/assets/#{@asset.id}",
+      data: { asset_id: @asset.id }
+    )
     render_json_response(
       status_code: 202,
       message: admin_asset_message(MessageService::Admin::Asset::THUMBNAIL_REGENERATION_QUEUED),
-      data: { asset: AssetSerializer.new(@asset.reload).serializable_hash[:data][:attributes] }
+      data: {
+        asset: AssetSerializer.new(@asset.reload).serializable_hash[:data][:attributes],
+        operation_id: operation_id,
+        operation_type: NotificationConstants::OperationType::VIDEO_THUMBNAIL,
+        operation_status: NotificationConstants::OperationStatus::QUEUED,
+        link: "/admin/assets/#{@asset.id}"
+      }
     )
   end
 

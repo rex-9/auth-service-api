@@ -17,6 +17,7 @@ class V1::AiController < V1::ApplicationController
 
     user_message = nil
     job = nil
+    operation_id = nil
 
     @room.with_lock do
       if @room.processing?
@@ -39,6 +40,16 @@ class V1::AiController < V1::ApplicationController
       )
 
       job = Ai::ProcessChatJob.perform_later(user_message.id)
+      operation_id = "#{NotificationConstants::OperationType::AI_RESPONSE}:#{user_message.id}"
+      NotificationService::Center.operation(
+        user_id: current_user.id,
+        operation_id: operation_id,
+        operation_type: NotificationConstants::OperationType::AI_RESPONSE,
+        operation_status: NotificationConstants::OperationStatus::QUEUED,
+        message: ai_message(MessageService::Ai::RESPONSE_QUEUED),
+        link: "/ai?room_id=#{@room.id}",
+        data: { type: NotificationConstants::NotificationType::AI_RESPONSE_READY, room_id: @room.id, message_id: user_message.id }
+      )
     end
 
     render_json_response(
@@ -47,7 +58,10 @@ class V1::AiController < V1::ApplicationController
       data: {
         message: Chat::MessageSerializer.new(user_message).serializable_hash[:data][:attributes],
         room_id: @room.id,
-        status: "queued",
+        status: NotificationConstants::OperationStatus::QUEUED,
+        operation_id: operation_id,
+        operation_type: NotificationConstants::OperationType::AI_RESPONSE,
+        link: "/ai?room_id=#{@room.id}",
         job_id: job.job_id
       }
     )

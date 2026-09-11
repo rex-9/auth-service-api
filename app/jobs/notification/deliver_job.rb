@@ -6,9 +6,18 @@ class Notification::DeliverJob < ApplicationJob
   retry_on DeliveryError,
            EmailService::Error,
            wait: :polynomially_longer,
-           attempts: 5
+           attempts: 5 do |job, error|
+    operation = job.arguments.first&.with_indifferent_access&.dig(:operation)
+    NotificationService::OperationTracker.transition(
+      operation: operation,
+      status: NotificationConstants::OperationStatus::FAILED,
+      error: error.message
+    ) if operation
+  end
 
-  def perform(channel:, payload:)
+  def perform(channel:, payload:, operation: nil)
+    track(operation, NotificationConstants::OperationStatus::PROCESSING)
+
     result = case channel.to_sym
     when :socket
       SocketService::Client.broadcast(**payload.symbolize_keys)
@@ -21,9 +30,20 @@ class Notification::DeliverJob < ApplicationJob
     end
 
     raise DeliveryError, "#{channel} delivery failed" unless result
+
+    track(operation, NotificationConstants::OperationStatus::COMPLETED)
   end
 
   private
+
+  def track(operation, status)
+    return unless operation
+
+    NotificationService::OperationTracker.transition(
+      operation: operation,
+      status: status
+    )
+  end
 
   def deliver_email(payload)
     if payload[:template_id].present?

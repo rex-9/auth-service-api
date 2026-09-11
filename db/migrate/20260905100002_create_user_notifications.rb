@@ -9,6 +9,9 @@ class CreateUserNotifications < ActiveRecord::Migration[8.1]
       t.text :message, null: false
       t.string :link
       t.jsonb :data, default: {}, null: false
+      t.string :operation_id
+      t.string :operation_type
+      t.string :operation_status
 
       t.datetime :read_at
 
@@ -27,6 +30,7 @@ class CreateUserNotifications < ActiveRecord::Migration[8.1]
 
     add_index :user_notifications, [ :user_id, :created_at ]
     add_index :user_notifications, [ :user_id, :read_at ]
+    add_index :user_notifications, [ :user_id, :operation_id ], unique: true, where: "operation_id IS NOT NULL"
     add_index :user_notifications, :discarded_at
   end
 end

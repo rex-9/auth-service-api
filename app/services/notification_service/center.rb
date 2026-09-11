@@ -9,21 +9,63 @@ module NotificationService
     class << self
       # ===== UNIFIED METHODS =====
 
-      def notify(user_id:, user_email: nil, title: nil, message: nil, push_title: nil, push_body: nil, link: nil, data: {}, send_socket: false, send_push: false, send_email: false, email_template: nil, email_template_data: {}, template_id: nil, push_template_id: nil, **kwargs)
+      def operation(user_id:, operation_id:, operation_type:, operation_status:, message:, link:, data: {})
+        notify(
+          user_id: user_id,
+          title: message,
+          message: message,
+          operation_id: operation_id,
+          operation_type: operation_type,
+          operation_status: operation_status,
+          link: link,
+          data: data,
+          send_socket: true
+        )
+      end
+
+      def notify(user_id:, user_email: nil, title: nil, message: nil, push_title: nil, push_body: nil, link: nil, data: {}, operation_id: nil, operation_type: nil, operation_status: nil, send_socket: false, send_push: false, send_email: false, email_template: nil, email_template_data: {}, template_id: nil, push_template_id: nil, **kwargs)
         results = {}
+        operation_data = {
+          operation_id: operation_id,
+          operation_type: operation_type,
+          operation_status: operation_status,
+          link: link
+        }.compact
+        data = data.merge(operation_data)
 
         # 1. Socket (WebSocket + In-App Database Persistence)
         if send_socket
           user_notification = nil
           if User.exists?(id: user_id)
-            user_notification = UserNotification.create(
-              user_id: user_id,
-              notification_id: template_id,
-              title: title.presence || message.presence || "Notification",
-              message: message.presence || title.presence || "Notification",
-              link: link,
-              data: data
-            )
+            user_notification = if operation_id.present?
+              NotificationService::OperationTracker.transition(
+                operation: {
+                  user_id: user_id,
+                  operation_id: operation_id,
+                  operation_type: operation_type,
+                  title: title.presence || message.presence || "Notification",
+                  message: message.presence || title.presence || "Notification",
+                  link: link,
+                  data: data
+                },
+                status: operation_status,
+                broadcast: false
+              )
+            else
+              UserNotification.new(user_id: user_id)
+            end
+            if user_notification && operation_id.blank?
+              user_notification.assign_attributes(
+                user_id: user_id,
+                notification_id: template_id,
+                title: title.presence || message.presence || "Notification",
+                message: message.presence || title.presence || "Notification",
+                link: link,
+                data: data,
+                read_at: nil
+              )
+              user_notification.save!
+            end
           end
 
           results[:socket] = enqueue(:socket) do
@@ -37,7 +79,7 @@ module NotificationService
                 data: user_notification.data,
                 read_at: user_notification.read_at,
                 created_at: user_notification.created_at.iso8601
-              }
+              }.compact
             else
               {
                 user_id: user_id,
@@ -50,7 +92,18 @@ module NotificationService
 
         # 2. Push notification
         if send_push && (push_title.present? || title.present? || push_template_id.present?)
-          results[:push] = enqueue(:push) do
+          results[:push] = enqueue(
+            :push,
+            operation: delivery_operation(
+              channel: NotificationConstants::Channel::PUSH,
+              user_id: user_id,
+              operation_id: operation_id,
+              title: push_title.presence || title,
+              message: push_body.presence || message || title,
+              link: link,
+              data: data
+            )
+          ) do
             {
               user_id: user_id,
               title: push_title.presence || title,
@@ -63,7 +116,18 @@ module NotificationService
 
         # 3. Email
         if send_email
-          results[:email] = enqueue(:email) do
+          results[:email] = enqueue(
+            :email,
+            operation: delivery_operation(
+              channel: NotificationConstants::Channel::EMAIL,
+              user_id: user_id,
+              operation_id: operation_id,
+              title: title || notification_message(MessageService::Notification::DEFAULT_TITLE),
+              message: message || notification_message(MessageService::Notification::DEFAULT_BODY),
+              link: link,
+              data: data
+            )
+          ) do
             user_email ||= User.find_by(id: user_id)&.email
 
             if email_template.present?
@@ -420,11 +484,32 @@ module NotificationService
         )
       end
 
-      def enqueue(channel)
-        Notification::DeliverJob.perform_later(
+      def delivery_operation(channel:, user_id:, operation_id:, title:, message:, link:, data:)
+        return if operation_id.blank? || User.exists?(id: user_id) == false
+
+        {
+          user_id: user_id,
+          operation_id: "#{operation_id}:#{channel}",
+          operation_type: NotificationConstants::OperationType::NOTIFICATION_DELIVERY,
+          title: title,
+          message: message,
+          link: link.presence || "/",
+          data: data.merge(channel: channel)
+        }
+      end
+
+      def enqueue(channel, operation: nil)
+        NotificationService::OperationTracker.transition(
+          operation: operation,
+          status: NotificationConstants::OperationStatus::QUEUED
+        ) if operation
+
+        arguments = {
           channel: channel,
           payload: yield
-        )
+        }
+        arguments[:operation] = operation if operation
+        Notification::DeliverJob.perform_later(**arguments)
 
         true
       rescue StandardError => error

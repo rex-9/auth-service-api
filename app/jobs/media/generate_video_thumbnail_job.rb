@@ -2,12 +2,16 @@ module Media
   class GenerateVideoThumbnailJob < ApplicationJob
     queue_as :media
 
-    retry_on MediaService::CompressionError, wait: :polynomially_longer, attempts: 3
-    retry_on StorageService::Error, wait: :polynomially_longer, attempts: 3
+    retry_on MediaService::CompressionError, StorageService::Error,
+             wait: :polynomially_longer, attempts: 3 do |job, error|
+      job.send(:broadcast_retry_exhausted!, error)
+    end
     discard_on ActiveRecord::RecordNotFound
 
-    def perform(asset_id:, replace: false)
+    def perform(asset_id:, replace: false, notification_user_id: nil, operation_id: nil)
       asset = Asset.find(asset_id)
+      @notification_user_id = notification_user_id.presence || asset.created_by_id.presence || asset.updated_by_id.presence
+      @operation_id = operation_id.presence || "#{NotificationConstants::OperationType::VIDEO_THUMBNAIL}:#{asset.id}:#{job_id}"
       return unless asset.compressible_video?
       return if asset.thumbnail.present? && !replace
 
@@ -41,6 +45,9 @@ module Media
         )
       end
       broadcast(asset, thumbnail)
+    rescue MediaService::CompressionError, StorageService::Error
+      StorageService::Client.delete(result[:storage_key]) if result&.dig(:storage_key) && !thumbnail&.persisted?
+      raise
     rescue StandardError
       StorageService::Client.delete(result[:storage_key]) if result&.dig(:storage_key) && !thumbnail&.persisted?
       broadcast_failure(asset) if asset
@@ -51,15 +58,30 @@ module Media
 
     private
 
-    def broadcast(asset, thumbnail)
-      return if asset.created_by_id.blank?
+    def broadcast_retry_exhausted!(_error)
+      arguments = self.arguments.first.with_indifferent_access
+      asset = Asset.find_by(id: arguments[:asset_id])
+      return unless asset
 
-      SocketService::Client.broadcast(
-        user_id: asset.created_by_id,
-        message: MessageService::Admin::Asset.t(
-          MessageService::Admin::Asset::THUMBNAIL_GENERATED,
-          name: asset.name
-        ),
+      @notification_user_id = arguments[:notification_user_id].presence || asset.created_by_id.presence || asset.updated_by_id.presence
+      @operation_id = arguments[:operation_id].presence || "#{NotificationConstants::OperationType::VIDEO_THUMBNAIL}:#{asset.id}:#{job_id}"
+      broadcast_failure(asset)
+    end
+
+    def broadcast(asset, thumbnail)
+      return if @notification_user_id.blank?
+
+      message = MessageService::Admin::Asset.t(
+        MessageService::Admin::Asset::THUMBNAIL_GENERATED,
+        name: asset.name
+      )
+      NotificationService::Center.operation(
+        user_id: @notification_user_id,
+        operation_id: @operation_id,
+        operation_type: NotificationConstants::OperationType::VIDEO_THUMBNAIL,
+        operation_status: NotificationConstants::OperationStatus::COMPLETED,
+        message: message,
+        link: "/admin/assets/#{asset.id}",
         data: {
           type: MediaConstants::SocketEvent::ASSET_THUMBNAIL_GENERATED,
           asset_id: asset.id,
@@ -71,14 +93,16 @@ module Media
     end
 
     def broadcast_failure(asset)
-      return if asset.created_by_id.blank?
+      return if @notification_user_id.blank?
 
-      SocketService::Client.broadcast(
-        user_id: asset.created_by_id,
-        message: MessageService::Admin::Asset.t(
-          MessageService::Admin::Asset::THUMBNAIL_FAILED,
-          name: asset.name
-        ),
+      message = MessageService::Admin::Asset.t(MessageService::Admin::Asset::THUMBNAIL_FAILED, name: asset.name)
+      NotificationService::Center.operation(
+        user_id: @notification_user_id,
+        operation_id: @operation_id,
+        operation_type: NotificationConstants::OperationType::VIDEO_THUMBNAIL,
+        operation_status: NotificationConstants::OperationStatus::FAILED,
+        message: message,
+        link: "/admin/assets/#{asset.id}",
         data: {
           type: MediaConstants::SocketEvent::ASSET_THUMBNAIL_FAILED,
           asset_id: asset.id

@@ -26,6 +26,9 @@ module RexoneCore
     config.time_zone = "UTC"  # Set a consistent timezone
     config.active_record.default_timezone = :utc
 
+    # Media variants are handled by the custom Garage/Vips pipeline.
+    config.active_storage.variant_processor = :disabled
+
     # Admin API translations are grouped by resource under locales/admin.
     config.i18n.load_path += Dir[Rails.root.join("config/locales/admin/**/*.{rb,yml}")]
     config.i18n.available_locales = %i[en my]

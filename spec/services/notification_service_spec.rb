@@ -47,6 +47,33 @@ RSpec.describe NotificationService::Center do
     expect(described_class.email(email: "user@example.com", subject: "Hi", body: "Body")).to be(false)
   end
 
+  it "updates one persisted notification throughout an async operation lifecycle" do
+    user = create(:user)
+    attributes = {
+      user_id: user.id,
+      operation_id: "ai_response:message-id",
+      operation_type: NotificationConstants::OperationType::AI_RESPONSE,
+      link: "/ai?room_id=room-id",
+      message: "Working"
+    }
+
+    described_class.operation(
+      **attributes,
+      operation_status: NotificationConstants::OperationStatus::PROCESSING
+    )
+    described_class.operation(
+      **attributes.merge(message: "Ready"),
+      operation_status: NotificationConstants::OperationStatus::COMPLETED
+    )
+
+    expect(user.user_notifications.count).to eq(1)
+    expect(user.user_notifications.first).to have_attributes(
+      message: "Ready",
+      operation_status: NotificationConstants::OperationStatus::COMPLETED,
+      link: "/ai?room_id=room-id"
+    )
+  end
+
   it "creates confirmation and password-reset email jobs" do
     described_class.confirmation_email(email: "user@example.com", code: "123456")
     described_class.password_reset_email(email: "user@example.com", token: "token")
