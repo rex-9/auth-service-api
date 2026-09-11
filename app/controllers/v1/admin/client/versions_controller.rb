@@ -7,28 +7,19 @@ class V1::Admin::Client::VersionsController < V1::ApplicationController
 
   # GET /v1/admin/client/versions
   def index
-    versions = Client::Version.with_install_counts
+    discarded = params[:discarded].to_s == "true"
+    versions = discarded ? Client::Version.with_discarded.discarded.with_install_counts : Client::Version.with_install_counts
     versions = versions.where(status: params[:status]) if params[:status].present?
-    versions = sort(versions, columns: SortConstants::Columns::VERSION)
+    versions = if discarded
+      sort(versions, columns: SortConstants::Columns::VERSION, default_column: :discarded_at)
+    else
+      sort(versions, columns: SortConstants::Columns::VERSION)
+    end
     pagy, records = pagy(versions)
 
     render_json_response(
       status_code: 200,
-      message: version_message(MessageService::Version::FETCHED),
-      data: Client::VersionAdminSerializer.paginated(records, pagy),
-      pagy: pagy
-    )
-  end
-
-  # GET /v1/admin/client/versions/discarded
-  def read_discarded
-    versions = Client::Version.with_discarded.discarded.with_install_counts
-    versions = sort(versions, columns: SortConstants::Columns::VERSION, default_column: :discarded_at)
-    pagy, records = pagy(versions)
-
-    render_json_response(
-      status_code: 200,
-      message: version_message(MessageService::Version::DISCARDED_FETCHED),
+      message: version_message(discarded ? MessageService::Version::DISCARDED_FETCHED : MessageService::Version::FETCHED),
       data: Client::VersionAdminSerializer.paginated(records, pagy),
       pagy: pagy
     )

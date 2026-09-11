@@ -32,19 +32,57 @@ RSpec.describe "V1 IAM User Roles API", type: :request do
 
       expect(response).to have_http_status(:ok)
     end
+
+    it "notifies the user when a new role is assigned" do
+      allow(NotificationService::Center).to receive(:iam_updated)
+
+      post "/v1/iam/users/#{target_user.id}/roles", params: { role_id: role.id }, headers: headers
+
+      expect(response).to have_http_status(:ok)
+      expect(NotificationService::Center).to have_received(:iam_updated).with(target_user).once
+    end
+
+    it "does not notify the user when the role is already assigned" do
+      create(:user_role, user: target_user, role: role)
+      allow(NotificationService::Center).to receive(:iam_updated)
+
+      post "/v1/iam/users/#{target_user.id}/roles", params: { role_id: role.id }, headers: headers
+
+      expect(response).to have_http_status(:ok)
+      expect(NotificationService::Center).not_to have_received(:iam_updated)
+    end
   end
 
-  describe "DELETE /v1/iam/users/:user_id/roles/:id" do
+  describe "DELETE /v1/iam/users/:user_id/roles/:role_id" do
     before do
       create(:user_role, user: target_user, role: role)
     end
 
     it "removes a role from a user" do
       expect do
-        delete "/v1/iam/users/#{target_user.id}/roles/#{role.id}", params: { role_id: role.id }, headers: headers
+        delete "/v1/iam/users/#{target_user.id}/roles/#{role.id}", headers: headers
       end.to change(target_user.roles, :count).by(-1)
 
       expect(response).to have_http_status(:ok)
+    end
+
+    it "notifies the user when a role is removed" do
+      allow(NotificationService::Center).to receive(:iam_updated)
+
+      delete "/v1/iam/users/#{target_user.id}/roles/#{role.id}", headers: headers
+
+      expect(response).to have_http_status(:ok)
+      expect(NotificationService::Center).to have_received(:iam_updated).with(target_user).once
+    end
+
+    it "prevents removing the final super admin role" do
+      super_admin_role = admin.roles.find_by!(name: IamConstants::Role::SUPER_ADMIN)
+
+      delete "/v1/iam/users/#{admin.id}/roles/#{super_admin_role.id}", headers: headers
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response_status["message"]).to eq(I18n.t("iam.user_roles.last_super_admin_role_protected"))
+      expect(admin.reload).to be_super_admin
     end
   end
 end

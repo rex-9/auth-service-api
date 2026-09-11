@@ -120,7 +120,6 @@ Rails.application.routes.draw do
 
     # ===== USERS =====
     get "users/current", to: "users#read_current_user"
-    get "users/current/iam", to: "users#read_current_iam"
     put "users/current", to: "users#update_current_user"
 
     # ===== ADMIN API =====
@@ -130,7 +129,6 @@ Rails.application.routes.draw do
       # API-only: no new/edit needed
       resources :assets, only: %i[index show update destroy] do
         collection do
-          get :read_discarded, path: "discarded"
           post :create_upload, path: "upload"
           get :read_storage_stats, path: "storage_stats"
           delete :destroy_bin, path: "bin"
@@ -150,7 +148,6 @@ Rails.application.routes.draw do
 
       resources :users, only: %i[index show create update] do
         collection do
-          get :read_discarded, path: "discarded"
         end
 
         member do
@@ -160,7 +157,12 @@ Rails.application.routes.draw do
       end
 
       namespace :iam do
-        resources :permissions, only: %i[index show create update destroy]
+        resources :permissions, only: %i[index show create update destroy] do
+          member do
+            post :discard
+            post :undiscard
+          end
+        end
         resources :roles, only: %i[index show create update destroy] do
           member do
             post :discard
@@ -187,7 +189,6 @@ Rails.application.routes.draw do
       namespace :payment do
         resources :products, only: %i[index show create update] do
           collection do
-            get :read_discarded, path: "discarded"
           end
 
           member do
@@ -213,7 +214,6 @@ Rails.application.routes.draw do
       namespace :client do
         resources :versions, only: %i[index show create update] do
           collection do
-            get :read_discarded, path: "discarded"
             get "user_versions", to: "user_versions#index"
           end
 
@@ -260,6 +260,7 @@ Rails.application.routes.draw do
       resources :users, only: [] do
         resources :roles,
           only: %i[index create destroy],
+          param: :role_id,
           controller: "user_roles"
       end
     end

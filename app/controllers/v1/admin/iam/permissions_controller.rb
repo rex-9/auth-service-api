@@ -1,17 +1,43 @@
 # app/controllers/v1/admin/iam/permissions_controller.rb
 class V1::Admin::Iam::PermissionsController < V1::ApplicationController
   before_action :super_admin_required!
-  before_action :set_permission, only: %i[show update destroy]
+  before_action :set_active_permission, only: %i[show update discard]
+  before_action :set_permission_including_discarded, only: %i[undiscard destroy]
 
   # GET /v1/admin/iam/permissions
   def index
-    permissions = ::Iam::Permission.order(:resource, :action)
+    permissions = if params[:discarded].to_s == "true"
+      ::Iam::Permission.with_discarded.discarded.order(:resource, :action)
+    else
+      ::Iam::Permission.order(:resource, :action)
+    end
     pagy, records = pagy(permissions)
     render_json_response(
       status_code: 200,
       message: iam_message(MessageService::Iam::PERMISSIONS_FETCHED),
       data: ::Iam::PermissionSerializer.paginated(records, pagy),
       pagy: pagy
+    )
+  end
+
+  # POST /v1/admin/iam/permissions/:id/discard
+  def discard
+    @permission.discard!
+
+    render_json_response(
+      status_code: 200,
+      message: iam_message(MessageService::Iam::PERMISSION_DISCARDED)
+    )
+  end
+
+  # POST /v1/admin/iam/permissions/:id/undiscard
+  def undiscard
+    @permission.undiscard!
+
+    render_json_response(
+      status_code: 200,
+      message: iam_message(MessageService::Iam::PERMISSION_RESTORED),
+      data: ::Iam::PermissionSerializer.new(@permission).serializable_hash[:data][:attributes]
     )
   end
 
@@ -66,7 +92,20 @@ class V1::Admin::Iam::PermissionsController < V1::ApplicationController
 
   # DELETE /v1/admin/iam/permissions/:id
   def destroy
-    @permission.destroy
+    unless @permission.discarded?
+      message = iam_message(MessageService::Iam::PERMISSION_NOT_DISCARDED)
+      render_json_response(status_code: 422, message: message, error: message)
+      return
+    end
+
+    unless @permission.destroy
+      render_json_response(
+        status_code: 422,
+        message: iam_message(MessageService::Iam::PERMISSION_DELETE_FAILED),
+        error: @permission.errors.full_messages.to_sentence
+      )
+      return
+    end
 
     render_json_response(
       status_code: 200,
@@ -76,8 +115,12 @@ class V1::Admin::Iam::PermissionsController < V1::ApplicationController
 
   private
 
-  def set_permission
+  def set_active_permission
     @permission = ::Iam::Permission.find(params[:id])
+  end
+
+  def set_permission_including_discarded
+    @permission = ::Iam::Permission.with_discarded.find(params[:id])
   end
 
   def permission_params

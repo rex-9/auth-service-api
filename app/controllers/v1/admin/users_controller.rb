@@ -1,43 +1,35 @@
 # app/controllers/v1/admin/users_controller.rb
 class V1::Admin::UsersController < V1::ApplicationController
-  before_action :super_admin_required!
   LOG_PREFIX = "[Admin::Users]".freeze
 
   before_action :set_active_user, only: %i[show update discard]
   before_action :set_user_including_discarded, only: :undiscard
   before_action :super_admin_required!, only: %i[
-    show
     create
     update
     discard
     undiscard
-    read_discarded
   ]
+  before_action :super_admin_required_for_discarded_index!, only: :index
 
   # GET /users?page=2&limit=25
   def index
-    users = search_users(User.includes(:roles))
-    users = sort(users, columns: SortConstants::Columns::USER)
+    discarded = params[:discarded].to_s == "true"
+    scope = discarded ? User.with_discarded.discarded.includes(:roles) : User.includes(:roles)
+    users = search_users(scope)
+    users = if discarded
+      sort(users, columns: SortConstants::Columns::USER, default_column: :discarded_at)
+    else
+      sort(users, columns: SortConstants::Columns::USER)
+    end
     Rails.logger.info("#{LOG_PREFIX} Query: #{users.to_sql}")
 
     pagy, records = pagy(users)
     render_json_response(
       status_code: 200,
-      message: admin_user_message(MessageService::Admin::User::USERS_RETRIEVED),
-      data: UserSerializer.paginated(records, pagy),
-      pagy: pagy
-    )
-  end
-
-  # GET /v1/admin/users/discarded?page=1&limit=25
-  def read_discarded
-    users = search_users(User.with_discarded.discarded.includes(:roles))
-    users = sort(users, columns: SortConstants::Columns::USER, default_column: :discarded_at)
-    pagy, records = pagy(users)
-
-    render_json_response(
-      status_code: 200,
-      message: admin_user_message(MessageService::Admin::User::DISCARDED_USERS_RETRIEVED),
+      message: admin_user_message(
+        discarded ? MessageService::Admin::User::DISCARDED_USERS_RETRIEVED : MessageService::Admin::User::USERS_RETRIEVED
+      ),
       data: UserSerializer.paginated(records, pagy),
       pagy: pagy
     )
@@ -62,8 +54,6 @@ class V1::Admin::UsersController < V1::ApplicationController
     end
 
     if user.save
-      assign_roles(user) if role_ids_param_provided?
-
       render_json_response(
         status_code: 201,
         message: admin_user_message(MessageService::Admin::User::USER_CREATED),
@@ -81,7 +71,6 @@ class V1::Admin::UsersController < V1::ApplicationController
   # PATCH/PUT /v1/admin/users/:id
   def update
     if @user.update(user_params)
-      assign_roles(@user) if role_ids_param_provided?
       assign_avatar(@user) if avatar_param_provided?
 
       render_json_response(
@@ -124,6 +113,10 @@ class V1::Admin::UsersController < V1::ApplicationController
 
   private
 
+  def super_admin_required_for_discarded_index!
+    super_admin_required! if params[:discarded].to_s == "true"
+  end
+
   def set_active_user
     @user = User.find(params[:id])
   end
@@ -153,11 +146,10 @@ class V1::Admin::UsersController < V1::ApplicationController
     end
 
     return false unless @user.super_admin?
-    return false if User.joins(:roles).where(iam_roles: { name: "super_admin" }).count > 1
 
     render_json_response(
       status_code: 422,
-      message: admin_user_message(MessageService::Admin::User::LAST_SUPER_ADMIN_PROTECTED)
+      message: admin_user_message(MessageService::Admin::User::SUPER_ADMIN_LIFECYCLE_PROTECTED)
     )
     true
   end
@@ -168,24 +160,6 @@ class V1::Admin::UsersController < V1::ApplicationController
       :name,
       :email
     )
-  end
-
-  def role_ids_param
-    params.dig(:user, :role_ids)
-  end
-
-  def role_ids_param_provided?
-    params[:user].respond_to?(:key?) && params[:user].key?(:role_ids)
-  end
-
-  def assign_roles(user)
-    role_ids = Array(role_ids_param).reject(&:blank?)
-    roles = Iam::Role.where(id: role_ids)
-
-    user.user_roles.destroy_all
-    roles.each do |role|
-      user.user_roles.find_or_create_by!(role: role)
-    end
   end
 
   def avatar_param_provided?

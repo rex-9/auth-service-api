@@ -141,6 +141,30 @@ RSpec.describe "V1 Admin Assets API", type: :request do
       expect(response).to have_http_status(:unprocessable_content)
       expect(response_status["error"]).to eq("ဖိုင်အရွယ်အစားသည် သတ်မှတ်ထားသော ကန့်သတ်ချက်ထက် ကျော်လွန်နေပါသည် (#{MediaConstants::MAX_NON_VIDEO_SIZE_MB}MB)။")
     end
+
+    it "converts SVG to PNG on save as optimal without enqueueing image compression" do
+      svg_file = fixture_file_upload("icon.svg", "image/svg+xml")
+      conversion = stub_svg_to_png_result
+      allow(MediaService::SvgToPng).to receive(:prepare).and_return(conversion)
+      allow(Media::CompressImageJob).to receive(:perform_later)
+      allow(StorageService::Client).to receive(:upload).and_return(
+        storage_key: "admin/general_icon.png",
+        url: "https://cdn.example.com/icon.png",
+        bytes: 8,
+        format: "png",
+        resource_type: "image"
+      )
+
+      post "/v1/admin/assets/upload", params: { file: svg_file, type: "general" }, headers: headers
+
+      expect(response).to have_http_status(:created)
+      expect(Asset.last).to have_attributes(extension: "png", format: "image", status: "optimal")
+      expect(StorageService::Client).to have_received(:upload).with(
+        conversion.file,
+        hash_including(storage_key: a_string_matching(/\.png$/), resource_type: "image")
+      )
+      expect(Media::CompressImageJob).not_to have_received(:perform_later)
+    end
   end
 
   describe "POST /v1/admin/assets/:id/compress" do
@@ -367,6 +391,31 @@ RSpec.describe "V1 Admin Assets API", type: :request do
       expect(response).to have_http_status(:unprocessable_content)
       expect(response_status["success"]).to be(false)
       expect(StorageService::Client).not_to have_received(:upload)
+    end
+
+    it "converts an SVG cover to PNG before storing the thumbnail" do
+      svg_file = fixture_file_upload("icon.svg", "image/svg+xml")
+      conversion = stub_svg_to_png_result
+      allow(MediaService::SvgToPng).to receive(:prepare).and_return(conversion)
+      allow(Media::CompressImageJob).to receive(:perform_later)
+      allow(StorageService::Client).to receive(:upload).and_return(
+        storage_key: "dev/admin/thumbnail_replacement.png",
+        url: "https://assets.example.com/thumbnail-replacement.png",
+        bytes: 512,
+        format: "png"
+      )
+
+      post "/v1/admin/assets/#{video_asset.id}/thumbnail/upload",
+           params: { file: svg_file },
+           headers: headers
+
+      expect(response).to have_http_status(:ok)
+      expect(video_asset.reload.thumbnail).to have_attributes(extension: "png", status: "optimal")
+      expect(StorageService::Client).to have_received(:upload).with(
+        conversion.file,
+        hash_including(resource_type: "image", storage_key: a_string_matching(/\.png$/))
+      )
+      expect(Media::CompressImageJob).not_to have_received(:perform_later)
     end
   end
 
@@ -611,5 +660,12 @@ RSpec.describe "V1 Admin Assets API", type: :request do
       expect(Asset.with_discarded.count).to eq(1)
       expect(Asset.find_by(id: assets.last.id)).to be_present
     end
+  end
+
+  def stub_svg_to_png_result
+    tmpdir = Dir.mktmpdir("svg_to_png_spec")
+    png_path = File.join(tmpdir, "icon.png")
+    File.binwrite(png_path, "FAKEPNG")
+    MediaService::SvgToPng::Result.new(file: png_path, filename: "icon.png", tmpdir: tmpdir)
   end
 end

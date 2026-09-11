@@ -17,4 +17,12 @@ RSpec.describe Iam::RolePermission, type: :model do
     assignment = create(:role_permission)
     expect { assignment.role.destroy! }.to change(described_class, :count).by(-1)
   end
+
+  it "cannot remove a permission assignment from the super admin role" do
+    role = create(:role, name: IamConstants::Role::SUPER_ADMIN)
+    assignment = create(:role_permission, role: role)
+
+    expect(assignment.destroy).to be(false)
+    expect(described_class.exists?(assignment.id)).to be(true)
+  end
 end

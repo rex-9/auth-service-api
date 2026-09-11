@@ -70,7 +70,7 @@ RSpec.describe "Admin users", type: :request do
     grant_admin_user_permission(:read)
     user.discard!
 
-    get "/v1/admin/users/discarded", headers: headers
+    get "/v1/admin/users", params: { discarded: true }, headers: headers
 
     expect(response).to have_http_status(:ok)
     expect(response_data).to include(hash_including("id" => user.id))
@@ -83,6 +83,16 @@ RSpec.describe "Admin users", type: :request do
 
     expect(response).to have_http_status(:unprocessable_content)
     expect(response_status["message"]).to eq(I18n.t("admin.user.self_lifecycle_protected"))
+  end
+
+  it "prevents discarding any super admin account" do
+    another_super_admin = create(:user, :super_admin)
+
+    post "/v1/admin/users/#{another_super_admin.id}/discard", headers: headers
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(response_status["message"]).to eq(I18n.t("admin.user.super_admin_lifecycle_protected"))
+    expect(another_super_admin.reload).to be_kept
   end
 
   it "localizes user validation errors from X-Locale" do
@@ -125,21 +135,6 @@ RSpec.describe "Admin users", type: :request do
       names = response_data.map { |u| u.dig("attributes", "name") }
       expect(names).to include("Alice")
       expect(names).not_to include("Bob")
-    end
-  end
-
-  describe "POST /v1/admin/users role assignment" do
-    it "assigns roles on creation" do
-      grant_admin_user_permission(:create)
-      role = create(:role, name: "test_role")
-
-      post "/v1/admin/users",
-           params: { user: valid_user_params.merge(role_ids: [ role.id ]) },
-           headers: headers
-
-      expect(response).to have_http_status(:created)
-      created_user = User.find_by(email: valid_user_params[:email])
-      expect(created_user.roles).to include(role)
     end
   end
 

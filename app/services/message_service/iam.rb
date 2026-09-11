@@ -12,6 +12,7 @@ module MessageService
     PERMISSION_RESTORED = "iam.permissions.restored"
     PERMISSION_NOT_DISCARDED = "iam.permissions.not_discarded"
     PERMISSION_DELETED = "iam.permissions.deleted"
+    PERMISSION_DELETE_FAILED = "iam.permissions.delete_failed"
     ROLES_FETCHED = "iam.roles.fetched"
     ROLE_FETCHED = "iam.roles.fetched_one"
     ROLE_CREATED = "iam.roles.created"
@@ -24,6 +25,7 @@ module MessageService
     USER_ROLES_FETCHED = "iam.user_roles.fetched"
     ROLE_ASSIGNED = "iam.user_roles.assigned"
     ROLE_REMOVED = "iam.user_roles.removed"
+    LAST_SUPER_ADMIN_ROLE_PROTECTED = "iam.user_roles.last_super_admin_role_protected"
     USER_ROLE_NOT_FOUND = "iam.user_roles.not_found"
     USER_ROLE_MISSING = "iam.user_roles.missing"
   end

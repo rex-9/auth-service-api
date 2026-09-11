@@ -4,27 +4,20 @@ class V1::Admin::Payment::ProductsController < V1::ApplicationController
 
   # GET /v1/admin/payment/products
   def index
-    products = ::Payment::Product.all
-    products = sort(products, columns: SortConstants::Columns::PRODUCT)
+    discarded = params[:discarded].to_s == "true"
+    products = discarded ? ::Payment::Product.with_discarded.discarded : ::Payment::Product.all
+    products = if discarded
+      sort(products, columns: SortConstants::Columns::PRODUCT, default_column: :discarded_at)
+    else
+      sort(products, columns: SortConstants::Columns::PRODUCT)
+    end
     pagy, records = pagy(products)
 
     render_json_response(
       status_code: 200,
-      message: payment_message(MessageService::Payment::PRODUCTS_FETCHED),
-      data: ::Payment::ProductSerializer.paginated(records, pagy),
-      pagy: pagy
-    )
-  end
-
-  # GET /v1/admin/payment/products/discarded
-  def read_discarded
-    products = ::Payment::Product.with_discarded.discarded
-    products = sort(products, columns: SortConstants::Columns::PRODUCT, default_column: :discarded_at)
-    pagy, records = pagy(products)
-
-    render_json_response(
-      status_code: 200,
-      message: payment_message(MessageService::Payment::DISCARDED_PRODUCTS_FETCHED),
+      message: payment_message(
+        discarded ? MessageService::Payment::DISCARDED_PRODUCTS_FETCHED : MessageService::Payment::PRODUCTS_FETCHED
+      ),
       data: ::Payment::ProductSerializer.paginated(records, pagy),
       pagy: pagy
     )

@@ -1,7 +1,7 @@
 # Database Schema Documentation (`rexone-core`)
 
-> **Database Engine:** PostgreSQL 16
-> **Schema Version:** `2026_09_05_190001`
+> **Database Engine:** PostgreSQL 18
+> **Schema Version:** `2026_09_05_100002`
 > **Key Conventions:** UUID v4 Primary Keys (`gen_random_uuid()`), Soft Deletion (`discard` gem), Audit Tracking (`Auditable` concern).
 
 > [!IMPORTANT]
@@ -70,12 +70,12 @@ erDiagram
   users ||--o{ client_logs : "originates"
 
   users ||--o{ user_notifications : "receives"
-  notification_templates ||--o{ user_notifications : "templated_by"
+  notifications ||--o{ user_notifications : "templated_by"
 
   users ||--o{ client_user_versions : "runs"
   client_versions ||--o{ client_user_versions : "matches"
-  versions ||--o{ feedbacks : "reports"
-  versions ||--o{ client_logs : "reports"
+  client_versions ||--o{ feedbacks : "reports"
+  client_versions ||--o{ client_logs : "reports"
 
   users ||--o{ assets : "assetable (polymorphic)"
   payment_products ||--o{ assets : "assetable (polymorphic)"
@@ -141,6 +141,11 @@ erDiagram
 
 - Self-referencing FKs for `created_by_id`, `updated_by_id`, `discarded_by_id`, `undiscarded_by_id` -> `users(id)`.
 
+**API representation and lifecycle invariants**:
+
+- `UserSerializer` embeds the current IAM snapshot under `iam`: admin flags plus all/admin/non-admin role and permission collections. The current-user API therefore has no separate IAM aggregate endpoint.
+- Super-admin accounts cannot be discarded.
+
 ---
 
 ### 3.2. `iam_roles`
@@ -197,6 +202,11 @@ erDiagram
 - `index_iam_permissions_on_resource_and_action` (UNIQUE: `resource`, `action`)
 - Auditing indexes on `created_by_id`, `updated_by_id`, `discarded_by_id`, `undiscarded_by_id`, `discarded_at`.
 
+**Mutation invariants**:
+
+- Permissions must be discarded before permanent deletion and may be restored from the recycle bin.
+- A role-permission assignment belonging to `super_admin` cannot be updated or removed.
+
 ---
 
 ### 3.4. `iam_user_roles`
@@ -224,6 +234,13 @@ erDiagram
 - `index_iam_user_roles_on_role_id` (`role_id`)
 - `index_iam_user_roles_on_user_id` (`user_id`)
 - FKs to `users(id)` and `iam_roles(id)`.
+
+**Mutation invariants**:
+
+- Role membership is changed only through the dedicated IAM user-role resource; admin user create/update does not accept role IDs.
+- The final remaining `super_admin` assignment cannot be removed.
+- System roles cannot be discarded or permanently deleted.
+- The `super_admin` role's permission assignments cannot be updated or removed; newly introduced permissions may still be assigned automatically.
 
 ---
 
@@ -570,7 +587,7 @@ erDiagram
 
 **Generated Video Thumbnails**:
 
-- A video may own one generated thumbnail through the unique self-reference `assets.parent_asset_id`. Thumbnail generation runs asynchronously on the `media` queue, stores a WebP object beside its source video, and preserves the original asset's polymorphic owner. Admin may also upload an image thumbnail for a compressible video or audio parent.
+- A video may own one generated thumbnail through the unique self-reference `assets.parent_asset_id`. Thumbnail generation runs asynchronously on the `media` queue, stores a WebP object beside its source video, and preserves the original asset's polymorphic owner. Admin may also upload an image thumbnail for a compressible video or audio parent; SVG covers are converted to PNG at save time and marked `optimal`.
 
 **Audio Compression**:
 
@@ -621,7 +638,7 @@ erDiagram
 - `index_feedbacks_on_created_at` (`created_at`)
 - `index_feedbacks_on_discarded_at` (`discarded_at`)
 - `index_feedbacks_on_version_id` (`version_id`)
-- FK to `users(id)`; FK to `versions(id)` `ON DELETE NULL`.
+- FK to `users(id)`; FK to `client_versions(id)` `ON DELETE NULL`.
 
 ---
 
@@ -675,7 +692,7 @@ erDiagram
 - `index_client_logs_on_resolved_at` (`resolved_at`)
 - `index_client_logs_on_resolved_by_id` (`resolved_by_id`)
 - `index_client_logs_on_version_id` (`version_id`)
-- FKs to `users(id)` for `user_id`, `resolved_by_id`, `created_by_id`, `updated_by_id`; FK to `versions(id)` `ON DELETE NULL`.
+- FKs to `users(id)` for `user_id`, `resolved_by_id`, `created_by_id`, `updated_by_id`; FK to `client_versions(id)` `ON DELETE NULL`.
 
 ---
 
@@ -828,7 +845,7 @@ erDiagram
 - `index_client_user_versions_on_discarded_at` (`discarded_at`)
 - `index_client_user_versions_on_user_id` (`user_id`)
 - `index_client_user_versions_on_version_id` (`version_id`)
-- FK to `users(id)`; FK to `versions(id)` `ON DELETE NULL`.
+- FK to `users(id)`; FK to `client_versions(id)` `ON DELETE NULL`.
 
 ---
 

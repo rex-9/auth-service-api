@@ -18,7 +18,7 @@ Built under a simple creed: **clear in thought, exact in structure, simple in us
 
 **API-first · Modular · Observable · Queue-aware · Built to grow**
 
-[Explore the foundation](#feature-map) · [Ecosystem Architecture](ECOSYSTEM.md) · [Development Law](LAW.md) · [Production Deployment](docs/DEPLOYMENT.md) · [Analytics Guide](docs/ANALYTICS.md) · [Run it locally](#getting-started) · [Open the dashboards](#operations-center) · [Meet the architecture](#architecture)
+[Explore the foundation](#feature-map) · [Ecosystem Architecture](ECOSYSTEM.md) · [Development Law](LAW.md) · [Production Deployment](docs/DEPLOYMENT.md) · [Security Hardening](docs/DDOS.md) · [Analytics Guide](docs/ANALYTICS.md) · [Run it locally](#getting-started) · [Open the dashboards](#operations-center) · [Meet the architecture](#architecture)
 
 </div>
 
@@ -28,6 +28,8 @@ Built under a simple creed: **clear in thought, exact in structure, simple in us
 > **🏛️ Unified Ecosystem**: For the complete cross-platform architecture, feature parity matrix, and communication protocols between Core, Web, and Mobile, see **[ECOSYSTEM.md](ECOSYSTEM.md)**.
 >
 > **📜 Constitutional Law**: All development must strictly adhere to the architecture, service boundary, and API envelope laws in **[LAW.md](LAW.md)**. Zero exceptions.
+>
+> **🛡️ Production Security**: Deployments must follow the origin-isolation, edge protection, rate limiting, and verification steps in **[Production DDoS and API Abuse Protection](docs/DDOS.md)**.
 
 ## Why Rexone Core?
 
@@ -267,6 +269,7 @@ The storage abstraction defaults to **Garage** (self-hosted S3-compatible distri
 When the media container is enabled (`MEDIA_CONTAINER_ENABLED=true`), uploaded assets run through an isolated, background media optimization pipeline:
 
 - **Isolated Worker (`media` container)**: CPU- and memory-intensive media processing runs on a dedicated Solid Queue worker (`config/queue.media.yml`), completely isolating image/video/audio compression and canonical FFmpeg video-thumbnail generation from API requests and transactional jobs.
+- **SVG to PNG on save**: Uploaded SVG is converted to PNG in the API process (`MediaService::SvgToPng` → `MediaService::ImageConversion` via `rsvg-convert`, fitted inside `IMAGE_MAX_WIDTH` × `IMAGE_MAX_HEIGHT`). The stored asset is `extension: png` and `optimal`; it does **not** enqueue `Media::CompressImageJob`. Thumbnail SVG covers use a `.png` key and are also `optimal`. Stored SVG rows are not converted until re-uploaded. Docker images need `librsvg2-bin` (rebuild `api` after pulling this change).
 - **Image Compression (`Media::CompressImageJob`)**: Powered by `libvips` with smart palette quantization (`palette: true`, dynamic Q factor), dimension constraints (`IMAGE_MAX_WIDTH`, `IMAGE_MAX_HEIGHT`), and format-specific optimizations across JPEG, PNG, and WebP.
 - **Video Compression (`Media::CompressVideoJob`)**: Powered by `ffmpeg` (`libx264`, `aac`) with adaptive CRF tuning, dimension constraints, bitrate caps (`VIDEO_MAX_BITRATE`), and audio stream optimization.
 - **Audio Compression (`Media::CompressAudioJob`)**: Powered by `ffmpeg` (`aac` / `libmp3lame`, `AUDIO_BITRATE`) with `-vn`, stereo 44.1 kHz. WAV, FLAC, and OGG remux to M4A because those containers cannot host AAC; MP3, M4A, and AAC keep their original extension.
@@ -415,7 +418,7 @@ Docker is the quickest and most reproducible path.
 - Docker with Docker Compose
 - Git
 
-For a native installation, use Ruby `4.0.4`, PostgreSQL, libvips, and Bundler `4.0.16`.
+For a native installation, use Ruby `4.0.4`, PostgreSQL, libvips, `librsvg2-bin` (`rsvg-convert` for SVG to PNG), and Bundler `4.0.16`.
 
 ### 1. Clone and configure
 

@@ -39,6 +39,7 @@ module MediaConstants
   IMAGE_EXT_JPEG = "jpeg".freeze
   IMAGE_EXT_PNG = "png".freeze
   IMAGE_EXT_WEBP = "webp".freeze
+  IMAGE_EXT_SVG = "svg".freeze
 
   # Video format extensions
   VIDEO_EXT_MP4 = "mp4".freeze

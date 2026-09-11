@@ -196,8 +196,7 @@ module Openapi
           name: { type: :string, maxLength: 50, example: "Admin Created" },
           email: { type: :string, format: :email, example: "admin-created@example.com" },
           password: { type: :string, format: :password, minLength: 6, writeOnly: true },
-          password_confirmation: { type: :string, format: :password, minLength: 6, writeOnly: true },
-          role_ids: { type: :array, uniqueItems: true, items: UUID }
+          password_confirmation: { type: :string, format: :password, minLength: 6, writeOnly: true }
         )
       ),
       current_user_update_request: object(
@@ -444,6 +443,28 @@ module Openapi
           description: "One or more delivery channels: socket, push, or email."
         }
       ),
+      notification_template_request: object(
+        required: %i[event name category],
+        event: { type: :string },
+        name: { type: :string },
+        description: { type: :string, nullable: true },
+        category: { type: :string },
+        link: { type: :string, nullable: true },
+        admin: { type: :boolean },
+        in_app_title: { type: :string, nullable: true },
+        in_app_body: { type: :string, nullable: true },
+        in_app_data: { type: :object, additionalProperties: true },
+        push_title: { type: :string, nullable: true },
+        push_body: { type: :string, nullable: true },
+        push_template_id: { type: :string, nullable: true },
+        email_subject: { type: :string, nullable: true },
+        email_body: { type: :string, nullable: true },
+        email_template_id: { type: :string, nullable: true }
+      ),
+      id_batch_request: object(
+        required: [ :ids ],
+        ids: { type: :array, minItems: 1, uniqueItems: true, items: UUID }
+      ),
       asset_upload_request: object(
         required: [ :file ],
         file: { type: :string, format: :binary },
@@ -642,9 +663,16 @@ module Openapi
         name: { type: :string, nullable: true },
         provider: { type: :string, enum: %w[email google] },
         avatar_url: { type: :string, format: :uri, nullable: true },
-        role_ids: { type: :array, items: UUID },
-        role_names: { type: :array, items: { type: :string } },
-        permissions: { type: :object, additionalProperties: { type: :array, items: { type: :string } } },
+        iam: object(
+          is_admin: { type: :boolean },
+          is_super_admin: { type: :boolean },
+          roles: { type: :array, items: { type: :object } },
+          admin_roles: { type: :array, items: { type: :object } },
+          non_admin_roles: { type: :array, items: { type: :object } },
+          permissions: { type: :array, items: { type: :object } },
+          admin_permissions: { type: :array, items: { type: :object } },
+          non_admin_permissions: { type: :array, items: { type: :object } }
+        ),
         created_at: DATE_TIME,
         updated_at: DATE_TIME
       ),
@@ -910,7 +938,8 @@ module Openapi
               query_parameter(:page, type: :integer),
               query_parameter(:limit, type: :integer),
               query_parameter(:sort_by, type: :string),
-              query_parameter(:sort_order, enum: SortConstants::Order::ALL)
+              query_parameter(:sort_order, enum: SortConstants::Order::ALL),
+              query_parameter(:discarded, type: :boolean)
             ],
             errors: [ 401, 403 ]
           ),
@@ -921,20 +950,6 @@ module Openapi
             success: 201,
             body: ref(:admin_version_request),
             errors: [ 401, 403, 422 ]
-          )
-        },
-        "/v1/admin/client/versions/discarded" => {
-          get: operation(
-            tags: "Admin / Versions",
-            summary: "List discarded versions",
-            description: "Super-admin only.",
-            parameters: [
-              query_parameter(:page, type: :integer),
-              query_parameter(:limit, type: :integer),
-              query_parameter(:sort_by, type: :string),
-              query_parameter(:sort_order, enum: SortConstants::Order::ALL)
-            ],
-            errors: [ 401, 403 ]
           )
         },
         "/v1/admin/client/versions/{id}" => {
@@ -1008,11 +1023,8 @@ module Openapi
             tags: "Users",
             summary: "Update the current user's name and username",
             body: ref(:current_user_update_request),
-            errors: [ 401, 403, 422 ]
+            errors: [ 401, 422 ]
           )
-        },
-        "/v1/users/current/iam" => {
-          get: operation(tags: "Users", summary: "Get the current user's roles and permissions", errors: [ 401 ])
         }
       }
 
@@ -1022,18 +1034,11 @@ module Openapi
                          query_parameter(:limit, type: :integer, minimum: 1),
                          query_parameter(:search, type: :string),
                          query_parameter(:sort_by, type: :string),
-                         query_parameter(:sort_order, enum: SortConstants::Order::ALL)
+                         query_parameter(:sort_order, enum: SortConstants::Order::ALL),
+                         query_parameter(:discarded, type: :boolean)
                        ], errors: [ 401, 403 ]),
         post: operation(tags: "Admin / Users", summary: "Create an admin-managed user", success: 201,
                         body: ref(:admin_user_request), errors: [ 401, 403, 422 ])
-      }
-      paths["/v1/admin/users/discarded"] = {
-        get: operation(tags: "Admin / Users", summary: "List discarded users in the recycle bin",
-                       parameters: [
-                         query_parameter(:limit, type: :integer, minimum: 1),
-                         query_parameter(:sort_by, type: :string),
-                         query_parameter(:sort_order, enum: SortConstants::Order::ALL)
-                       ], errors: [ 401, 403 ])
       }
       paths["/v1/admin/users/{id}"] = {
         get: operation(tags: "Admin / Users", summary: "Get an admin-managed user",
@@ -1053,14 +1058,18 @@ module Openapi
                        parameters: [
                          query_parameter(:limit, type: :integer, minimum: 1),
                          query_parameter(:sort_by, type: :string),
-                         query_parameter(:sort_order, enum: SortConstants::Order::ALL)
+                         query_parameter(:sort_order, enum: SortConstants::Order::ALL),
+                         query_parameter(:discarded, type: :boolean)
                        ], errors: [ 401, 403 ]),
         post: operation(tags: "Admin / IAM Roles", summary: "Create an admin-managed role", success: 201,
                         body: ref(:role_request), errors: [ 401, 403, 422 ])
       }
       paths["/v1/admin/iam/permissions"] = {
         get: operation(tags: "Admin / IAM Permissions", summary: "List permissions for the admin client",
-                       parameters: [ query_parameter(:limit, type: :integer, minimum: 1) ], errors: [ 401, 403 ]),
+                       parameters: [
+                         query_parameter(:limit, type: :integer, minimum: 1),
+                         query_parameter(:discarded, type: :boolean)
+                       ], errors: [ 401, 403 ]),
         post: operation(tags: "Admin / IAM Permissions", summary: "Create an admin-managed permission", success: 201,
                         body: ref(:permission_request), errors: [ 401, 403, 422 ])
       }
@@ -1073,6 +1082,12 @@ module Openapi
         delete: operation(tags: "Admin / IAM Roles", summary: "Delete an admin-managed role",
                           parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422 ])
       }
+      %w[discard undiscard].each do |action|
+        paths["/v1/admin/iam/roles/{id}/#{action}"] = {
+          post: operation(tags: "Admin / IAM Roles", summary: "#{action.capitalize} an admin-managed role",
+                          parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422 ])
+        }
+      end
       paths["/v1/admin/iam/permissions/{id}"] = {
         get: operation(tags: "Admin / IAM Permissions", summary: "Get an admin-managed permission",
                        parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ]),
@@ -1080,8 +1095,14 @@ module Openapi
                          parameters: [ path_parameter(:id) ], body: ref(:permission_request),
                          errors: [ 401, 403, 404, 422 ]),
         delete: operation(tags: "Admin / IAM Permissions", summary: "Delete an admin-managed permission",
-                          parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ])
+                          parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422 ])
       }
+      %w[discard undiscard].each do |action|
+        paths["/v1/admin/iam/permissions/{id}/#{action}"] = {
+          post: operation(tags: "Admin / IAM Permissions", summary: "#{action.capitalize} an admin-managed permission",
+                          parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422 ])
+        }
+      end
       paths["/v1/admin/chat/rooms"] = {
         get: operation(tags: "Admin / Chat Rooms", summary: "List chat rooms for the admin client",
                        parameters: [
@@ -1116,6 +1137,14 @@ module Openapi
         delete: operation(tags: "Admin / Chat Messages", summary: "Delete an admin chat message",
                           parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ])
       }
+      [ [ "rooms", "room" ], [ "messages", "message" ] ].each do |collection, resource|
+        %w[discard undiscard].each do |action|
+          paths["/v1/admin/chat/#{collection}/{id}/#{action}"] = {
+            post: operation(tags: "Admin / Chat #{collection.capitalize}", summary: "#{action.capitalize} an admin chat #{resource}",
+                            parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422 ])
+          }
+        end
+      end
       paths["/v1/admin/payment/products"] = {
         get: operation(tags: "Admin / Payment Products", summary: "List Stripe-backed products for the admin client",
                        parameters: [
@@ -1125,14 +1154,6 @@ module Openapi
                        ], errors: [ 401, 403 ]),
         post: operation(tags: "Admin / Payment Products", summary: "Create a Stripe-backed product", success: 201,
                         body: ref(:admin_product_request), errors: [ 401, 403, 422 ])
-      }
-      paths["/v1/admin/payment/products/discarded"] = {
-        get: operation(tags: "Admin / Payment Products", summary: "List discarded Stripe-backed products for the recycle bin",
-                       parameters: [
-                         query_parameter(:limit, type: :integer, minimum: 1),
-                         query_parameter(:sort_by, type: :string),
-                         query_parameter(:sort_order, enum: SortConstants::Order::ALL)
-                       ], errors: [ 401, 403 ])
       }
       paths["/v1/admin/payment/products/{id}"] = {
         get: operation(tags: "Admin / Payment Products", summary: "Get a Stripe-backed product",
@@ -1195,14 +1216,14 @@ module Openapi
           body: ref(:user_role_request), errors: [ 401, 403, 404, 422 ]
         )
       }
-      paths["/v1/iam/users/{user_id}/roles/{id}"] = {
+      paths["/v1/iam/users/{user_id}/roles/{role_id}"] = {
         delete: operation(tags: "IAM User Roles", summary: "Remove a role from a user",
-                          parameters: [ path_parameter(:user_id), path_parameter(:id, "Role ID") ],
-                          errors: [ 401, 403, 404 ])
+                          parameters: [ path_parameter(:user_id), path_parameter(:role_id, "Role ID") ],
+                          errors: [ 401, 403, 404, 422 ])
       }
 
-      log_filters = %i[severity platform environment unresolved resolved storage_issues].map do |name|
-        query_parameter(name, type: name.in?(%i[unresolved resolved storage_issues]) ? :boolean : :string)
+      log_filters = %i[severity platform environment discarded unresolved resolved storage_issues].map do |name|
+        query_parameter(name, type: name.in?(%i[discarded unresolved resolved storage_issues]) ? :boolean : :string)
       end
       paths["/v1/client/logs"] = {
         get: operation(tags: "Client Logs", summary: "List and filter client error reports",
@@ -1227,9 +1248,21 @@ module Openapi
                          parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ])
         }
       end
+      %w[discard undiscard].each do |action|
+        paths["/v1/client/logs/{id}/#{action}"] = {
+          post: operation(
+            tags: "Client Logs",
+            summary: action == "discard" ? "Move a client error to the recycle bin" : "Restore a discarded client error",
+            parameters: [ path_parameter(:id) ],
+            errors: [ 401, 403, 404 ]
+          )
+        }
+      end
 
       paths["/v1/media/upload"] = {
-        post: operation(tags: "Media", summary: "Upload and persist an asset", success: 201,
+        post: operation(tags: "Media", summary: "Upload and persist an asset",
+                        description: "SVG uploads are converted to PNG at save time, fitted to IMAGE_MAX_WIDTH x IMAGE_MAX_HEIGHT, stored with extension png, and marked optimal. They do not enter the image compression pipeline. Existing stored SVG assets are not converted until re-uploaded.",
+                        success: 201,
                         body: ref(:asset_upload_request), errors: [ 401, 422, 500 ])
       }
       paths["/v1/media/upload"][:post][:requestBody] = {
@@ -1241,6 +1274,21 @@ module Openapi
         }
       }
       paths["/v1/admin/notifications"] = {
+        get: operation(
+          tags: "Admin / Notifications",
+          summary: "List notification templates",
+          parameters: [
+            query_parameter(:category), query_parameter(:search),
+            query_parameter(:page, type: :integer), query_parameter(:limit, type: :integer)
+          ],
+          errors: [ 401, 403 ]
+        ),
+        post: operation(
+          tags: "Admin / Notifications", summary: "Create a notification template", success: 201,
+          body: ref(:notification_template_request), errors: [ 401, 403, 422 ]
+        )
+      }
+      paths["/v1/admin/notifications/dispatch"] = {
         post: operation(
           tags: "Admin / Notifications",
           summary: "Queue an admin notification for selected users, selected roles, or all users",
@@ -1254,6 +1302,19 @@ module Openapi
           body: ref(:notification_request),
           errors: [ 401, 403, 422, 503 ]
         )
+      }
+      paths["/v1/admin/notifications/{id}"] = {
+        get: operation(tags: "Admin / Notifications", summary: "Get a notification template",
+                       parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ]),
+        put: operation(tags: "Admin / Notifications", summary: "Update a notification template",
+                       parameters: [ path_parameter(:id) ], body: ref(:notification_template_request),
+                       errors: [ 401, 403, 404, 422 ]),
+        delete: operation(tags: "Admin / Notifications", summary: "Discard a notification template",
+                          parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ])
+      }
+      paths["/v1/admin/notifications/{id}/undiscard"] = {
+        post: operation(tags: "Admin / Notifications", summary: "Restore a discarded notification template",
+                        parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422 ])
       }
       paths["/v1/admin/notifications/templates"] = {
         get: operation(
@@ -1368,21 +1429,29 @@ module Openapi
         get: operation(tags: "Admin / Assets", summary: "List and filter assets for admins",
                        parameters: asset_filters + [
                          query_parameter(:page, type: :integer),
-                         query_parameter(:limit, type: :integer)
+                         query_parameter(:limit, type: :integer),
+                         query_parameter(:discarded, type: :boolean)
                        ],
                        errors: [ 401, 403 ])
       }
-      paths["/v1/admin/assets/discarded"] = {
-        get: operation(tags: "Admin / Assets", summary: "List discarded assets in the recycle bin",
-                       parameters: [
-                         query_parameter(:limit, type: :integer),
-                         query_parameter(:page, type: :integer),
-                         query_parameter(:sort_by, type: :string),
-                         query_parameter(:sort_order, enum: SortConstants::Order::ALL)
-                       ], errors: [ 401, 403 ])
+      paths["/v1/admin/assets/storage_stats"] = {
+        get: operation(tags: "Admin / Assets", summary: "Get database, Garage partition, and host storage statistics",
+                       description: "Super-admin only.", errors: [ 401, 403, 503 ])
       }
+      paths["/v1/admin/assets/bin"] = {
+        delete: operation(tags: "Admin / Assets", summary: "Permanently empty the asset recycle bin",
+                          errors: [ 401, 403, 422 ])
+      }
+      %w[discard_batch undiscard_batch destroy_batch].each do |action|
+        paths["/v1/admin/assets/#{action}"] = {
+          post: operation(tags: "Admin / Assets", summary: "#{action.humanize} assets",
+                          body: ref(:id_batch_request), errors: [ 401, 403, 404, 422 ])
+        }
+      end
       paths["/v1/admin/assets/upload"] = {
-        post: operation(tags: "Admin / Assets", summary: "Upload and persist an asset via admin", success: 201,
+        post: operation(tags: "Admin / Assets", summary: "Upload and persist an asset via admin",
+                        description: "SVG uploads are converted to PNG at save time, fitted to IMAGE_MAX_WIDTH x IMAGE_MAX_HEIGHT, stored with extension png, and marked optimal. They do not enter the image compression pipeline. Existing stored SVG assets are not converted until re-uploaded.",
+                        success: 201,
                         body: ref(:asset_upload_request), errors: [ 401, 403, 422, 500 ])
       }
       paths["/v1/admin/assets/upload"][:post][:requestBody] = {
@@ -1422,6 +1491,7 @@ module Openapi
       }
       paths["/v1/admin/assets/{id}/thumbnail/upload"] = {
         post: operation(tags: "Admin / Assets", summary: "Upload and replace a thumbnail for a compressible video or audio asset",
+                        description: "SVG covers are converted to PNG at save time and stored as optimal. Thumbnail upload does not enqueue compression. Other image formats are stored as uploaded.",
                         parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422, 500 ])
       }
       paths["/v1/admin/assets/{id}/thumbnail/upload"][:post][:requestBody] = {
@@ -1445,6 +1515,28 @@ module Openapi
                          parameters: [ path_parameter(:id) ], body: ref(:asset_update_request), errors: [ 401, 403, 404, 422 ]),
         delete: operation(tags: "Assets", summary: "Delete asset record",
                           parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ])
+      }
+
+      paths["/v1/notifications"] = {
+        get: operation(tags: "Notifications", summary: "List the current user's in-app notifications",
+                       parameters: [ query_parameter(:filter), query_parameter(:page, type: :integer),
+                                     query_parameter(:limit, type: :integer) ], errors: [ 401 ])
+      }
+      paths["/v1/notifications/unread_count"] = {
+        get: operation(tags: "Notifications", summary: "Get the current user's unread notification count",
+                       errors: [ 401 ])
+      }
+      paths["/v1/notifications/read_all"] = {
+        put: operation(tags: "Notifications", summary: "Mark all current-user notifications as read",
+                       errors: [ 401 ])
+      }
+      paths["/v1/notifications/{id}/read"] = {
+        put: operation(tags: "Notifications", summary: "Mark a current-user notification as read",
+                       parameters: [ path_parameter(:id) ], errors: [ 401, 404 ])
+      }
+      paths["/v1/notifications/{id}"] = {
+        delete: operation(tags: "Notifications", summary: "Remove a current-user notification",
+                          parameters: [ path_parameter(:id) ], errors: [ 401, 404 ])
       }
 
       room_parameter = query_parameter(:room_id, required: false, format: :uuid,

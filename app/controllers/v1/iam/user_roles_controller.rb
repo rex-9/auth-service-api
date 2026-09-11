@@ -23,7 +23,10 @@ class V1::Iam::UserRolesController < V1::ApplicationController
     user = User.find(params[:user_id])
     role = Iam::Role.find(params[:role_id])
 
-    user_role = Iam::UserRole.find_or_create_by!(user: user, role: role)
+    user_role = Iam::UserRole.find_or_initialize_by(user: user, role: role)
+    role_changed = user_role.new_record?
+    user_role.save!
+    NotificationService::Center.iam_updated(user) if role_changed
 
     render_json_response(
       status_code: 200,
@@ -43,7 +46,25 @@ class V1::Iam::UserRolesController < V1::ApplicationController
     user_role = Iam::UserRole.find_by(user: user, role: role)
 
     if user_role
-      user_role.destroy
+      if role.name == IamConstants::Role::SUPER_ADMIN
+        removed = role.with_lock do
+          if role.users.count <= 1
+            render_json_response(
+              status_code: 422,
+              message: iam_message(MessageService::Iam::LAST_SUPER_ADMIN_ROLE_PROTECTED)
+            )
+            false
+          else
+            user_role.destroy!
+            true
+          end
+        end
+        return unless removed
+      else
+        user_role.destroy!
+      end
+
+      NotificationService::Center.iam_updated(user)
       render_json_response(
         status_code: 200,
         message: iam_message(MessageService::Iam::ROLE_REMOVED)

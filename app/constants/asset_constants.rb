@@ -73,9 +73,10 @@ module AssetConstants
       "#{USER_NAMESPACE}/#{user_id}/#{type}_#{base}_#{Time.now.to_i}#{ext}".freeze
     end
 
-    def self.thumbnail_for(asset, version: nil)
+    def self.thumbnail_for(asset, version: nil, extension: MediaConstants::IMAGE_EXT_WEBP)
       suffix = version.present? ? "_#{version}" : ""
-      "#{File.dirname(asset.storage_key)}/thumbnail_#{asset.id}#{suffix}.webp".freeze
+      ext = extension.to_s.delete(".").presence || MediaConstants::IMAGE_EXT_WEBP
+      "#{File.dirname(asset.storage_key)}/thumbnail_#{asset.id}#{suffix}.#{ext}".freeze
     end
 
     def self.rename_type(old_key, new_type, user_id = nil)

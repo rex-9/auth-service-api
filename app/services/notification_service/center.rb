@@ -339,6 +339,16 @@ module NotificationService
         )
       end
 
+      def iam_updated(user)
+        notify(
+          user_id: user.id,
+          title: notification_message(MessageService::Notification::IAM_UPDATED_TITLE),
+          message: notification_message(MessageService::Notification::IAM_UPDATED_BODY),
+          data: { type: NotificationConstants::NotificationType::IAM_UPDATED },
+          send_socket: true
+        )
+      end
+
       # ===== EMAIL ONLY =====
 
       def confirmation_email(email:, code:, **kwargs)

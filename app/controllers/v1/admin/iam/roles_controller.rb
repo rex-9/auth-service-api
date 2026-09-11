@@ -54,7 +54,17 @@ class V1::Admin::Iam::RolesController < V1::ApplicationController
   # PATCH/PUT /v1/admin/iam/roles/:id
   def update
     if @role.update(role_params)
-      assign_permissions(@role) if permission_ids_param_provided?
+      permissions_changed = begin
+        permission_ids_param_provided? && assign_permissions(@role)
+      rescue ActiveRecord::RecordNotDestroyed => error
+        render_json_response(
+          status_code: 422,
+          message: iam_message(MessageService::Iam::ROLE_UPDATE_FAILED),
+          error: error.record.errors.full_messages.to_sentence
+        )
+        return
+      end
+      notify_assigned_users(@role) if permissions_changed
 
       render_json_response(
         status_code: 200,
@@ -144,10 +154,22 @@ class V1::Admin::Iam::RolesController < V1::ApplicationController
   def assign_permissions(role)
     permission_ids = Array(permission_ids_param).reject(&:blank?)
     permissions = ::Iam::Permission.where(id: permission_ids)
+    current_permission_ids = role.permission_ids.map(&:to_s).sort
+    next_permission_ids = permissions.pluck(:id).map(&:to_s).sort
 
-    role.role_permissions.destroy_all
+    return false if current_permission_ids == next_permission_ids
+
+    role.role_permissions.where.not(permission_id: next_permission_ids).find_each(&:destroy!)
     permissions.each do |permission|
       role.role_permissions.find_or_create_by!(permission: permission)
+    end
+
+    true
+  end
+
+  def notify_assigned_users(role)
+    role.users.find_each do |user|
+      NotificationService::Center.iam_updated(user)
     end
   end
 

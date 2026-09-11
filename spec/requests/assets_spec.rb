@@ -108,6 +108,33 @@ RSpec.describe "Asset uploads", type: :request do
     expect(response_status["error"]).to eq("ဖိုင်အရွယ်အစားသည် သတ်မှတ်ထားသော ကန့်သတ်ချက်ထက် ကျော်လွန်နေပါသည် (#{MediaConstants::MAX_NON_VIDEO_SIZE_MB}MB)")
   end
 
+  it "converts SVG to PNG on save as optimal without enqueueing image compression" do
+    svg_file = fixture_file_upload("icon.svg", "image/svg+xml")
+    tmpdir = Dir.mktmpdir("svg_to_png_spec")
+    png_path = File.join(tmpdir, "icon.png")
+    File.binwrite(png_path, "FAKEPNG")
+    conversion = MediaService::SvgToPng::Result.new(file: png_path, filename: "icon.png", tmpdir: tmpdir)
+    allow(MediaService::SvgToPng).to receive(:prepare).and_return(conversion)
+    allow(Media::CompressImageJob).to receive(:perform_later)
+    allow(StorageService::Client).to receive(:upload).and_return(
+      storage_key: "user/#{user.id}/general_icon.png",
+      url: "https://cdn.example.com/icon.png",
+      bytes: 8,
+      format: "png",
+      resource_type: "image"
+    )
+
+    post "/v1/media/upload", params: { file: svg_file }, headers: headers
+
+    expect(response).to have_http_status(:created)
+    expect(Asset.last).to have_attributes(extension: "png", format: "image", status: "optimal")
+    expect(StorageService::Client).to have_received(:upload).with(
+      png_path,
+      hash_including(storage_key: a_string_matching(/\.png$/), resource_type: "image")
+    )
+    expect(Media::CompressImageJob).not_to have_received(:perform_later)
+  end
+
   def grant_asset_create_permission(account)
     role = create(:role, name: "asset_uploader")
     permission = create(:permission, action: "create", resource: "assets")
