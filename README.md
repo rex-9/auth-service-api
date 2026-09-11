@@ -18,7 +18,7 @@ Built under a simple creed: **clear in thought, exact in structure, simple in us
 
 **API-first · Modular · Observable · Queue-aware · Built to grow**
 
-[Explore the foundation](#feature-map) · [Ecosystem Architecture](ECOSYSTEM.md) · [Development Law](LAW.md) · [Production Deployment](docs/DEPLOYMENT.md) · [Security Hardening](docs/DDOS.md) · [Analytics Guide](docs/ANALYTICS.md) · [Run it locally](#getting-started) · [Open the dashboards](#operations-center) · [Meet the architecture](#architecture)
+[Explore the foundation](#feature-map) · [Ecosystem Architecture](ECOSYSTEM.md) · [Development Law](LAW.md) · [Production Deployment](docs/DEPLOYMENT.md) · [Security Hardening](docs/DDOS.md) · [Async Operations](docs/ASYNC_OPERATIONS.md) · [Analytics Guide](docs/ANALYTICS.md) · [Run it locally](#getting-started) · [Open the dashboards](#operations-center) · [Meet the architecture](#architecture)
 
 </div>
 
@@ -69,22 +69,22 @@ Just deliberate engineering, tested boundaries, and a foundation built to remain
 
 ## Feature map
 
-| Foundation     | What is ready                                                                                           | Details                                                |
-| -------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| Identity       | Devise, JWT, confirmation, recovery, Google sign-in, platform sessions                                  | [Authentication & security](#authentication--security) |
-| Authorization  | Roles, permissions, user-role and role-permission assignments                                           | [IAM & access control](#iam--access-control)           |
-| Commerce       | Stripe Checkout, products, transactions, subscriptions, access grants                                   | [Payments & entitlements](#payments--entitlements)     |
-| Async work     | Solid Queue, dedicated queues, retries, concurrency controls, recurring cleanup                         | [Background processing](#background-processing)        |
-| Notifications  | Socket, push, and email coordination through OneSignal and Action Cable                                 | [Notifications & real time](#notifications--real-time) |
-| Media          | Garage S3/Cloudinary/local storage, underground silent compression (libvips/FFmpeg), optimal-first flow | [Storage & assets](#storage--assets)                   |
-| Speech         | Synchronous & async TTS (MP3 binary stream), batch STT, live audio WebSocket streaming (Azure/Nova)     | [Speech capabilities](#speech-capabilities)            |
-| AI             | Durable queued chat, persisted history, completion alerts, and language tools                           | [AI capabilities](#ai-capabilities)                    |
-| Localization   | Request-scoped English and Myanmar responses with modular domain translations                           | [Localization](#localization)                          |
-| Data lifecycle | PostgreSQL, global soft deletion, actor-aware auditing, JSON:API serialization                          | [Data & API design](#data--api-design)                 |
-| Operations     | Performance, errors, client logs, queues, cache, cable, health checks                                   | [Observability](#observability)                        |
+| Foundation     | What is ready                                                                                                     | Details                                                |
+| -------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| Identity       | Devise, JWT, confirmation, recovery, Google sign-in, platform sessions                                            | [Authentication & security](#authentication--security) |
+| Authorization  | Roles, permissions, user-role and role-permission assignments                                                     | [IAM & access control](#iam--access-control)           |
+| Commerce       | Stripe Checkout, products, transactions, subscriptions, access grants                                             | [Payments & entitlements](#payments--entitlements)     |
+| Async work     | Solid Queue, dedicated queues, retries, concurrency controls, recurring cleanup                                   | [Background processing](#background-processing)        |
+| Notifications  | Socket, push, and email coordination through OneSignal and Action Cable                                           | [Notifications & real time](#notifications--real-time) |
+| Media          | Garage S3/Cloudinary/local storage, underground silent compression (libvips/FFmpeg), optimal-first flow           | [Storage & assets](#storage--assets)                   |
+| Speech         | Synchronous & async TTS (MP3 binary stream), batch STT, live audio WebSocket streaming (Azure/Nova)               | [Speech capabilities](#speech-capabilities)            |
+| AI             | Durable queued chat, persisted history, completion alerts, and language tools                                     | [AI capabilities](#ai-capabilities)                    |
+| Localization   | Request-scoped English and Myanmar responses with modular domain translations                                     | [Localization](#localization)                          |
+| Data lifecycle | PostgreSQL, global soft deletion, actor-aware auditing, JSON:API serialization                                    | [Data & API design](#data--api-design)                 |
+| Operations     | Performance, errors, client logs, queues, cache, cable, health checks                                             | [Observability](#observability)                        |
 | Administration | Administrate for Server plus Client Admin API for users, IAM, products, chat, assets, notifications, app versions | [Administration](#administration)                      |
-| Delivery       | Docker images, 5-container topology (API/waka/media/db/garage), graceful shutdown                       | [Deployment](#deployment)                              |
-| Quality        | RSpec, factories, security scanning, dependency auditing, linting                                       | [Quality toolchain](#quality-toolchain)                |
+| Delivery       | Docker images, 5-container topology (API/waka/media/db/garage), graceful shutdown                                 | [Deployment](#deployment)                              |
+| Quality        | RSpec, factories, security scanning, dependency auditing, linting                                                 | [Quality toolchain](#quality-toolchain)                |
 
 ## Architecture
 
@@ -200,6 +200,8 @@ The important distinction is deliberate: customer-facing payment flows remain re
 - Transactional and marketing email delivery.
 
 Each enabled channel receives its own Solid Queue job. A failed email therefore does not repeat a successful push, and a notification provider outage does not roll back a completed payment or authentication action.
+
+Client-visible queued work follows the shared `queued -> processing -> completed | failed` contract with a stable operation ID and resource link. See [Asynchronous operation contract](docs/ASYNC_OPERATIONS.md).
 
 - **Persistent In-App Notifications (`user_notifications`)**:
   - In-app socket broadcasts are persisted to `user_notifications` as immutable historical receipts (`title`, `message`, `link`, `data`, `read_at`).
@@ -394,18 +396,18 @@ A separate `/v1/admin` namespace supports the web admin client, exposing version
 
 Operational dashboards are mounted in the application and protected by admin authentication. API documentation and the health endpoint are listed alongside them for convenience.
 
-| Path                  | Purpose                                      |
-| --------------------- | -------------------------------------------- |
-| `/admin`              | Administrate resource management             |
-| `/admin/client/versions`     | App versions (super-admin only)              |
-| `/admin/client/user_versions` | User version snapshots (index/show)          |
-| `/admin/pulse`        | Request, query, and job performance          |
-| `/admin/red`          | Backend errors and diagnostics               |
-| `/admin/queue`        | Solid Queue inspection and control           |
-| `/admin/cache`        | Solid Cache inspection                       |
-| `/admin/cable`        | Solid Cable inspection                       |
-| `/api-docs`           | Swagger/OpenAPI documentation                |
-| `/up`                 | Application health check                     |
+| Path                          | Purpose                             |
+| ----------------------------- | ----------------------------------- |
+| `/admin`                      | Administrate resource management    |
+| `/admin/client/versions`      | App versions (super-admin only)     |
+| `/admin/client/user_versions` | User version snapshots (index/show) |
+| `/admin/pulse`                | Request, query, and job performance |
+| `/admin/red`                  | Backend errors and diagnostics      |
+| `/admin/queue`                | Solid Queue inspection and control  |
+| `/admin/cache`                | Solid Cache inspection              |
+| `/admin/cable`                | Solid Cable inspection              |
+| `/api-docs`                   | Swagger/OpenAPI documentation       |
+| `/up`                         | Application health check            |
 
 Client-side errors are accepted at `POST /v1/client/logs` and managed from the admin area.
 
@@ -471,6 +473,15 @@ Review and replace seeded credentials before using them outside local developmen
 ### Useful commands
 
 ```bash
+# Run the complete Core CI suite locally
+./scripts/ci.sh
+
+# Validate OpenAPI, channels, and socket contracts
+./scripts/ci.sh contracts
+
+# Validate English/Myanmar locale parity and MessageService keys
+./scripts/check_locales.sh
+
 # Rails console
 ./scripts/console.sh
 
@@ -479,12 +490,6 @@ Review and replace seeded credentials before using them outside local developmen
 
 # Run the repository test script (RSpec)
 ./scripts/test.sh
-
-# Continuous Integration (GitHub Actions)
-# Automated PR workflow (.github/workflows/test.yml) executes:
-#   1. Syntax & autoload verification: bin/rails zeitwerk:check
-#   2. Test database preparation: bin/rails db:test:prepare
-#   3. RSpec test suite (excluding system/e2e specs): bundle exec rspec --tag ~type:system --tag ~e2e
 
 # Automated Backups
 ./scripts/backup_all.sh     # Backs up both PostgreSQL and Garage S3 storage
@@ -501,6 +506,8 @@ bin/brakeman
 # Run linting
 bin/rubocop
 ```
+
+The same `scripts/ci.sh` entry point serves both environments: local runs use Docker Compose, while GitHub Actions runs Rails natively against its PostgreSQL service and restores gems from Bundler's `Gemfile.lock` cache.
 
 ## Configuration
 

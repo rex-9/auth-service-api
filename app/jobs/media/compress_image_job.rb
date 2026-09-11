@@ -4,12 +4,16 @@ module Media
   class CompressImageJob < ApplicationJob
     queue_as :media
 
-    retry_on MediaService::CompressionError, wait: :polynomially_longer, attempts: 3
-    retry_on StorageService::Error, wait: :polynomially_longer, attempts: 3
+    retry_on MediaService::CompressionError, StorageService::Error,
+             wait: :polynomially_longer, attempts: 3 do |job, error|
+      job.send(:mark_retry_exhausted!, error)
+    end
     discard_on ActiveRecord::RecordNotFound
 
-    def perform(asset_id:)
+    def perform(asset_id:, notification_user_id: nil, operation_id: nil)
       @asset = Asset.find(asset_id)
+      @notification_user_id = notification_user_id.presence || @asset.created_by_id.presence || @asset.updated_by_id.presence
+      @operation_id = operation_id.presence || "#{NotificationConstants::OperationType::ASSET_COMPRESSION}:#{@asset.id}:#{job_id}"
       return if @asset.optimal? || @asset.max_compressed?
 
       @asset.mark_processing!
@@ -53,16 +57,33 @@ module Media
       end
 
       Rails.logger.info("[CompressImageJob] Completed for asset #{asset_id} (pass #{count}/#{MediaConstants::MAX_COMPRESSION_PASSES})")
+    rescue MediaService::CompressionError, StorageService::Error => e
+      Rails.logger.warn("[CompressImageJob] Retriable failure for asset #{asset_id}: #{e.message}")
+      raise
     rescue StandardError => e
-      @asset&.mark_failed! if @asset&.persisted?
-      broadcast_status_change(MediaConstants::Status::FAILED)
-      Rails.logger.error("[CompressImageJob] Failed for asset #{asset_id}: #{e.message}")
+      mark_failed!(e)
       raise
     ensure
       cleanup_temp_files
     end
 
     private
+
+    def mark_retry_exhausted!(error)
+      arguments = self.arguments.first.with_indifferent_access
+      @asset = Asset.find_by(id: arguments[:asset_id])
+      return unless @asset
+
+      @notification_user_id = arguments[:notification_user_id].presence || @asset.created_by_id.presence || @asset.updated_by_id.presence
+      @operation_id = arguments[:operation_id].presence || "#{NotificationConstants::OperationType::ASSET_COMPRESSION}:#{@asset.id}:#{job_id}"
+      mark_failed!(error)
+    end
+
+    def mark_failed!(error)
+      @asset&.mark_failed! if @asset&.persisted?
+      broadcast_status_change(MediaConstants::Status::FAILED)
+      Rails.logger.error("[CompressImageJob] Failed for asset #{@asset&.id}: #{error.message}")
+    end
 
     def broadcast_status_change(status)
       return unless @asset
@@ -95,12 +116,26 @@ module Media
               MessageService::Admin::Asset.t(MessageService::Admin::Asset::COMPRESSION_IN_PROGRESS, name: @asset.name)
       end
 
-      user_id = @asset.created_by_id.presence || @asset.updated_by_id.presence
-      if user_id.present?
-        SocketService::Client.broadcast(user_id: user_id, message: msg, data: payload)
-      end
+      return if @notification_user_id.blank?
+
+      NotificationService::Center.operation(
+        user_id: @notification_user_id,
+        operation_id: @operation_id,
+        operation_type: NotificationConstants::OperationType::ASSET_COMPRESSION,
+        operation_status: operation_status(status),
+        message: msg,
+        link: "/admin/assets/#{@asset.id}",
+        data: payload
+      )
     rescue => e
       Rails.logger.error("[CompressImageJob] Broadcast error for asset #{@asset.id}: #{e.message}")
+    end
+
+    def operation_status(status)
+      return NotificationConstants::OperationStatus::FAILED if status == MediaConstants::Status::FAILED
+      return NotificationConstants::OperationStatus::PROCESSING if status == MediaConstants::Status::PROCESSING
+
+      NotificationConstants::OperationStatus::COMPLETED
     end
 
     def download_from_storage

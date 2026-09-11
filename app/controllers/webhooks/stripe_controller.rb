@@ -56,7 +56,9 @@ class Webhooks::StripeController < ActionController::API
     render json: {
       received: true,
       event_id: webhook_event.stripe_event_id,
-      status: "queued",
+      status: NotificationConstants::OperationStatus::QUEUED,
+      operation_id: "#{NotificationConstants::OperationType::PAYMENT_WEBHOOK}:#{webhook_event.id}",
+      operation_type: NotificationConstants::OperationType::PAYMENT_WEBHOOK,
       job_id: job.job_id
     }, status: :ok
 

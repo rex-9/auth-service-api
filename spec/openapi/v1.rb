@@ -120,6 +120,16 @@ module Openapi
     end
 
     SCHEMAS = {
+      async_operation: object(
+        required: %i[operation_id operation_type operation_status link],
+        operation_id: { type: :string, description: "Stable identifier shared by every lifecycle update." },
+        operation_type: {
+          type: :string,
+          enum: NotificationConstants::OperationType::ALL
+        },
+        operation_status: { type: :string, enum: NotificationConstants::OperationStatus::ALL },
+        link: { type: :string, description: "Client route for the affected resource." }
+      ),
       signup_request: object(
         required: [ :user ],
         user: object(
@@ -299,7 +309,7 @@ module Openapi
           },
           expires_at: {
             type: :string,
-            format: :date_time,
+            format: "date-time",
             nullable: true,
             description: "Explicit expiration timestamp. Calculated from days if omitted."
           }
@@ -309,7 +319,7 @@ module Openapi
         required: [ :access ],
         access: object(
           days: { type: :integer, minimum: 1, nullable: true, example: 30 },
-          expires_at: { type: :string, format: :date_time, nullable: true },
+          expires_at: { type: :string, format: "date-time", nullable: true },
           status: { type: :string, nullable: true, enum: AccessConstants::AccessStatus::ALL }
         )
       ),
@@ -625,14 +635,46 @@ module Openapi
         tts_status: { type: :string, enum: STATUSES, nullable: true, description: "Async TTS state for assistant messages." },
         tts_error: { type: :string, nullable: true, description: "Last TTS failure message when tts_status is failed or retrying." }
       ),
+      response_status: object(
+        required: %i[code success message],
+        code: { type: :integer, example: 200 },
+        success: { type: :boolean, example: true },
+        message: { type: :string }
+      ),
+      current_user_response: object(
+        required: %i[status data],
+        status: ref(:response_status),
+        data: object(required: [ :user ], user: ref(:user))
+      ),
+      asset_operation_response: object(
+        required: %i[status data],
+        status: ref(:response_status),
+        data: object(
+          required: %i[asset operation_id operation_type operation_status link],
+          asset: ref(:asset),
+          operation_id: { type: :string },
+          operation_type: { type: :string, enum: NotificationConstants::OperationType::ALL },
+          operation_status: { type: :string, enum: NotificationConstants::OperationStatus::ALL },
+          link: { type: :string }
+        )
+      ),
+      ai_chat_response: object(
+        required: %i[status data],
+        status: ref(:response_status),
+        data: object(
+          required: %i[message room_id status operation_id operation_type link job_id],
+          message: ref(:message),
+          room_id: UUID,
+          status: { type: :string, enum: NotificationConstants::OperationStatus::ALL },
+          operation_id: { type: :string },
+          operation_type: { type: :string, enum: NotificationConstants::OperationType::ALL },
+          link: { type: :string },
+          job_id: { type: :string }
+        )
+      ),
       response: object(
         required: [ :status ],
-        status: object(
-          required: %i[code success message],
-          code: { type: :integer, example: 200 },
-          success: { type: :boolean, example: true },
-          message: { type: :string }
-        ),
+        status: ref(:response_status),
         data: { nullable: true },
         meta: object(pagination: ref(:pagination))
       ),
@@ -1018,12 +1060,14 @@ module Openapi
           )
         },
         "/v1/users/current" => {
-          get: operation(tags: "Users", summary: "Get the current user", errors: [ 401 ]),
+          get: operation(tags: "Users", summary: "Get the current user", errors: [ 401 ],
+                         success_schema: ref(:current_user_response)),
           put: operation(
             tags: "Users",
             summary: "Update the current user's name and username",
             body: ref(:current_user_update_request),
-            errors: [ 401, 422 ]
+            errors: [ 401, 422 ],
+            success_schema: ref(:current_user_response)
           )
         }
       }
@@ -1478,8 +1522,9 @@ module Openapi
         }
       end
       paths["/v1/admin/assets/{id}/compress"] = {
-        post: operation(tags: "Admin / Assets", summary: "Manually trigger background compression for an image, video, or audio asset",
-                        parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422 ])
+        post: operation(tags: "Admin / Assets", summary: "Manually trigger background compression for an asset",
+                        parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422 ],
+                        success_schema: ref(:asset_operation_response))
       }
       paths["/v1/admin/assets/{id}/download"] = {
         get: operation(tags: "Admin / Assets", summary: "Get a signed attachment URL for an asset",
@@ -1487,7 +1532,8 @@ module Openapi
       }
       paths["/v1/admin/assets/{id}/thumbnail/regenerate"] = {
         post: operation(tags: "Admin / Assets", summary: "Queue video thumbnail regeneration",
-                        success: 202, parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422 ])
+                        success: 202, parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422 ],
+                        success_schema: ref(:asset_operation_response))
       }
       paths["/v1/admin/assets/{id}/thumbnail/upload"] = {
         post: operation(tags: "Admin / Assets", summary: "Upload and replace a thumbnail for a compressible video or audio asset",
@@ -1550,7 +1596,8 @@ module Openapi
                                        description: "Uses or creates the current room when omitted")
       paths["/v1/ai/chat"] = {
         post: operation(tags: "AI", summary: "Persist and queue a message for an AI room",
-                        body: ref(:ai_chat_request), errors: [ 401, 422, 500, 503 ])
+                        body: ref(:ai_chat_request), errors: [ 401, 422, 500, 503 ],
+                        success_schema: ref(:ai_chat_response))
       }
       paths["/v1/ai/history"] = {
         get: operation(tags: "AI", summary: "Get room message history", parameters: [ room_parameter ], errors: [ 401, 404 ])

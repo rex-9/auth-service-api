@@ -185,7 +185,14 @@ RSpec.describe "V1 Admin Assets API", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response_data.dig("asset", "status")).to eq("pending")
       expect(image_asset.reload.status).to eq("pending")
-      expect(Media::CompressImageJob).to have_received(:perform_later).with(asset_id: image_asset.id)
+      expect(Media::CompressImageJob).to have_received(:perform_later).with(
+        hash_including(
+          asset_id: image_asset.id,
+          notification_user_id: admin.id,
+          operation_id: start_with("asset_compression:#{image_asset.id}:")
+        )
+      )
+      expect(response_data["operation_id"]).to start_with("asset_compression:#{image_asset.id}:")
     end
 
     it "enqueues image compression for webp assets" do
@@ -195,7 +202,13 @@ RSpec.describe "V1 Admin Assets API", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(webp_asset.reload.status).to eq("pending")
-      expect(Media::CompressImageJob).to have_received(:perform_later).with(asset_id: webp_asset.id)
+      expect(Media::CompressImageJob).to have_received(:perform_later).with(
+        hash_including(
+          asset_id: webp_asset.id,
+          notification_user_id: admin.id,
+          operation_id: start_with("asset_compression:#{webp_asset.id}:")
+        )
+      )
     end
 
     it "enqueues video compression for compressible video assets" do
@@ -204,7 +217,14 @@ RSpec.describe "V1 Admin Assets API", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response_data.dig("asset", "status")).to eq("pending")
       expect(video_asset.reload.status).to eq("pending")
-      expect(Media::CompressVideoJob).to have_received(:perform_later).with(asset_id: video_asset.id)
+      expect(Media::CompressVideoJob).to have_received(:perform_later).with(
+        hash_including(
+          asset_id: video_asset.id,
+          notification_user_id: admin.id,
+          operation_id: start_with("asset_compression:#{video_asset.id}:")
+        )
+      )
+      expect(response_data["operation_id"]).to start_with("asset_compression:#{video_asset.id}:")
     end
 
     it "enqueues audio compression for compressible audio assets" do
@@ -213,7 +233,14 @@ RSpec.describe "V1 Admin Assets API", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response_data.dig("asset", "status")).to eq("pending")
       expect(audio_asset.reload.status).to eq("pending")
-      expect(Media::CompressAudioJob).to have_received(:perform_later).with(asset_id: audio_asset.id)
+      expect(Media::CompressAudioJob).to have_received(:perform_later).with(
+        hash_including(
+          asset_id: audio_asset.id,
+          notification_user_id: admin.id,
+          operation_id: start_with("asset_compression:#{audio_asset.id}:")
+        )
+      )
+      expect(response_data["operation_id"]).to start_with("asset_compression:#{audio_asset.id}:")
     end
 
     it "rejects compression for non-compressible assets with 422" do
@@ -289,9 +316,14 @@ RSpec.describe "V1 Admin Assets API", type: :request do
       expect(response).to have_http_status(:accepted)
       expect(response_status["success"]).to be(true)
       expect(Media::GenerateVideoThumbnailJob).to have_received(:perform_later).with(
-        asset_id: video_asset.id,
-        replace: true
+        hash_including(
+          asset_id: video_asset.id,
+          replace: true,
+          notification_user_id: admin.id,
+          operation_id: start_with("video_thumbnail:#{video_asset.id}:")
+        )
       )
+      expect(response_data["operation_id"]).to start_with("video_thumbnail:#{video_asset.id}:")
     end
 
     it "rejects non-video assets" do

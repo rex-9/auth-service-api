@@ -2,6 +2,23 @@
 
 # app/constants/notification_constants.rb
 module NotificationConstants
+  module OperationStatus
+    QUEUED = "queued".freeze
+    PROCESSING = "processing".freeze
+    COMPLETED = "completed".freeze
+    FAILED = "failed".freeze
+    ALL = [ QUEUED, PROCESSING, COMPLETED, FAILED ].freeze
+  end
+
+  module OperationType
+    AI_RESPONSE = "ai_response".freeze
+    ASSET_COMPRESSION = "asset_compression".freeze
+    VIDEO_THUMBNAIL = "video_thumbnail".freeze
+    NOTIFICATION_DELIVERY = "notification_delivery".freeze
+    PAYMENT_WEBHOOK = "payment_webhook".freeze
+    ALL = [ AI_RESPONSE, ASSET_COMPRESSION, VIDEO_THUMBNAIL, NOTIFICATION_DELIVERY, PAYMENT_WEBHOOK ].freeze
+  end
+
   module AudienceType
     ALL       = "all".freeze
     ROLES     = "roles".freeze
