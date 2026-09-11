@@ -135,6 +135,29 @@ RSpec.describe "Asset uploads", type: :request do
     expect(Media::CompressImageJob).not_to have_received(:perform_later)
   end
 
+  describe "GET /v1/assets" do
+    it "returns paginated assets" do
+      create_list(:asset, 3)
+
+      get "/v1/assets", params: { limit: 2 }
+
+      expect(response).to have_http_status(:ok)
+      expect(response_data.size).to eq(2)
+      expect(response_meta.dig("pagination", "total_count")).to eq(3)
+    end
+
+    it "filters assets by type" do
+      create(:asset, type: "video", format: "video", extension: "mp4")
+      create(:asset, type: "avatar")
+
+      get "/v1/assets", params: { type: "video" }
+
+      expect(response).to have_http_status(:ok)
+      expect(response_data.size).to eq(1)
+      expect(response_data.first.dig("attributes", "type")).to eq("video")
+    end
+  end
+
   def grant_asset_create_permission(account)
     role = create(:role, name: "asset_uploader")
     permission = create(:permission, action: "create", resource: "assets")

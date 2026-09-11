@@ -3,9 +3,10 @@ class V1::AssetsController < V1::ApplicationController
   skip_before_action :authenticate_user!, only: [ :index, :show ]
   before_action :set_asset, only: [ :show, :update, :destroy ]
 
-  # GET /assets?page=1&limit=10
+  # GET /v1/assets?type=video&page=1&limit=10
   def index
     assets = Asset.all
+    assets = assets.where(type: params[:type]) if params[:type].present?
     pagy, records = pagy(:offset, assets, limit: params[:limit])
 
     render_json_response(

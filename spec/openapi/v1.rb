@@ -1504,7 +1504,14 @@ module Openapi
       }
 
       paths["/v1/assets"] = {
-        get: operation(tags: "Assets", summary: "List stored assets", errors: [ 401, 403 ]),
+        get: operation(tags: "Assets", summary: "List stored assets",
+                       description: "Optional type filter matches AssetType (avatar, thumbnail, audio, video, attachment, general).",
+                       parameters: [
+                         query_parameter(:type, description: "Filter by asset type"),
+                         query_parameter(:page, type: :integer),
+                         query_parameter(:limit, type: :integer)
+                       ],
+                       errors: [ 401, 403 ]),
         post: operation(tags: "Assets", summary: "Create an asset record", success: 201,
                         body: ref(:asset_request), errors: [ 401, 403, 422 ])
       }

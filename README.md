@@ -259,7 +259,7 @@ The storage abstraction defaults to **Garage** (self-hosted S3-compatible distri
   - `POST /v1/admin/assets/batch_undiscard`: Multi-select restoration (restores multiple discarded assets via `undiscard_batch`).
   - `POST /v1/admin/assets/batch_destroy`: Multi-select permanent purging (hard-deletes selected assets and immediately purges backing objects from Garage S3 via `destroy_batch`).
   - All lifecycle actions map cleanly: `destroy_bin`, `destroy_batch`, `discard_batch`, and `undiscard_batch` resolve uniformly under `:delete` permission in authorization.
-- **Unified Asset Lifecycle**: Uploads return the URL and metadata the client needs immediately while retaining provider identifiers, category, media type, extension, size, source, and ownership.
+- **Unified Asset Lifecycle**: Uploads return the URL and metadata the client needs immediately while retaining provider identifiers, category, media type, extension, size, source, and ownership. `GET /v1/assets` lists stored assets and accepts `type` (`avatar`, `thumbnail`, `audio`, `video`, `attachment`, `general`) plus pagination (`page`, `limit`).
 - **Default Self-Hosted Storage**: `STORAGE_PROVIDER=garage` uses the official `aws-sdk-s3` client connected to the local or production Garage daemon (`http://garage:3100` / `http://localhost:3100`).
 - **Instant Clean Purge**: Storage deletion executes directly (`StorageService::Client.delete`) upon record destruction commit, ensuring storage objects are permanently cleaned without orphan drift.
 - **Provider Switching**: Easily switch between `garage` (S3), `cloudinary`, or `local` via `STORAGE_PROVIDER` without code changes.
@@ -536,7 +536,7 @@ The API is broader than a starter CRUD demo. Its main route families are:
 | Admin API        | `/v1/admin/*`                                                            |
 | Payments         | `/v1/payment/*`, `/webhooks/stripe`                                      |
 | Entitlements     | `/v1/access/*`                                                           |
-| Media            | `/v1/media/upload`                                                       |
+| Media            | `/v1/media/upload`, `/v1/assets`                                         |
 | Notifications    | `/v1/admin/notifications`                                                |
 | AI               | `/v1/ai/*`                                                               |
 | Speech           | `/v1/speech/*`, `SpeechLiveChannel` (WS)                                 |
