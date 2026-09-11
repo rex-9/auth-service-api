@@ -477,6 +477,9 @@ Review and replace seeded credentials before using them outside local developmen
 # Validate OpenAPI, channels, and socket contracts
 ./scripts/ci.sh contracts
 
+# Validate English/Myanmar locale parity and MessageService keys
+./scripts/check_locales.sh
+
 # Rails console
 ./scripts/console.sh
 
