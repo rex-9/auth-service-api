@@ -31,4 +31,4 @@ my:
       too_long: "အများဆုံး စာလုံး %{count} လုံးသာ ရှိရမည်"
       wrong_length: "စာလုံး %{count} လုံး ဖြစ်ရမည်"
       invalid: "မမှန်ပါ"
-      confirmation: "မကိုက်ညီပါ"
+      confirmation: "%{attribute} နှင့် မကိုက်ညီပါ"

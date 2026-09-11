@@ -17,6 +17,8 @@ if [[ "$MODE" != "all" && "$MODE" != "contracts" ]]; then
   exit 2
 fi
 
+./scripts/check_locales.sh
+
 run_native_ci() {
   bin/rails db:test:prepare
 
