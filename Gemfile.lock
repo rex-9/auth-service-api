@@ -705,7 +705,7 @@ DEPENDENCIES
   factory_bot_rails (~> 6.5)
   faker (~> 3.8)
   guard-rspec (~> 4.7)
-  json (~> 2.13)
+  json (< 3.0)
   jsonapi-serializer (~> 2.2)
   jwt (~> 3.2)
   kamal
