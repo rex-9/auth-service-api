@@ -17,7 +17,7 @@ class CreatePaymentTransactions < ActiveRecord::Migration[8.1]
 
       # Payment details
       t.string :currency, null: false
-      t.integer :price_unit_amount, null: false
+      t.integer :unit_amount, null: false
       t.string :status, null: false, default: "requires_payment_method"
 
       # Payment intent metadata

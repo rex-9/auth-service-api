@@ -2,7 +2,7 @@
 class Payment::TransactionSerializer < ApplicationSerializer
   attributes :id, :stripe_payment_intent_id, :stripe_charge_id, :stripe_customer_id,
              :status, :payment_method_id, :payment_method_type,
-             :price_unit_amount, :currency, :client_secret,
+             :unit_amount, :currency, :client_secret,
              :paid_at, :refunded_at, :canceled_at, :processing_at,
              :amount_received, :amount_capturable,
              :created_at, :updated_at, :user_id, :product_id
@@ -11,7 +11,7 @@ class Payment::TransactionSerializer < ApplicationSerializer
   belongs_to :product, serializer: Payment::ProductSerializer, optional: true
 
   # Formatted price
-  attribute :price_unit_amount do |transaction|
+  attribute :price do |transaction|
     transaction.display_price
   end
 
@@ -52,5 +52,21 @@ class Payment::TransactionSerializer < ApplicationSerializer
   # Product details
   attribute :product_name do |transaction|
     transaction.product&.name
+  end
+
+  attribute :product_code do |transaction|
+    transaction.product&.code
+  end
+
+  attribute :user_name do |transaction|
+    transaction.user&.name
+  end
+
+  attribute :username do |transaction|
+    transaction.user&.username
+  end
+
+  attribute :user_email do |transaction|
+    transaction.user&.email
   end
 end

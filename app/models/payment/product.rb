@@ -22,7 +22,12 @@ class Payment::Product < ApplicationRecord
   has_many :assets, as: :assetable, dependent: :nullify
 
   # ===== ENUMS =====
-  enum :cycle, { monthly: "month", yearly: "year" }, prefix: true
+  enum :interval, {
+    day: PaymentConstants::BillingInterval::DAY,
+    week: PaymentConstants::BillingInterval::WEEK,
+    month: PaymentConstants::BillingInterval::MONTH,
+    year: PaymentConstants::BillingInterval::YEAR
+  }, prefix: true
   enum :currency, { usd: "usd" }, prefix: true
 
   # ===== READONLY & IMMUTABLE ATTRIBUTES =====
@@ -31,7 +36,7 @@ class Payment::Product < ApplicationRecord
   # ===== VALIDATIONS =====
   validates :code, presence: true, uniqueness: { case_sensitive: true }, format: { with: /\A[A-Za-z0-9]{10}\z/, message: "must be 10 alphanumeric characters" }
   validates :name, presence: true
-  validates :price_unit_amount, numericality: { greater_than_or_equal_to: 0 }
+  validates :unit_amount, numericality: { greater_than_or_equal_to: 0 }
   validates :stripe_product_id, presence: true, uniqueness: true
   validates :stripe_price_id, presence: true, uniqueness: true
   validates :currency, presence: true
@@ -43,18 +48,18 @@ class Payment::Product < ApplicationRecord
   before_validation :normalize_free_product
   # ===== SCOPES =====
   scope :active, -> { where(active: true) }
-  scope :one_time, -> { where(cycle: nil) }
-  scope :recurring, -> { where.not(cycle: nil) }
+  scope :one_time, -> { where(interval: nil) }
+  scope :recurring, -> { where.not(interval: nil) }
 
   before_discard :deactivate
 
   # ===== INSTANCE METHODS =====
   def recurring?
-    cycle.present?
+    interval.present?
   end
 
   def free?
-    price_unit_amount.to_i.zero?
+    unit_amount.to_i.zero?
   end
 
   def premium?
@@ -64,27 +69,34 @@ class Payment::Product < ApplicationRecord
   def display_price
     return "Free" if free?
 
-    format("%s %.2f", currency.upcase, price_unit_amount / 100.0)
+    format("%s %.2f", currency.upcase, unit_amount / 100.0)
   end
 
-  def cycle_in_duration
+  def interval_in_duration
     return 0.days unless recurring?
 
-    case cycle
-    when "monthly" then 30.days
-    when "yearly" then 365.days
+    case interval
+    when PaymentConstants::BillingInterval::DAY then 1.day
+    when PaymentConstants::BillingInterval::WEEK then 7.days
+    when PaymentConstants::BillingInterval::MONTH then 30.days
+    when PaymentConstants::BillingInterval::YEAR then 365.days
     else 0.days
     end
   end
 
-  def cycle_in_seconds
-    cycle_in_duration.to_i
+  def interval_in_seconds
+    interval_in_duration.to_i
   end
 
   # The period of the subscription (e.g., "monthly", "yearly", "one-time")
   def period_label
     return "One-time purchase" unless recurring?
-    cycle.humanize.downcase
+    {
+      PaymentConstants::BillingInterval::DAY => "daily",
+      PaymentConstants::BillingInterval::WEEK => "weekly",
+      PaymentConstants::BillingInterval::MONTH => "monthly",
+      PaymentConstants::BillingInterval::YEAR => "yearly"
+    }.fetch(interval, interval.humanize.downcase)
   end
 
   def get_thumbnail_url
@@ -112,20 +124,20 @@ class Payment::Product < ApplicationRecord
   end
 
   def normalize_free_product
-    self.cycle = nil if free?
+    self.interval = nil if free?
   end
 
   def free_product_must_be_one_time
-    if free? && cycle.present?
-      errors.add(:cycle, "Free products must be one-time and cannot have a recurring billing cycle")
+    if free? && interval.present?
+      errors.add(:interval, "Free products must be one-time and cannot have a recurring billing interval")
     end
   end
 
   def prevent_free_to_premium_transition
-    return unless price_unit_amount_changed?
+    return unless unit_amount_changed?
 
-    if price_unit_amount_was.to_i.zero? && price_unit_amount.to_i.positive?
-      errors.add(:price_unit_amount, "Free products cannot be converted to premium products")
+    if unit_amount_was.to_i.zero? && unit_amount.to_i.positive?
+      errors.add(:unit_amount, "Free products cannot be converted to premium products")
     end
   end
 

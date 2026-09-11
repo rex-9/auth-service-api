@@ -19,13 +19,13 @@ class Payment::ProductDashboard < Administrate::BaseDashboard
     created_by_id: Field::String,
     creator: Field::BelongsTo,
     currency: Field::Select.with_options(searchable: false, collection: ->(field) { field.resource.class.send(field.attribute.to_s.pluralize).keys }),
-    cycle: Field::Select.with_options(searchable: false, collection: ->(field) { field.resource.class.send(field.attribute.to_s.pluralize).keys }),
+    interval: Field::Select.with_options(searchable: false, collection: ->(field) { field.resource.class.send(field.attribute.to_s.pluralize).keys }),
     description: Field::Text,
     discarded_at: Field::DateTime,
     discarded_by_id: Field::String,
     discarder: Field::BelongsTo,
     name: Field::String,
-    price_unit_amount: Field::Number,
+    unit_amount: Field::Number,
     stripe_price_id: Field::String,
     stripe_product_id: Field::String,
     subscriptions: Field::HasMany,
@@ -46,8 +46,8 @@ class Payment::ProductDashboard < Administrate::BaseDashboard
   # Feel free to add, remove, or rearrange items.
   COLLECTION_ATTRIBUTES = %i[
     name
-    cycle
-    price_unit_amount
+    interval
+    unit_amount
     currency
     active
   ].freeze
@@ -61,13 +61,13 @@ class Payment::ProductDashboard < Administrate::BaseDashboard
     created_by_id
     creator
     currency
-    cycle
+    interval
     description
     discarded_at
     discarded_by_id
     discarder
     name
-    price_unit_amount
+    unit_amount
     stripe_price_id
     stripe_product_id
     subscriptions
@@ -90,13 +90,13 @@ class Payment::ProductDashboard < Administrate::BaseDashboard
     created_by_id
     creator
     currency
-    cycle
+    interval
     description
     discarded_at
     discarded_by_id
     discarder
     name
-    price_unit_amount
+    unit_amount
     stripe_price_id
     stripe_product_id
     subscriptions

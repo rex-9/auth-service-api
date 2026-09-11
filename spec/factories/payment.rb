@@ -3,9 +3,9 @@ FactoryBot.define do
     sequence(:name) { |n| "Product #{n}" }
     sequence(:stripe_product_id) { |n| "prod_#{n}" }
     sequence(:stripe_price_id) { |n| "price_#{n}" }
-    price_unit_amount { 1_000 }
+    unit_amount { 1_000 }
     currency { "usd" }
-    cycle { "month" }
+    interval { "month" }
     active { true }
   end
 
@@ -13,11 +13,18 @@ FactoryBot.define do
     user
     association :product, factory: :payment_product
     sequence(:stripe_subscription_id) { |n| "sub_#{n}" }
+    sequence(:stripe_subscription_item_id) { |n| "si_#{n}" }
+    sequence(:stripe_price_id) { |n| "price_subscription_#{n}" }
     stripe_customer_id { "cus_test" }
     status { "active" }
-    cycle { "month" }
+    currency { "usd" }
+    unit_amount { 1_000 }
+    quantity { 1 }
+    interval { "month" }
+    interval_count { 1 }
     current_period_start { Time.current }
     current_period_end { 30.days.from_now }
+    started_at { Time.current }
   end
 
   factory :payment_transaction, class: "Payment::Transaction" do
@@ -25,7 +32,7 @@ FactoryBot.define do
     association :product, factory: :payment_product
     sequence(:stripe_payment_intent_id) { |n| "pi_#{n}" }
     status { "succeeded" }
-    price_unit_amount { 1_000 }
+    unit_amount { 1_000 }
     currency { "usd" }
   end
 

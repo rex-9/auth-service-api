@@ -1,5 +1,5 @@
 class Payment::ProductSerializer < ApplicationSerializer
-  attributes :id, :code, :name, :description, :price_unit_amount, :currency, :cycle,
+  attributes :id, :code, :name, :description, :unit_amount, :currency, :interval,
              :stripe_product_id, :stripe_price_id, :active, :created_at, :updated_at,
              :discarded_at, :undiscarded_at
 

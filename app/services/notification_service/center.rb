@@ -202,7 +202,7 @@ module NotificationService
         context = {
           product_name: product.name,
           period: product.period_label,
-          active_until: format_date(Time.zone.at(subscription.current_period_end))
+          active_until: format_date(subscription.current_period_end)
         }
 
         title = template ? template.render_text(template.in_app_title, user: user, context: context) : payment_message(MessageService::Payment::SUBSCRIPTION_CREATED_TITLE, product_name: product.name)
@@ -229,8 +229,8 @@ module NotificationService
           email_template_data: {
             user_name: user.name || user.username,
             product_name: product.name,
-            current_period_start: format_date(Time.zone.at(subscription.current_period_start)),
-            current_period_end: format_date(Time.zone.at(subscription.current_period_end)),
+            current_period_start: format_date(subscription.current_period_start),
+            current_period_end: format_date(subscription.current_period_end),
             period: product.period_label
           },
           **kwargs
@@ -273,7 +273,7 @@ module NotificationService
           email_template_data: {
             user_name: user.name || user.username,
             product_name: product.name,
-            canceled_on: subscription.canceled_at ? Time.zone.at(subscription.canceled_at).strftime("%B %d, %Y") : payment_message(MessageService::Payment::TODAY),
+            canceled_on: subscription.canceled_at ? format_date(subscription.canceled_at) : payment_message(MessageService::Payment::TODAY),
             valid_until: active_until ? Time.zone.at(active_until).strftime("%B %d, %Y") : payment_message(MessageService::Payment::END_OF_PERIOD)
           },
           **kwargs
@@ -308,7 +308,7 @@ module NotificationService
           email_template_data: {
             user_name: user.name || user.username,
             product_name: product.name,
-            current_period_end: Time.zone.at(subscription.current_period_end).strftime("%B %d, %Y")
+            current_period_end: format_date(subscription.current_period_end)
           },
           **kwargs
         )
@@ -319,7 +319,7 @@ module NotificationService
         context = {
           product_name: product.name,
           amount: product.display_price,
-          due_date: Time.zone.at(subscription.current_period_end).strftime("%B %d, %Y")
+          due_date: format_date(subscription.current_period_end)
         }
 
         title = template ? template.render_text(template.in_app_title, user: user, context: context) : payment_message(MessageService::Payment::PAYMENT_FAILED_TITLE)
@@ -346,7 +346,7 @@ module NotificationService
           email_template_data: {
             user_name: user.name || user.username,
             product_name: product.name,
-            due_date: Time.zone.at(subscription.current_period_end).strftime("%B %d, %Y")
+            due_date: format_date(subscription.current_period_end)
           },
           **kwargs
         )

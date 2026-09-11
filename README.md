@@ -183,7 +183,7 @@ Stripe integration covers the full commercial loop:
 - Product and price synchronization.
 - Checkout Sessions for one-time purchases and subscriptions.
 - Customer creation and reuse.
-- Transactions, payment-method metadata, and subscription lifecycle state.
+- PaymentIntent transaction snapshots, payment-method metadata, and Stripe-version-aligned subscription item snapshots.
 - Cancellation-at-period-end and subscription resumption.
 - Access grants and revocation driven by payment state.
 - Persisted webhook events with duplicate protection, processing state, attempts, errors, retention, and admin visibility.

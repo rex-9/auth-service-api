@@ -6,9 +6,9 @@ RSpec.describe AnalyticsService::Overview, type: :service do
   describe "#call" do
     it "returns calculated KPIs, time-series data, and breakdowns for 30d default" do
       user = create(:user)
-      product = create(:payment_product, price_unit_amount: 5000)
-      create(:payment_transaction, user: user, product: product, price_unit_amount: 5000, status: PaymentConstants::TransactionStatus::SUCCEEDED)
-      create(:payment_subscription, user: user, product: product, status: PaymentConstants::SubscriptionStatus::ACTIVE, cycle: "monthly")
+      product = create(:payment_product, unit_amount: 5000)
+      create(:payment_transaction, user: user, product: product, unit_amount: 5000, status: PaymentConstants::TransactionStatus::SUCCEEDED)
+      create(:payment_subscription, user: user, product: product, status: PaymentConstants::SubscriptionStatus::ACTIVE, unit_amount: 5000, interval: PaymentConstants::BillingInterval::MONTH)
       room = create(:chat_room, user: user)
       create(:chat_message, room: room, role: AiConstants::ChatRole::USER, content: "Hello AI")
       create(:chat_message, room: room, role: AiConstants::ChatRole::ASSISTANT, content: "Hello human")
@@ -34,7 +34,7 @@ RSpec.describe AnalyticsService::Overview, type: :service do
       expect(result[:time_series]).to be_an(Array)
       expect(result[:time_series].size).to be >= 28
 
-      expect(result[:breakdowns][:subscriptions_by_cycle]).to eq({ "monthly" => 1 })
+      expect(result[:breakdowns][:subscriptions_by_interval]).to eq({ "month" => 1 })
       expect(result[:breakdowns][:feedback_ratings]).to eq({ 5 => 1 })
       expect(result[:breakdowns][:errors_by_platform]).to eq({ "web" => 1 })
     end
