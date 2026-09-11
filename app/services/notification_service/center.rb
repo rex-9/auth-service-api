@@ -25,6 +25,10 @@ module NotificationService
 
       def notify(user_id:, user_email: nil, title: nil, message: nil, push_title: nil, push_body: nil, link: nil, data: {}, operation_id: nil, operation_type: nil, operation_status: nil, send_socket: false, send_push: false, send_email: false, email_template: nil, email_template_data: {}, template_id: nil, push_template_id: nil, **kwargs)
         results = {}
+        push_requested = send_push && (push_title.present? || title.present? || push_template_id.present?)
+        # Every push has one canonical persisted in-app notification. This gives
+        # every client the same UserNotification ID for open analytics.
+        send_socket ||= push_requested
         operation_data = {
           operation_id: operation_id,
           operation_type: operation_type,
@@ -91,7 +95,10 @@ module NotificationService
         end
 
         # 2. Push notification
-        if send_push && (push_title.present? || title.present? || push_template_id.present?)
+        if push_requested
+          push_data = data.merge(
+            AnalyticsConstants::Parameter::NOTIFICATION_ID => user_notification&.id
+          ).compact
           results[:push] = enqueue(
             :push,
             operation: delivery_operation(
@@ -101,14 +108,14 @@ module NotificationService
               title: push_title.presence || title,
               message: push_body.presence || message || title,
               link: link,
-              data: data
+              data: push_data
             )
           ) do
             {
               user_id: user_id,
               title: push_title.presence || title,
               body: push_body.presence || message || title,
-              data: data.merge(link: link).compact,
+              data: push_data.merge(link: link).compact,
               template_id: push_template_id
             }.compact
           end
