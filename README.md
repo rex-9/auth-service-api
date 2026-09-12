@@ -18,7 +18,7 @@ Built under a simple creed: **clear in thought, exact in structure, simple in us
 
 **API-first · Modular · Observable · Queue-aware · Built to grow**
 
-[Explore the foundation](#feature-map) · [Ecosystem Architecture](ECOSYSTEM.md) · [Development Law](LAW.md) · [Production Deployment](docs/DEPLOYMENT.md) · [Security Hardening](docs/DDOS.md) · [Async Operations](docs/ASYNC_OPERATIONS.md) · [Analytics Guide](docs/ANALYTICS.md) · [Run it locally](#getting-started) · [Open the dashboards](#operations-center) · [Meet the architecture](#architecture)
+[Explore the foundation](#feature-map) · [Who it is for](#who-rexone-is-for) · [Growth Roadmap](docs/OPEN_SOURCE_GROWTH_ROADMAP.md) · [Ecosystem Architecture](ECOSYSTEM.md) · [Development Law](LAW.md) · [Production Deployment](docs/DEPLOYMENT.md) · [Security Hardening](docs/DDOS.md) · [Run it locally](#getting-started)
 
 </div>
 
@@ -48,6 +48,32 @@ And no—this was not vibe-coded into existence.
 The boundaries were reasoned about. Failure paths were traced. Immediate work was separated from deferred work. Retries, idempotency, observability, security, and data lifecycle were treated as engineering concerns, not decorations added after the demo survived.
 
 Rexone Core brings startup speed with battle-tested discipline—and fewer final-hour whispers of _“we should probably build that before launch.”_
+
+## Who Rexone is for
+
+Rexone is built for Rails teams, founder-engineers, and agencies creating API-first web or mobile products that need production infrastructure without rebuilding the same foundation for every launch.
+
+It is a particularly good fit when a product needs several of these capabilities to work together:
+
+- Authentication and explicit role-based access control.
+- Stripe payments connected to durable entitlements.
+- Provider-neutral media storage and background optimization.
+- In-app, push, email, and real-time notification delivery.
+- Queued AI and speech workflows that survive client disconnection.
+- Operational dashboards, client telemetry, audit trails, and health checks.
+- Reference React and Flutter clients consuming the same contracts.
+
+Rexone is not a no-code application generator or a promise that every product domain is already modeled. It supplies the disciplined platform foundation; the product remains responsible for its own domain, workflows, interface, and operating decisions.
+
+## What you get
+
+- **One coherent system:** identity, authorization, commerce, media, async work, notifications, and observability are designed to cooperate.
+- **Real client contracts:** [Rexone Web](https://github.com/rex-9/rexone-web) and [Rexone Mobile](https://github.com/rex-9/rexone_mobile) exercise the same versioned API and real-time events.
+- **Replaceable providers:** external services remain behind focused client and base contracts.
+- **Inspectable operations:** queues, cache, sockets, performance, backend errors, and frontend telemetry have explicit operational surfaces.
+- **A documented engineering standard:** architectural constraints, API conventions, lifecycle rules, and cross-client responsibilities are written down and tested.
+
+The public [open-source growth roadmap](docs/OPEN_SOURCE_GROWTH_ROADMAP.md) tracks how Rexone will improve evaluation, evidence, contribution readiness, and responsible distribution.
 
 ## The philosophy
 
@@ -133,7 +159,7 @@ The foundation currently queues work where it benefits from durability, isolatio
 | -------------------------------- | --------------- | --------------------------------------------------------------- |
 | Stripe webhook processing        | `payments`      | Durable ingestion, idempotency, retries, and concurrency safety |
 | Socket, push, and email delivery | `notifications` | Provider latency must not delay the originating request         |
-| Image & video compression        | `media`         | Dedicated worker (libvips/FFmpeg) isolating heavy media compute |
+| Image, video & audio compression | `media`         | Dedicated worker (libvips/FFmpeg) isolating heavy media compute |
 
 Production workers are separated by workload in [`config/queue.yml`](config/queue.yml), and recurring maintenance lives in [`config/recurring.yml`](config/recurring.yml).
 
@@ -261,7 +287,7 @@ The storage abstraction defaults to **Garage** (self-hosted S3-compatible distri
   - `POST /v1/admin/assets/batch_undiscard`: Multi-select restoration (restores multiple discarded assets via `undiscard_batch`).
   - `POST /v1/admin/assets/batch_destroy`: Multi-select permanent purging (hard-deletes selected assets and immediately purges backing objects from Garage S3 via `destroy_batch`).
   - All lifecycle actions map cleanly: `destroy_bin`, `destroy_batch`, `discard_batch`, and `undiscard_batch` resolve uniformly under `:delete` permission in authorization.
-- **Unified Asset Lifecycle**: Uploads return the URL and metadata the client needs immediately while retaining provider identifiers, category, media type, extension, size, source, and ownership.
+- **Unified Asset Lifecycle**: Uploads return the URL and metadata the client needs immediately while retaining provider identifiers, category, media type, extension, size, source, and ownership. `GET /v1/assets` lists stored assets and accepts `type` (`avatar`, `thumbnail`, `audio`, `video`, `attachment`, `general`) plus pagination (`page`, `limit`).
 - **Default Self-Hosted Storage**: `STORAGE_PROVIDER=garage` uses the official `aws-sdk-s3` client connected to the local or production Garage daemon (`http://garage:3100` / `http://localhost:3100`).
 - **Instant Clean Purge**: Storage deletion executes directly (`StorageService::Client.delete`) upon record destruction commit, ensuring storage objects are permanently cleaned without orphan drift.
 - **Provider Switching**: Easily switch between `garage` (S3), `cloudinary`, or `local` via `STORAGE_PROVIDER` without code changes.
@@ -270,14 +296,16 @@ The storage abstraction defaults to **Garage** (self-hosted S3-compatible distri
 
 When the media container is enabled (`MEDIA_CONTAINER_ENABLED=true`), uploaded assets run through an isolated, background media optimization pipeline:
 
-- **Isolated Worker (`media` container)**: CPU- and memory-intensive media processing runs on a dedicated Solid Queue worker (`config/queue.media.yml`), completely isolating image/video compression and canonical FFmpeg video-thumbnail generation from API requests and transactional jobs.
+- **Isolated Worker (`media` container)**: CPU- and memory-intensive media processing runs on a dedicated Solid Queue worker (`config/queue.media.yml`), completely isolating image/video/audio compression and canonical FFmpeg video-thumbnail generation from API requests and transactional jobs.
+- **SVG to PNG on save**: Uploaded SVG is converted to PNG in the API process (`MediaService::SvgToPng` → `MediaService::ImageConversion` via `rsvg-convert`, fitted inside `IMAGE_MAX_WIDTH` × `IMAGE_MAX_HEIGHT`). The stored asset is `extension: png` and `optimal`; it does **not** enqueue `Media::CompressImageJob`. Thumbnail SVG covers use a `.png` key and are also `optimal`. Stored SVG rows are not converted until re-uploaded. Docker images need `librsvg2-bin` (rebuild `api` after pulling this change).
 - **Image Compression (`Media::CompressImageJob`)**: Powered by `libvips` with smart palette quantization (`palette: true`, dynamic Q factor), dimension constraints (`IMAGE_MAX_WIDTH`, `IMAGE_MAX_HEIGHT`), and format-specific optimizations across JPEG, PNG, and WebP.
 - **Video Compression (`Media::CompressVideoJob`)**: Powered by `ffmpeg` (`libx264`, `aac`) with adaptive CRF tuning, dimension constraints, bitrate caps (`VIDEO_MAX_BITRATE`), and audio stream optimization.
+- **Audio Compression (`Media::CompressAudioJob`)**: Powered by `ffmpeg` (`aac` / `libmp3lame`, `AUDIO_BITRATE`) with `-vn`, stereo 44.1 kHz. WAV, FLAC, and OGG remux to M4A because those containers cannot host AAC; MP3, M4A, and AAC keep their original extension.
 - **Optimal-First Flow**:
   - If initial compression yields no improvement or reduction is negligible (`< 3%`), the pipeline immediately marks the asset as `optimal` without incrementing cache counters or scheduling redundant passes.
   - If meaningful reduction is achieved, the pass counter increments with a fallback safety cap of 2 passes (`MAX_COMPRESSION_PASSES = 2`).
 - **Real-Time Cable Broadcasts**: Status changes (`pending` $\rightarrow$ `processing` $\rightarrow$ `ready` or `optimal`), updated file sizes, and compression ratios broadcast in real-time over ActionCable (`NotificationChannel`) to connected clients.
-- **Canonical Video Thumbnails**: Every uploaded compressible video queues independent FFmpeg thumbnail generation. The resulting WebP is stored beside the original, represented by its own `Asset` linked through `parent_asset_id`, serialized on the source asset, and broadcast as `asset_thumbnail_generated` so Web and Mobile can update without waiting. Admin clients can also regenerate or upload a replacement thumbnail; replacement commits the new asset before the superseded Garage object is cleaned up.
+- **Canonical Video Thumbnails**: Every uploaded compressible video queues independent FFmpeg thumbnail generation. The resulting WebP is stored beside the original, represented by its own `Asset` linked through `parent_asset_id`, serialized on the source asset, and broadcast as `asset_thumbnail_generated` so Web and Mobile can update without waiting. Admin clients can regenerate a video thumbnail or upload an image replacement for a compressible video or audio parent; replacement commits the new asset before the superseded Garage object is cleaned up.
 - **Upload Boundaries (`MAX_NON_VIDEO_SIZE_MB` & `MAX_VIDEO_SIZE_MB`)**:
   - Dynamically conditioned on `MEDIA_CONTAINER_ENABLED` and configurable via `MEDIA_MAX_NON_VIDEO_SIZE_MB` and `MEDIA_MAX_VIDEO_SIZE_MB`.
   - **With Media Container** (`MEDIA_CONTAINER_ENABLED=true`): Defaults to **10 MB** for images/non-videos and **100 MB** for videos.
@@ -422,7 +450,7 @@ Docker is the quickest and most reproducible path.
 - Docker with Docker Compose
 - Git
 
-For a native installation, use Ruby `4.0.4`, PostgreSQL, libvips, and Bundler `4.0.16`.
+For a native installation, use Ruby `4.0.4`, PostgreSQL, libvips, `librsvg2-bin` (`rsvg-convert` for SVG to PNG), and Bundler `4.0.16`.
 
 ### 1. Clone and configure
 
@@ -526,7 +554,7 @@ The important groups are:
 - DeepSeek AI API URL, key, and model.
 - Speech services: Azure Speech (key, region) and Nova Speech (key, endpoint) for TTS/STT.
 - Storage & S3: `STORAGE_PROVIDER` (`garage`, `cloudinary`, `local`), S3 endpoints, credentials, and bucket.
-- Media compression: `MEDIA_CONTAINER_ENABLED`, upload size limits (`MEDIA_MAX_VIDEO_SIZE_MB`, `MEDIA_MAX_NON_VIDEO_SIZE_MB`), video profile (CRF, preset, bitrate, resolution), and image profile (JPEG/PNG/WebP quality, compression).
+- Media compression: `MEDIA_CONTAINER_ENABLED`, upload size limits (`MEDIA_MAX_VIDEO_SIZE_MB`, `MEDIA_MAX_NON_VIDEO_SIZE_MB`), video profile (CRF, preset, bitrate, resolution), audio profile (`MEDIA_AUDIO_CODEC`, `MEDIA_AUDIO_BITRATE`), and image profile (JPEG/PNG/WebP quality, compression).
 - Solid Queue process, supervisors (`SOLID_QUEUE_IN_PUMA`), and shutdown settings (`SOLID_QUEUE_SHUTDOWN_TIMEOUT`).
 - Observability & Error Dashboard: `DASHBOARD_BASE_URL`, `APP_VERSION`, `GIT_SHA`.
 - App store listings for force-update: `IOS_STORE_URL`, `ANDROID_STORE_URL` (returned as `store_url` on `GET /v1/client/versions/current`, chosen from `X-Platform`).
@@ -545,7 +573,7 @@ The API is broader than a starter CRUD demo. Its main route families are:
 | Admin API        | `/v1/admin/*`                                                                                                                                                       |
 | Payments         | `/v1/payment/*`, `/webhooks/stripe`                                                                                                                                 |
 | Entitlements     | `/v1/access/*`                                                                                                                                                      |
-| Media            | `/v1/media/upload`                                                                                                                                                  |
+| Media            | `/v1/media/upload`, `/v1/assets`                                                                                                                                    |
 | Notifications    | `/v1/admin/notifications`                                                                                                                                           |
 | AI               | `/v1/ai/*`                                                                                                                                                          |
 | Speech           | `/v1/speech/*`, `SpeechLiveChannel` (WS)                                                                                                                            |
