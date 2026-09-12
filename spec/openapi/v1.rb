@@ -513,6 +513,10 @@ module Openapi
         required: [ :file ],
         file: { type: :string, format: :binary }
       ),
+      asset_subtitle_upload_request: object(
+        required: [ :file ],
+        file: { type: :string, format: :binary }
+      ),
       checkout_session_request: object(
         required: %i[product_id success_url cancel_url],
         product_id: UUID,
@@ -888,6 +892,16 @@ module Openapi
         assetable_id: UUID.merge(nullable: true),
         parent_asset_id: UUID.merge(nullable: true),
         thumbnail: {
+          type: :object,
+          nullable: true,
+          properties: {
+            id: UUID,
+            url: { type: :string, format: :uri },
+            status: { type: :string, enum: MediaConstants::Status::ALL },
+            size_bytes: { type: :integer, nullable: true }
+          }
+        },
+        subtitle: {
           type: :object,
           nullable: true,
           properties: {
@@ -1650,10 +1664,23 @@ module Openapi
           }
         }
       }
+      paths["/v1/admin/assets/{id}/subtitle/upload"] = {
+        post: operation(tags: "Admin / Assets", summary: "Upload and replace an SRT subtitle for a compressible video or audio asset",
+                        description: "Accepts .srt by filename. Stored as type/format subtitle, Garage raw, status ready. Does not enqueue the media queue.",
+                        parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422, 500 ])
+      }
+      paths["/v1/admin/assets/{id}/subtitle/upload"][:post][:requestBody] = {
+        required: true,
+        content: {
+          "multipart/form-data" => {
+            schema: ref(:asset_subtitle_upload_request)
+          }
+        }
+      }
 
       paths["/v1/assets"] = {
         get: operation(tags: "Assets", summary: "List stored assets",
-                       description: "Optional type filter matches AssetType (avatar, thumbnail, audio, video, attachment, general).",
+                       description: "Optional type filter matches AssetType (#{AssetConstants::AssetType::ALL.join(', ')}).",
                        parameters: [
                          query_parameter(:type, description: "Filter by asset type"),
                          query_parameter(:page, type: :integer),
