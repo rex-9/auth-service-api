@@ -24,6 +24,7 @@ class Notification::DispatchJob < ApplicationJob
           push_title: push_title,
           push_body: push_body,
           link: notification.link,
+          clients: notification.clients,
           data: { type: notification.event }.merge(notification.in_app_data || {}),
           send_socket: channels.include?(NotificationConstants::Channel::SOCKET),
           send_push: channels.include?(NotificationConstants::Channel::PUSH),

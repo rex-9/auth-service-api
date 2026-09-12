@@ -20,6 +20,22 @@ RSpec.describe Notification, type: :model do
       expect(build(:notification, category: NotificationConstants::Category::BROADCAST)).to be_valid
     end
 
+    it "requires one or more normalized client identifiers" do
+      expect(build(:notification, clients: [ "web", "web2" ])).to be_valid
+      expect(build(:notification, clients: [])).not_to be_valid
+      expect(build(:notification, clients: [ "Web" ])).not_to be_valid
+    end
+
+    it "accepts shared client routes and absolute HTTPS template links" do
+      NotificationConstants::Link::TEMPLATE_LINKS.each do |link|
+        expect(build(:notification, link: link)).to be_valid
+      end
+
+      expect(build(:notification, link: "/settings")).not_to be_valid
+      expect(build(:notification, link: "https://example.com/rexone")).to be_valid
+      expect(build(:notification, link: "http://example.com/rexone")).not_to be_valid
+    end
+
     it "enforces uniqueness of event among kept notifications" do
       create(:notification, event: "unique_event")
       expect(build(:notification, event: "unique_event")).not_to be_valid

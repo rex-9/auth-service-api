@@ -12,7 +12,12 @@ RSpec.describe NotificationService::Center do
     expect(result).to eq(socket: true)
     expect(Notification::DeliverJob).to have_been_enqueued.with(
       channel: :socket,
-      payload: { user_id: "user-id", message: "Message", data: { type: "custom" } }
+      payload: {
+        user_id: "user-id",
+        message: "Message",
+        clients: NotificationConstants::Client::DEFAULT,
+        data: { type: "custom" }
+      }
     )
   end
 
@@ -20,6 +25,26 @@ RSpec.describe NotificationService::Center do
     expect do
       described_class.notify(user_id: "user-id", message: "Body", send_push: true)
     end.not_to have_enqueued_job(Notification::DeliverJob)
+  end
+
+  it "keeps admin portal operations on Web and does not send a mobile push" do
+    user = create(:user)
+
+    described_class.notify(
+      user_id: user.id,
+      title: "Asset ready",
+      message: "Asset ready",
+      link: "/admin/assets/asset-id",
+      send_socket: true,
+      send_push: true
+    )
+
+    expect(user.user_notifications.last.clients).to eq(NotificationConstants::Client::ADMIN_PORTAL)
+    expect(Notification::DeliverJob).to have_been_enqueued.with(
+      channel: :socket,
+      payload: hash_including(clients: NotificationConstants::Client::ADMIN_PORTAL)
+    )
+    expect(Notification::DeliverJob).not_to have_been_enqueued.with(channel: :push, payload: anything)
   end
 
   it "persists every push and sends its user notification id to the client" do
@@ -150,6 +175,22 @@ RSpec.describe NotificationService::Center do
       expect do
         described_class.welcome(user_id: user.id, name: user.name)
       end.to change(user.user_notifications, :count).by(1)
+    end
+
+    it "delivers an HTTPS link configured on the template" do
+      external_link = "https://example.com/welcome"
+      create(
+        :notification,
+        event: NotificationConstants::NotificationType::WELCOME,
+        link: external_link
+      )
+
+      described_class.welcome(user_id: user.id, name: user.name)
+
+      expect(Notification::DeliverJob).to have_been_enqueued.with(
+        channel: :socket,
+        payload: hash_including(link: external_link)
+      )
     end
 
     it "safely returns if user is nil" do

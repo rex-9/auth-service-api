@@ -12,12 +12,14 @@ class UserNotification < ApplicationRecord
   validates :operation_id, uniqueness: { scope: :user_id }, allow_nil: true
   validates :operation_type, inclusion: { in: NotificationConstants::OperationType::ALL }, allow_nil: true
   validates :operation_status, inclusion: { in: NotificationConstants::OperationStatus::ALL }, allow_nil: true
+  validate :clients_are_valid
   validate :complete_operation_metadata
 
   # ===== SCOPES =====
   scope :unread, -> { where(read_at: nil) }
   scope :read_scope, -> { where.not(read_at: nil) }
   scope :recent, -> { order(created_at: :desc) }
+  scope :for_client, ->(client) { where("clients @> ARRAY[?]::varchar[]", client.to_s) }
 
   # ===== CALLBACKS =====
   after_create_commit :increment_notification_sent_count, if: -> { notification_id.present? }
@@ -33,6 +35,14 @@ class UserNotification < ApplicationRecord
   end
 
   private
+
+  def clients_are_valid
+    valid = clients.is_a?(Array) && clients.present? && clients.uniq == clients &&
+      clients.all? { |client| client.match?(NotificationConstants::Client::FORMAT) }
+    return if valid
+
+    errors.add(:clients, :invalid)
+  end
 
   def complete_operation_metadata
     fields = [ operation_id, operation_type, operation_status ]

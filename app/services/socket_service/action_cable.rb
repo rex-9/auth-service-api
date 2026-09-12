@@ -16,13 +16,14 @@ module SocketService
     # }
     # (via streamed from notification_user_0917b97f-b7cb-4d03-a6fb-f36ba1421731)
 
-    def broadcast(user_id:, message:, data: {}, id: nil, title: nil, link: nil, read_at: nil, created_at: nil)
+    def broadcast(user_id:, message:, data: {}, id: nil, title: nil, link: nil, clients: nil, read_at: nil, created_at: nil)
       payload = {
         id: id,
         type: NotificationConstants::NotificationType::NOTIFICATION,
         title: title,
         message: message,
         link: link,
+        clients: clients,
         data: data,
         read_at: read_at,
         created_at: created_at || Time.current.iso8601

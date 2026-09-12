@@ -9,6 +9,7 @@ class UserNotificationDashboard < Administrate::BaseDashboard
   # on pages throughout the dashboard.
   ATTRIBUTE_TYPES = {
     id: Field::String,
+    clients: Field::String,
     created_by_id: Field::String,
     creator: Field::BelongsTo,
     data: Field::String.with_options(searchable: false),
@@ -30,7 +31,7 @@ class UserNotificationDashboard < Administrate::BaseDashboard
     updater: Field::BelongsTo,
     user: Field::BelongsTo,
     created_at: Field::DateTime,
-    updated_at: Field::DateTime,
+    updated_at: Field::DateTime
   }.freeze
 
   # COLLECTION_ATTRIBUTES
@@ -39,16 +40,18 @@ class UserNotificationDashboard < Administrate::BaseDashboard
   # By default, it's limited to four items to reduce clutter on index pages.
   # Feel free to add, remove, or rearrange items.
   COLLECTION_ATTRIBUTES = %i[
-    id
-    created_by_id
-    creator
+    link
+    message
+    clients
     data
+    creator
   ].freeze
 
   # SHOW_PAGE_ATTRIBUTES
   # an array of attributes that will be displayed on the model's show page.
   SHOW_PAGE_ATTRIBUTES = %i[
     id
+    clients
     created_by_id
     creator
     data
@@ -77,6 +80,7 @@ class UserNotificationDashboard < Administrate::BaseDashboard
   # an array of attributes that will be displayed
   # on the model's form (`new` and `edit`) pages.
   FORM_ATTRIBUTES = %i[
+    clients
     created_by_id
     creator
     data

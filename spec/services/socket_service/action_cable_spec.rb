@@ -6,11 +6,22 @@ RSpec.describe SocketService::ActionCable do
   it "broadcasts the frontend notification envelope" do
     allow(ActionCable.server).to receive(:broadcast)
     travel_to(Time.zone.parse("2026-01-01 12:00:00 UTC")) do
-      expect(provider.broadcast(user_id: "user-id", message: "Hello", data: { type: "welcome" })).to be(true)
+      expect(
+        provider.broadcast(
+          user_id: "user-id",
+          message: "Hello",
+          clients: %w[web mobile],
+          data: { type: "welcome" }
+        )
+      ).to be(true)
     end
     expect(ActionCable.server).to have_received(:broadcast).with(
       "notification_user_user-id",
-      type: "notification", message: "Hello", data: { type: "welcome" }, created_at: "2026-01-01T12:00:00Z"
+      type: "notification",
+      message: "Hello",
+      clients: %w[web mobile],
+      data: { type: "welcome" },
+      created_at: "2026-01-01T12:00:00Z"
     )
   end
 

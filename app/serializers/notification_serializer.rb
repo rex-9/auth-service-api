@@ -7,6 +7,7 @@ class NotificationSerializer < ApplicationSerializer
              :description,
              :category,
              :link,
+             :clients,
              :admin,
              :in_app_title,
              :in_app_body,

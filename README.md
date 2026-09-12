@@ -18,7 +18,7 @@ Built under a simple creed: **clear in thought, exact in structure, simple in us
 
 **API-first · Modular · Observable · Queue-aware · Built to grow**
 
-[Quick Start](docs/QUICK_START.md) · [Explore the foundation](#feature-map) · [Foundation Guide](docs/FOUNDATION.md) · [Ecosystem Architecture](ECOSYSTEM.md) · [Who it is for](#who-rexone-is-for) · [Growth Roadmap](docs/OPEN_SOURCE_GROWTH_ROADMAP.md) · [Development Law](LAW.md) · [Production Deployment](docs/DEPLOYMENT.md)
+[Quick Start](docs/QUICK_START.md) · [Explore the foundation](#feature-map) · [Foundation Guide](docs/FOUNDATION.md) · [Ecosystem Architecture](ECOSYSTEM.md) · [Who it is for](#who-rexone-is-for) · [Development Law](LAW.md) · [Production Deployment](docs/DEPLOYMENT.md)
 
 </div>
 

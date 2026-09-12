@@ -186,7 +186,12 @@ module Openapi
       ),
       role_request: object(
         required: [ :name ],
-        name: { type: :string, example: "teacher" },
+        name: {
+          type: :string,
+          pattern: "^[a-z0-9_]+$",
+          example: "content_admin",
+          description: "Custom role name containing only lowercase ASCII letters, digits, and underscores."
+        },
         description: { type: :string, nullable: true },
         permission_ids: {
           type: :array,
@@ -459,7 +464,20 @@ module Openapi
         name: { type: :string },
         description: { type: :string, nullable: true },
         category: { type: :string },
-        link: { type: :string, nullable: true },
+        link: {
+          type: :string,
+          nullable: true,
+          pattern: "^(?:/(?:home|profile|payment|ai)|https://.+)$",
+          description: "Optional shared in-app route or absolute HTTPS external destination."
+        },
+        clients: {
+          type: :array,
+          minItems: 1,
+          uniqueItems: true,
+          items: { type: :string, pattern: "^[a-z][a-z0-9_]*$" },
+          default: NotificationConstants::Client::DEFAULT,
+          description: "Clients allowed to receive this in-app notification, such as web or mobile."
+        },
         admin: { type: :boolean },
         in_app_title: { type: :string, nullable: true },
         in_app_body: { type: :string, nullable: true },

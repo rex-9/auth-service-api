@@ -9,10 +9,16 @@ module NotificationService
           user_id: attributes.fetch(:user_id),
           operation_id: attributes.fetch(:operation_id)
         )
+        clients = if attributes[:link].to_s.start_with?("/admin")
+          NotificationConstants::Client::ADMIN_PORTAL
+        else
+          attributes[:clients] || notification.clients.presence || NotificationConstants::Client::DEFAULT
+        end
         notification.assign_attributes(
           title: attributes.fetch(:title),
           message: error.presence || attributes.fetch(:message),
           link: attributes[:link],
+          clients: clients,
           operation_type: attributes.fetch(:operation_type),
           operation_status: status,
           data: (attributes[:data] || {}).merge(
@@ -32,6 +38,7 @@ module NotificationService
             title: notification.title,
             message: notification.message,
             link: notification.link,
+            clients: notification.clients,
             data: notification.data,
             read_at: notification.read_at,
             created_at: notification.created_at.iso8601

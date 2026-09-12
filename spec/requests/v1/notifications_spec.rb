@@ -50,6 +50,25 @@ RSpec.describe "V1 Notifications API", type: :request do
       expect(response_data.length).to eq(1)
       expect(response_data.first.dig("attributes", "title")).to eq("Read 1")
     end
+
+    it "returns only notifications targeting the requesting client" do
+      web = create(:user_notification, user: user, title: "Web", clients: [ NotificationConstants::Client::WEB ])
+      create(:user_notification, user: user, title: "Mobile", clients: [ NotificationConstants::Client::MOBILE ])
+
+      get "/v1/notifications", headers: headers.merge("X-Platform" => NotificationConstants::Client::WEB)
+
+      expect(response_data.map { |record| record["id"] }).to eq([ web.id ])
+      expect(response_data.first.dig("attributes", "clients")).to eq([ NotificationConstants::Client::WEB ])
+    end
+
+    it "maps native platforms to the Mobile notification client" do
+      create(:user_notification, user: user, title: "Web", clients: [ NotificationConstants::Client::WEB ])
+      mobile = create(:user_notification, user: user, title: "Mobile", clients: [ NotificationConstants::Client::MOBILE ])
+
+      get "/v1/notifications", headers: headers.merge("X-Platform" => AuthConstants::Platform::ANDROID)
+
+      expect(response_data.map { |record| record["id"] }).to eq([ mobile.id ])
+    end
   end
 
   describe "GET /v1/notifications/unread_count" do
@@ -81,6 +100,14 @@ RSpec.describe "V1 Notifications API", type: :request do
       other_notification = create(:user_notification, :unread, user: other_user)
 
       put "/v1/notifications/#{other_notification.id}/read", headers: headers
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it "cannot mark a notification for another client as read" do
+      mobile_notification = create(:user_notification, :unread, user: user, clients: [ NotificationConstants::Client::MOBILE ])
+
+      put "/v1/notifications/#{mobile_notification.id}/read", headers: headers.merge("X-Platform" => NotificationConstants::Client::WEB)
 
       expect(response).to have_http_status(:not_found)
     end

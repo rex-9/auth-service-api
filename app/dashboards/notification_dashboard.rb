@@ -11,6 +11,7 @@ class NotificationDashboard < Administrate::BaseDashboard
     id: Field::String,
     admin: Field::Boolean,
     category: Field::String,
+    clients: Field::String,
     created_by_id: Field::String,
     creator: Field::BelongsTo,
     description: Field::Text,
@@ -48,6 +49,7 @@ class NotificationDashboard < Administrate::BaseDashboard
   # Feel free to add, remove, or rearrange items.
   COLLECTION_ATTRIBUTES = %i[
     category
+    clients
     event
     name
     admin
@@ -59,6 +61,7 @@ class NotificationDashboard < Administrate::BaseDashboard
     id
     admin
     category
+    clients
     created_by_id
     creator
     description
@@ -95,6 +98,7 @@ class NotificationDashboard < Administrate::BaseDashboard
   FORM_ATTRIBUTES = %i[
     admin
     category
+    clients
     created_by_id
     creator
     description
