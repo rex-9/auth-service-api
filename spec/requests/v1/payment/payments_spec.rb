@@ -4,7 +4,7 @@ RSpec.describe "V1 Payments API", type: :request do
   let(:user) { create(:user) }
   let(:token) { jwt_for(user) }
   let(:headers) { authorization_headers(token) }
-  let(:product) { create(:payment_product, cycle: nil) }
+  let(:product) { create(:payment_product, interval: nil) }
 
   before do
     allow(CacheService).to receive(:read).and_return(token)
@@ -39,7 +39,7 @@ RSpec.describe "V1 Payments API", type: :request do
     end
 
     it "rejects when active subscription already exists for recurring product" do
-      recurring_product = create(:payment_product, cycle: "month")
+      recurring_product = create(:payment_product, interval: "month")
       create(:payment_subscription, user: user, product: recurring_product, status: "active")
 
       post "/v1/payment/session",
@@ -50,7 +50,7 @@ RSpec.describe "V1 Payments API", type: :request do
     end
 
     it "grants access directly for free products without creating a Stripe checkout session" do
-      free_product = create(:payment_product, price_unit_amount: 0, cycle: nil)
+      free_product = create(:payment_product, unit_amount: 0, interval: nil)
       expect(PaymentService::Client).not_to receive(:create_checkout_session)
 
       post "/v1/payment/session",
@@ -66,7 +66,7 @@ RSpec.describe "V1 Payments API", type: :request do
     end
 
     it "rejects free product checkout when active access already exists" do
-      free_product = create(:payment_product, price_unit_amount: 0, cycle: nil)
+      free_product = create(:payment_product, unit_amount: 0, interval: nil)
       AccessService.grant(user_id: user.id, product_id: free_product.id)
 
       post "/v1/payment/session",

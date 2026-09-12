@@ -1,11 +1,58 @@
 require "rails_helper"
 
 RSpec.describe PaymentService::Stripe do
+  describe "Stripe 2026-08-26.dahlia subscription mapping" do
+    let(:service) { described_class.new }
+    let(:stripe_subscription) do
+      Stripe::Subscription.construct_from(
+        id: "sub_snapshot",
+        object: "subscription",
+        customer: "cus_snapshot",
+        currency: "usd",
+        start_date: 1_788_800_000,
+        items: {
+          object: "list",
+          data: [ {
+            id: "si_snapshot",
+            object: "subscription_item",
+            current_period_start: 1_788_800_000,
+            current_period_end: 1_791_478_400,
+            quantity: 2,
+            price: {
+              id: "price_snapshot",
+              object: "price",
+              currency: "usd",
+              unit_amount: 2_500,
+              recurring: { interval: "month", interval_count: 1 }
+            }
+          } ]
+        }
+      )
+    end
+
+    it "reads period and price snapshot fields from the subscription item" do
+      expect(Stripe.api_version).to eq(PaymentConstants::StripeApi::VERSION)
+      expect(service.send(:subscription_period, stripe_subscription)).to eq(
+        starts_at: Time.at(1_788_800_000).utc,
+        ends_at: Time.at(1_791_478_400).utc
+      )
+      expect(service.send(:subscription_item_attributes, stripe_subscription)).to eq(
+        stripe_subscription_item_id: "si_snapshot",
+        stripe_price_id: "price_snapshot",
+        currency: "usd",
+        unit_amount: 2_500,
+        quantity: 2,
+        interval: "month",
+        interval_count: 1
+      )
+    end
+  end
+
   describe "#create_checkout_session" do
     it "creates a Stripe Checkout session for a free product" do
       service = described_class.new
       user = create(:user, stripe_customer_id: "cus_free")
-      product = create(:payment_product, price_unit_amount: 0, cycle: nil)
+      product = create(:payment_product, unit_amount: 0, interval: nil)
       session = instance_double("Stripe::Checkout::Session", url: "https://checkout.stripe.test/free", id: "cs_free")
 
       allow(Stripe::Checkout::Session).to receive(:create).and_return(session)
@@ -25,7 +72,7 @@ RSpec.describe PaymentService::Stripe do
     it "creates a subscription-mode Checkout session for a recurring product" do
       service = described_class.new
       user = create(:user, stripe_customer_id: "cus_sub")
-      product = create(:payment_product, price_unit_amount: 2_000, cycle: "month")
+      product = create(:payment_product, unit_amount: 2_000, interval: "month")
       session = instance_double("Stripe::Checkout::Session", url: "https://checkout.stripe.test/sub", id: "cs_sub")
       
       allow(Stripe::Checkout::Session).to receive(:create).and_return(session)
@@ -56,9 +103,9 @@ RSpec.describe PaymentService::Stripe do
       result = service.create_product(
         name: "Premium",
         description: "Premium access",
-        price_unit_amount: 2_000,
+        unit_amount: 2_000,
         currency: "usd",
-        cycle: "month",
+        interval: "month",
         active: true
       )
       product = result[:data]
@@ -83,9 +130,9 @@ RSpec.describe PaymentService::Stripe do
       result = service.create_product(
         name: "Free",
         description: "Free access",
-        price_unit_amount: 0,
+        unit_amount: 0,
         currency: "usd",
-        cycle: "month",
+        interval: "month",
         active: true
       )
       product = result[:data]
@@ -93,7 +140,7 @@ RSpec.describe PaymentService::Stripe do
       expect(product).to be_persisted
       expect(product).to be_free
       expect(product.display_price).to eq("Free")
-      expect(product.cycle).to be_nil
+      expect(product.interval).to be_nil
       expect(product.stripe_product_id).to eq("prod_free")
       expect(product.stripe_price_id).to eq("price_free")
       expect(Stripe::Price).to have_received(:create).with(
@@ -121,9 +168,9 @@ RSpec.describe PaymentService::Stripe do
         service.create_product(
           name: "Premium",
           description: "Premium access",
-          price_unit_amount: 2_000,
+          unit_amount: 2_000,
           currency: "usd",
-          cycle: "month",
+          interval: "month",
           active: true
         )
       end.to raise_error(ActiveRecord::RecordInvalid)
@@ -165,9 +212,9 @@ RSpec.describe PaymentService::Stripe do
         :payment_product,
         stripe_product_id: "prod_existing",
         stripe_price_id: "price_old",
-        price_unit_amount: 1_000,
+        unit_amount: 1_000,
         currency: "usd",
-        cycle: "month"
+        interval: "month"
       )
       new_price = instance_double("Stripe::Price", id: "price_new")
 
@@ -177,9 +224,9 @@ RSpec.describe PaymentService::Stripe do
 
       result = service.update_product(
         product.id,
-        price_unit_amount: 2_000,
+        unit_amount: 2_000,
         currency: "usd",
-        cycle: "month"
+        interval: "month"
       )
       updated_product = result[:data]
 
@@ -206,20 +253,20 @@ RSpec.describe PaymentService::Stripe do
       expect(Stripe::Price).not_to have_received(:update)
     end
 
-    it "does not create or deactivate a price when the incoming cycle matches the existing enum value" do
+    it "does not create or deactivate a price when the incoming interval matches the existing enum value" do
       service = described_class.new
       product = create(
         :payment_product,
         stripe_product_id: "prod_existing",
         stripe_price_id: "price_old",
-        cycle: "month"
+        interval: "month"
       )
 
       allow(Stripe::Product).to receive(:update)
       allow(Stripe::Price).to receive(:create)
       allow(Stripe::Price).to receive(:update)
 
-      service.update_product(product.id, cycle: "month")
+      service.update_product(product.id, interval: "month")
 
       expect(Stripe::Price).not_to have_received(:create)
       expect(Stripe::Price).not_to have_received(:update)
@@ -231,7 +278,7 @@ RSpec.describe PaymentService::Stripe do
         :payment_product,
         stripe_product_id: "prod_paid",
         stripe_price_id: "price_paid",
-        price_unit_amount: 1_000
+        unit_amount: 1_000
       )
       free_price = instance_double("Stripe::Price", id: "price_free")
 
@@ -239,11 +286,11 @@ RSpec.describe PaymentService::Stripe do
       allow(Stripe::Price).to receive(:create).and_return(free_price)
       allow(Stripe::Price).to receive(:update)
 
-      result = service.update_product(product.id, price_unit_amount: 0)
+      result = service.update_product(product.id, unit_amount: 0)
       updated_product = result[:data]
 
       expect(updated_product).to be_free
-      expect(updated_product.cycle).to be_nil
+      expect(updated_product.interval).to be_nil
       expect(updated_product.stripe_product_id).to eq("prod_paid")
       expect(updated_product.stripe_price_id).to eq("price_free")
       expect(Stripe::Price).to have_received(:create).with(
@@ -261,15 +308,15 @@ RSpec.describe PaymentService::Stripe do
         :payment_product,
         stripe_product_id: "prod_free",
         stripe_price_id: "price_free",
-        price_unit_amount: 0,
-        cycle: nil
+        unit_amount: 0,
+        interval: nil
       )
 
       allow(Stripe::Product).to receive(:update)
       allow(Stripe::Price).to receive(:create)
       allow(Stripe::Price).to receive(:update)
 
-      result = service.update_product(product.id, price_unit_amount: 2_000, currency: "usd", cycle: "month")
+      result = service.update_product(product.id, unit_amount: 2_000, currency: "usd", interval: "month")
 
       expect(result[:error]).to eq("Free products cannot be converted to premium products")
       expect(product.reload).to be_free
@@ -283,9 +330,9 @@ RSpec.describe PaymentService::Stripe do
         name: "Premium",
         stripe_product_id: "prod_existing",
         stripe_price_id: "price_old",
-        price_unit_amount: 1_000,
+        unit_amount: 1_000,
         currency: "usd",
-        cycle: "month",
+        interval: "month",
         active: true
       )
       new_price = instance_double("Stripe::Price", id: "price_new")
@@ -300,9 +347,9 @@ RSpec.describe PaymentService::Stripe do
       expect do
         service.update_product(
           product.id,
-          price_unit_amount: 2_000,
+          unit_amount: 2_000,
           currency: "usd",
-          cycle: "month"
+          interval: "month"
         )
       end.to raise_error(ActiveRecord::RecordInvalid)
 
@@ -373,8 +420,8 @@ RSpec.describe PaymentService::Stripe do
       product = Payment::Product.find_by!(stripe_product_id: "prod_webhook_premium")
       expect(product).to be_premium
       expect(product.stripe_price_id).to eq("price_webhook_premium")
-      expect(product.price_unit_amount).to eq(2_000)
-      expect(product.cycle).to eq("monthly")
+      expect(product.unit_amount).to eq(2_000)
+      expect(product.interval).to eq("month")
     end
 
     it "discards the local product when Stripe deactivates its product" do
@@ -397,7 +444,7 @@ RSpec.describe PaymentService::Stripe do
         "Stripe::Price",
         id: "price_archived",
         product: "prod_archived",
-        unit_amount: product.price_unit_amount,
+        unit_amount: product.unit_amount,
         currency: product.currency,
         recurring: nil,
         active: true
@@ -438,8 +485,8 @@ RSpec.describe PaymentService::Stripe do
       product = Payment::Product.find_by!(stripe_product_id: "prod_webhook_free")
       expect(product).to be_free
       expect(product.stripe_price_id).to eq("price_webhook_free")
-      expect(product.price_unit_amount).to eq(0)
-      expect(product.cycle).to be_nil
+      expect(product.unit_amount).to eq(0)
+      expect(product.interval).to be_nil
       expect(product.period_label).to eq("One-time purchase")
     end
   end

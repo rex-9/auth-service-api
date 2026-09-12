@@ -259,19 +259,19 @@ module Openapi
       admin_product_request: object(
         required: [ :product ],
         product: object(
-          required: %i[name price_unit_amount currency],
+          required: %i[name unit_amount currency],
           name: { type: :string, minLength: 1, example: "Premium Access" },
           description: { type: :string, nullable: true, example: "Unlocks premium features." },
-          price_unit_amount: {
+          unit_amount: {
             type: :integer,
             minimum: 0,
             description: "Amount in the smallest currency unit, for example cents. Use 0 for a free product."
           },
           currency: { type: :string, enum: Payment::Product.currencies.values, example: "usd" },
-          cycle: {
+          interval: {
             type: :string,
             nullable: true,
-            enum: Payment::Product.cycles.values + [ nil ],
+            enum: Payment::Product.intervals.values + [ nil ],
             description: "Use null for one-time products."
           },
           active: { type: :boolean, default: true }
@@ -492,6 +492,10 @@ module Openapi
         size_bytes: { type: :integer, description: "Exact file size in bytes." }
       ),
       asset_thumbnail_upload_request: object(
+        required: [ :file ],
+        file: { type: :string, format: :binary }
+      ),
+      asset_subtitle_upload_request: object(
         required: [ :file ],
         file: { type: :string, format: :binary }
       ),
@@ -741,10 +745,10 @@ module Openapi
         id: UUID,
         name: { type: :string },
         description: { type: :string, nullable: true },
-        price_unit_amount: { type: :integer, description: "Minor currency units" },
+        unit_amount: { type: :integer, description: "Minor currency units" },
         price: { type: :string },
         currency: { type: :string, example: "usd" },
-        cycle: { type: :string },
+        interval: { type: :string, nullable: true, enum: PaymentConstants::BillingInterval::ALL },
         period_label: { type: :string },
         recurring: { type: :boolean },
         free: { type: :boolean },
@@ -755,42 +759,89 @@ module Openapi
         updated_at: DATE_TIME
       ),
       subscription: object(
+        required: %i[
+          id user_id product_id stripe_subscription_id
+          stripe_subscription_item_id stripe_price_id status currency
+          unit_amount quantity interval interval_count
+          current_period_start current_period_end started_at cancel_at_period_end
+          active canceled past_due ended expired scheduled_for_cancellation
+          cancelable renewing created_at updated_at
+        ],
         id: UUID,
         user_id: UUID,
         product_id: UUID,
         stripe_subscription_id: { type: :string },
-        stripe_customer_id: { type: :string },
-        status: { type: :string },
-        cycle: { type: :string },
-        current_period_start: DATE_TIME,
-        current_period_end: DATE_TIME,
+        stripe_customer_id: { type: :string, nullable: true },
+        stripe_subscription_item_id: { type: :string },
+        stripe_price_id: { type: :string },
+        status: { type: :string, enum: PaymentConstants::SubscriptionStatus::ALL },
+        currency: { type: :string, pattern: "^[a-z]{3}$" },
+        unit_amount: { type: :integer, minimum: 0, description: "Price amount in minor currency units" },
+        quantity: { type: :integer, minimum: 1 },
+        interval: { type: :string, enum: PaymentConstants::BillingInterval::ALL },
+        interval_count: { type: :integer, minimum: 1 },
+        payment_method_id: { type: :string, nullable: true },
+        payment_method_type: { type: :string, nullable: true },
+        current_period_start: DATE_TIME.merge(nullable: false),
+        current_period_end: DATE_TIME.merge(nullable: false),
+        started_at: DATE_TIME.merge(nullable: false),
         cancel_at_period_end: { type: :boolean },
-        canceled_at: DATE_TIME,
-        cancel_at: DATE_TIME,
-        ended_at: DATE_TIME,
+        canceled_at: DATE_TIME.merge(nullable: true),
+        cancel_at: DATE_TIME.merge(nullable: true),
+        ended_at: DATE_TIME.merge(nullable: true),
         active: { type: :boolean },
         canceled: { type: :boolean },
+        past_due: { type: :boolean },
         ended: { type: :boolean },
+        expired: { type: :boolean },
         scheduled_for_cancellation: { type: :boolean },
         cancelable: { type: :boolean },
-        product_name: { type: :string },
-        price: { type: :string },
+        renewing: { type: :boolean },
+        days_until_renewal: { type: :integer, nullable: true },
+        days_until_period_end: { type: :integer, nullable: true },
+        payment_method_display: { type: :string, nullable: true },
+        card_last4: { type: :string, nullable: true },
+        card_brand: { type: :string, nullable: true },
+        masked_card_number: { type: :string, nullable: true },
+        product_name: { type: :string, nullable: true },
+        price: { type: :string, nullable: true },
+        period_label: { type: :string, nullable: true },
         created_at: DATE_TIME,
         updated_at: DATE_TIME
       ),
       transaction: object(
+        required: %i[
+          id user_id stripe_payment_intent_id status unit_amount currency
+          amount_received amount_capturable paid pending failed requires_action
+          created_at updated_at
+        ],
         id: UUID,
         user_id: UUID,
         product_id: UUID.merge(nullable: true),
         stripe_payment_intent_id: { type: :string },
-        status: { type: :string },
-        price_unit_amount: { type: :string },
-        currency: { type: :string },
-        paid_at: DATE_TIME,
-        refunded_at: DATE_TIME,
+        stripe_charge_id: { type: :string, nullable: true },
+        stripe_customer_id: { type: :string, nullable: true },
+        status: { type: :string, enum: PaymentConstants::TransactionStatus::ALL },
+        payment_method_id: { type: :string, nullable: true },
+        payment_method_type: { type: :string, nullable: true },
+        unit_amount: { type: :integer, minimum: 1, description: "PaymentIntent amount in minor currency units" },
+        price: { type: :string },
+        currency: { type: :string, pattern: "^[a-z]{3}$" },
+        client_secret: { type: :string, nullable: true },
+        paid_at: DATE_TIME.merge(nullable: true),
+        refunded_at: DATE_TIME.merge(nullable: true),
+        canceled_at: DATE_TIME.merge(nullable: true),
+        processing_at: DATE_TIME.merge(nullable: true),
+        amount_received: { type: :integer, minimum: 0 },
+        amount_capturable: { type: :integer, minimum: 0 },
         paid: { type: :boolean },
         pending: { type: :boolean },
         failed: { type: :boolean },
+        requires_action: { type: :boolean },
+        payment_method_display: { type: :string, nullable: true },
+        card_last4: { type: :string, nullable: true },
+        card_brand: { type: :string, nullable: true },
+        masked_card_number: { type: :string, nullable: true },
         product_name: { type: :string, nullable: true },
         created_at: DATE_TIME,
         updated_at: DATE_TIME
@@ -823,6 +874,16 @@ module Openapi
         assetable_id: UUID.merge(nullable: true),
         parent_asset_id: UUID.merge(nullable: true),
         thumbnail: {
+          type: :object,
+          nullable: true,
+          properties: {
+            id: UUID,
+            url: { type: :string, format: :uri },
+            status: { type: :string, enum: MediaConstants::Status::ALL },
+            size_bytes: { type: :integer, nullable: true }
+          }
+        },
+        subtitle: {
           type: :object,
           nullable: true,
           properties: {
@@ -1409,6 +1470,43 @@ module Openapi
         get: operation(tags: "Payments", summary: "Get a transaction",
                        parameters: [ path_parameter(:id) ], errors: [ 401, 404 ])
       }
+      paths["/v1/admin/payment/transactions"] = {
+        get: operation(tags: "Admin / Payments", summary: "List all payment transactions",
+                       parameters: [
+                         query_parameter(:page, type: :integer),
+                         query_parameter(:limit, type: :integer),
+                         query_parameter(:sort_by, type: :string),
+                         query_parameter(:sort_order, type: :string),
+                         query_parameter(:search, type: :string),
+                         query_parameter(:status, type: :string),
+                         query_parameter(:currency, type: :string),
+                         query_parameter(:product_id, type: :string, format: :uuid),
+                         query_parameter(:user_id, type: :string, format: :uuid)
+                       ], errors: [ 401, 403 ])
+      }
+      paths["/v1/admin/payment/transactions/{id}"] = {
+        get: operation(tags: "Admin / Payments", summary: "Get a payment transaction",
+                       parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ])
+      }
+      paths["/v1/admin/payment/subscriptions"] = {
+        get: operation(tags: "Admin / Payments", summary: "List all payment subscriptions",
+                       parameters: [
+                         query_parameter(:page, type: :integer),
+                         query_parameter(:limit, type: :integer),
+                         query_parameter(:sort_by, type: :string),
+                         query_parameter(:sort_order, type: :string),
+                         query_parameter(:search, type: :string),
+                         query_parameter(:status, type: :string),
+                         query_parameter(:interval, type: :string),
+                         query_parameter(:product_id, type: :string, format: :uuid),
+                         query_parameter(:user_id, type: :string, format: :uuid),
+                         query_parameter(:cancel_at_period_end, type: :boolean)
+                       ], errors: [ 401, 403 ])
+      }
+      paths["/v1/admin/payment/subscriptions/{id}"] = {
+        get: operation(tags: "Admin / Payments", summary: "Get a payment subscription",
+                       parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ])
+      }
       paths["/v1/payment/session"] = {
         post: operation(
           tags: "Payments", summary: "Create a Stripe Checkout session",
@@ -1548,10 +1646,23 @@ module Openapi
           }
         }
       }
+      paths["/v1/admin/assets/{id}/subtitle/upload"] = {
+        post: operation(tags: "Admin / Assets", summary: "Upload and replace an SRT subtitle for a compressible video or audio asset",
+                        description: "Accepts .srt by filename. Stored as type/format subtitle, Garage raw, status ready. Does not enqueue the media queue.",
+                        parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422, 500 ])
+      }
+      paths["/v1/admin/assets/{id}/subtitle/upload"][:post][:requestBody] = {
+        required: true,
+        content: {
+          "multipart/form-data" => {
+            schema: ref(:asset_subtitle_upload_request)
+          }
+        }
+      }
 
       paths["/v1/assets"] = {
         get: operation(tags: "Assets", summary: "List stored assets",
-                       description: "Optional type filter matches AssetType (avatar, thumbnail, audio, video, attachment, general).",
+                       description: "Optional type filter matches AssetType (#{AssetConstants::AssetType::ALL.join(', ')}).",
                        parameters: [
                          query_parameter(:type, description: "Filter by asset type"),
                          query_parameter(:page, type: :integer),

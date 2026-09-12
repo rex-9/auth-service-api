@@ -23,8 +23,8 @@ class Payment::TransactionDashboard < Administrate::BaseDashboard
     paid_at: Field::DateTime,
     payment_method_details: Field::String.with_options(searchable: false),
     payment_method_id: Field::String,
-    payment_method_type: Field::Select.with_options(searchable: false, collection: ->(field) { field.resource.class.send(field.attribute.to_s.pluralize).keys }),
-    price_unit_amount: Field::Number,
+    payment_method_type: Field::String,
+    unit_amount: Field::Number,
     processing_at: Field::DateTime,
     product: Field::BelongsTo,
     refunded_at: Field::DateTime,
@@ -48,7 +48,7 @@ class Payment::TransactionDashboard < Administrate::BaseDashboard
   # By default, it's limited to four items to reduce clutter on index pages.
   # Feel free to add, remove, or rearrange items.
   COLLECTION_ATTRIBUTES = %i[
-    price_unit_amount
+    unit_amount
     currency
     amount_received
     amount_capturable
@@ -76,7 +76,7 @@ class Payment::TransactionDashboard < Administrate::BaseDashboard
     payment_method_details
     payment_method_id
     payment_method_type
-    price_unit_amount
+    unit_amount
     processing_at
     product
     refunded_at
@@ -113,7 +113,7 @@ class Payment::TransactionDashboard < Administrate::BaseDashboard
     payment_method_details
     payment_method_id
     payment_method_type
-    price_unit_amount
+    unit_amount
     processing_at
     product
     refunded_at

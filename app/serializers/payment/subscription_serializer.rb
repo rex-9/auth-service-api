@@ -3,8 +3,14 @@ class Payment::SubscriptionSerializer < ApplicationSerializer
   attributes :id,
             :stripe_subscription_id,
             :stripe_customer_id,
+            :stripe_subscription_item_id,
+            :stripe_price_id,
             :status,
-            :cycle,
+            :currency,
+            :unit_amount,
+            :quantity,
+            :interval,
+            :interval_count,
             :payment_method_id,
             :payment_method_type,
             :current_period_start,
@@ -83,6 +89,22 @@ class Payment::SubscriptionSerializer < ApplicationSerializer
   # Product details
   attribute :product_name do |subscription|
     subscription.product&.name
+  end
+
+  attribute :product_code do |subscription|
+    subscription.product&.code
+  end
+
+  attribute :user_name do |subscription|
+    subscription.user&.name
+  end
+
+  attribute :username do |subscription|
+    subscription.user&.username
+  end
+
+  attribute :user_email do |subscription|
+    subscription.user&.email
   end
 
   attribute :price do |subscription|

@@ -449,7 +449,7 @@ components:
               type: string
               nullable: true
               example: Unlocks premium features.
-            price_unit_amount:
+            unit_amount:
               type: integer
               minimum: 0
               description: Amount in the smallest currency unit, for example cents.
@@ -459,10 +459,12 @@ components:
               enum:
               - usd
               example: usd
-            cycle:
+            interval:
               type: string
               nullable: true
               enum:
+              - day
+              - week
               - month
               - year
               -
@@ -472,7 +474,7 @@ components:
               default: true
           required:
           - name
-          - price_unit_amount
+          - unit_amount
           - currency
       required:
       - product
@@ -960,6 +962,14 @@ components:
       required:
       - file
     asset_thumbnail_upload_request:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+      required:
+      - file
+    asset_subtitle_upload_request:
       type: object
       properties:
         file:
@@ -1591,7 +1601,7 @@ components:
         description:
           type: string
           nullable: true
-        price_unit_amount:
+        unit_amount:
           type: integer
           description: Minor currency units
         price:
@@ -1599,8 +1609,14 @@ components:
         currency:
           type: string
           example: usd
-        cycle:
+        interval:
           type: string
+          nullable: true
+          enum:
+          - day
+          - week
+          - month
+          - year
         period_label:
           type: string
         recurring:
@@ -1638,18 +1654,60 @@ components:
           type: string
         stripe_customer_id:
           type: string
+          nullable: true
+        stripe_subscription_item_id:
+          type: string
+        stripe_price_id:
+          type: string
         status:
           type: string
-        cycle:
+          enum:
+          - incomplete
+          - active
+          - past_due
+          - canceled
+          - incomplete_expired
+          - unpaid
+          - trialing
+          - paused
+        currency:
           type: string
+          pattern: "^[a-z]{3}$"
+        unit_amount:
+          type: integer
+          minimum: 0
+          description: Price amount in minor currency units
+        quantity:
+          type: integer
+          minimum: 1
+        interval:
+          type: string
+          enum:
+          - day
+          - week
+          - month
+          - year
+        interval_count:
+          type: integer
+          minimum: 1
+        payment_method_id:
+          type: string
+          nullable: true
+        payment_method_type:
+          type: string
+          nullable: true
         current_period_start:
           type: string
           format: date-time
-          nullable: true
+          nullable: false
         current_period_end:
           type: string
           format: date-time
-          nullable: true
+          nullable: false
+        started_at:
+          type: string
+          format: date-time
+          nullable: false
         cancel_at_period_end:
           type: boolean
         canceled_at:
@@ -1668,16 +1726,45 @@ components:
           type: boolean
         canceled:
           type: boolean
+        past_due:
+          type: boolean
         ended:
+          type: boolean
+        expired:
           type: boolean
         scheduled_for_cancellation:
           type: boolean
         cancelable:
           type: boolean
+        renewing:
+          type: boolean
+        days_until_renewal:
+          type: integer
+          nullable: true
+        days_until_period_end:
+          type: integer
+          nullable: true
+        payment_method_display:
+          type: string
+          nullable: true
+        card_last4:
+          type: string
+          nullable: true
+        card_brand:
+          type: string
+          nullable: true
+        masked_card_number:
+          type: string
+          nullable: true
         product_name:
           type: string
+          nullable: true
         price:
           type: string
+          nullable: true
+        period_label:
+          type: string
+          nullable: true
         created_at:
           type: string
           format: date-time
@@ -1686,7 +1773,33 @@ components:
           type: string
           format: date-time
           nullable: true
-      required: []
+      required:
+      - id
+      - user_id
+      - product_id
+      - stripe_subscription_id
+      - stripe_subscription_item_id
+      - stripe_price_id
+      - status
+      - currency
+      - unit_amount
+      - quantity
+      - interval
+      - interval_count
+      - current_period_start
+      - current_period_end
+      - started_at
+      - cancel_at_period_end
+      - active
+      - canceled
+      - past_due
+      - ended
+      - expired
+      - scheduled_for_cancellation
+      - cancelable
+      - renewing
+      - created_at
+      - updated_at
     transaction:
       type: object
       properties:
@@ -1702,12 +1815,40 @@ components:
           nullable: true
         stripe_payment_intent_id:
           type: string
+        stripe_charge_id:
+          type: string
+          nullable: true
+        stripe_customer_id:
+          type: string
+          nullable: true
         status:
           type: string
-        price_unit_amount:
+          enum:
+          - succeeded
+          - processing
+          - requires_action
+          - requires_capture
+          - requires_confirmation
+          - requires_payment_method
+          - canceled
+        payment_method_id:
+          type: string
+          nullable: true
+        payment_method_type:
+          type: string
+          nullable: true
+        unit_amount:
+          type: integer
+          minimum: 1
+          description: PaymentIntent amount in minor currency units
+        price:
           type: string
         currency:
           type: string
+          pattern: "^[a-z]{3}$"
+        client_secret:
+          type: string
+          nullable: true
         paid_at:
           type: string
           format: date-time
@@ -1716,12 +1857,40 @@ components:
           type: string
           format: date-time
           nullable: true
+        canceled_at:
+          type: string
+          format: date-time
+          nullable: true
+        processing_at:
+          type: string
+          format: date-time
+          nullable: true
+        amount_received:
+          type: integer
+          minimum: 0
+        amount_capturable:
+          type: integer
+          minimum: 0
         paid:
           type: boolean
         pending:
           type: boolean
         failed:
           type: boolean
+        requires_action:
+          type: boolean
+        payment_method_display:
+          type: string
+          nullable: true
+        card_last4:
+          type: string
+          nullable: true
+        card_brand:
+          type: string
+          nullable: true
+        masked_card_number:
+          type: string
+          nullable: true
         product_name:
           type: string
           nullable: true
@@ -1733,7 +1902,21 @@ components:
           type: string
           format: date-time
           nullable: true
-      required: []
+      required:
+      - id
+      - user_id
+      - stripe_payment_intent_id
+      - status
+      - unit_amount
+      - currency
+      - amount_received
+      - amount_capturable
+      - paid
+      - pending
+      - failed
+      - requires_action
+      - created_at
+      - updated_at
     access:
       type: object
       properties:
@@ -1786,6 +1969,7 @@ components:
           enum:
           - avatar
           - thumbnail
+          - subtitle
           - audio
           - video
           - attachment
@@ -1797,6 +1981,7 @@ components:
           - audio
           - video
           - doc
+          - subtitle
           nullable: true
         extension:
           type: string
@@ -1833,6 +2018,27 @@ components:
           format: uuid
           nullable: true
         thumbnail:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            url:
+              type: string
+              format: uri
+            status:
+              type: string
+              enum:
+              - pending
+              - processing
+              - ready
+              - optimal
+              - failed
+            size_bytes:
+              type: integer
+              nullable: true
+        subtitle:
           type: object
           nullable: true
           properties:
@@ -8083,6 +8289,317 @@ paths:
                 "$ref": "#/components/schemas/error_response"
       security:
       - bearerAuth: []
+  "/v1/admin/payment/transactions":
+    get:
+      tags:
+      - Admin / Payments
+      summary: List all payment transactions
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: currency
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: product_id
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: user_id
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+  "/v1/admin/payment/transactions/{id}":
+    get:
+      tags:
+      - Admin / Payments
+      summary: Get a payment transaction
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+  "/v1/admin/payment/subscriptions":
+    get:
+      tags:
+      - Admin / Payments
+      summary: List all payment subscriptions
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: interval
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: product_id
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: user_id
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: cancel_at_period_end
+        in: query
+        required: false
+        schema:
+          type: boolean
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
+  "/v1/admin/payment/subscriptions/{id}":
+    get:
+      tags:
+      - Admin / Payments
+      summary: Get a payment subscription
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      security:
+      - bearerAuth: []
   "/v1/payment/session":
     post:
       tags:
@@ -9866,6 +10383,86 @@ paths:
           multipart/form-data:
             schema:
               "$ref": "#/components/schemas/asset_thumbnail_upload_request"
+  "/v1/admin/assets/{id}/subtitle/upload":
+    post:
+      tags:
+      - Admin / Assets
+      summary: Upload and replace an SRT subtitle for a compressible video or audio
+        asset
+      parameters:
+      - name: X-Locale
+        in: header
+        required: false
+        description: Response language. Accepts en or my; Accept-Language is also
+          supported.
+        schema:
+          type: string
+          enum:
+          - en
+          - my
+      - name: X-Platform
+        in: header
+        required: false
+        description: Active-session namespace.
+        schema:
+          type: string
+          enum:
+          - web
+          - mobile
+          default: web
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '422':
+          description: Unprocessable Content
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      description: Accepts .srt by filename. Stored as type/format subtitle, Garage
+        raw, status ready. Does not enqueue the media queue.
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              "$ref": "#/components/schemas/asset_subtitle_upload_request"
   "/v1/assets":
     get:
       tags:
@@ -9927,8 +10524,8 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/error_response"
-      description: Optional type filter matches AssetType (avatar, thumbnail, audio,
-        video, attachment, general).
+      description: Optional type filter matches AssetType (avatar, thumbnail, subtitle,
+        audio, video, attachment, general).
       security:
       - bearerAuth: []
     post:

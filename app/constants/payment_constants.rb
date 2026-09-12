@@ -2,6 +2,10 @@
 
 # app/constants/payment_constants.rb
 module PaymentConstants
+  module StripeApi
+    VERSION = "2026-08-26.dahlia".freeze
+  end
+
   module SubscriptionStatus
     INCOMPLETE         = "incomplete".freeze
     ACTIVE             = "active".freeze
@@ -17,19 +21,12 @@ module PaymentConstants
     ].freeze
   end
 
-  module BillingCycle
+  module BillingInterval
+    DAY   = "day".freeze
+    WEEK  = "week".freeze
     MONTH = "month".freeze
     YEAR  = "year".freeze
-    ALL   = [ MONTH, YEAR ].freeze
-  end
-
-  module PaymentMethodType
-    CARD          = "card".freeze
-    GOOGLE_PAY    = "google_pay".freeze
-    APPLE_PAY     = "apple_pay".freeze
-    BANK_TRANSFER = "bank_transfer".freeze
-    OTHER         = "other".freeze
-    ALL           = [ CARD, GOOGLE_PAY, APPLE_PAY, BANK_TRANSFER, OTHER ].freeze
+    ALL   = [ DAY, WEEK, MONTH, YEAR ].freeze
   end
 
   module TransactionStatus

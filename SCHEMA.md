@@ -285,9 +285,9 @@ erDiagram
 | `code`              | `string`   |    ❌    | —                   | Immutable unique product code (10 alphanumeric chars) |
 | `name`              | `string`   |    ❌    | —                   | Product display name                                  |
 | `description`       | `text`     |    ✔️    | `NULL`              | Marketing / plan description                          |
-| `price_unit_amount` | `integer`  |    ❌    | —                   | Price in smallest currency unit (cents, 0 = Free)     |
+| `unit_amount`       | `integer`  |    ❌    | —                   | Price in smallest currency unit (cents, 0 = Free)     |
 | `currency`          | `string`   |    ❌    | —                   | Currency code (e.g. `usd`)                            |
-| `cycle`             | `string`   |    ✔️    | `NULL`              | Billing cycle: `month`, `year`, or `NULL` (one-time)  |
+| `interval`          | `string`   |    ✔️    | `NULL`              | Billing interval: `day`, `week`, `month`, `year`, or `NULL` (one-time) |
 | `active`            | `boolean`  |    ❌    | `true`              | Availability status                                   |
 | `stripe_product_id` | `string`   |    ❌    | —                   | Stripe Product ID (`prod_...`)                        |
 | `stripe_price_id`   | `string`   |    ❌    | —                   | Stripe Price ID (`price_...`)                         |
@@ -321,17 +321,23 @@ erDiagram
 | `product_id`             | `uuid`     |    ❌    | —                   | FK to `payment_products.id`                                              |
 | `stripe_subscription_id` | `string`   |    ❌    | —                   | Stripe Subscription ID (`sub_...`)                                       |
 | `stripe_customer_id`     | `string`   |    ✔️    | `NULL`              | Stripe Customer ID (`cus_...`)                                           |
+| `stripe_subscription_item_id` | `string` | ❌ | — | Stripe Subscription Item ID (`si_...`) |
+| `stripe_price_id`        | `string`   |    ❌    | —                   | Price snapshot ID (`price_...`)                                          |
 | `status`                 | `string`   |    ❌    | `"incomplete"`      | Status: `incomplete`, `active`, `past_due`, `canceled`, `trialing`, etc. |
-| `cycle`                  | `string`   |    ❌    | —                   | Billing cycle: `month`, `year`                                           |
-| `current_period_start`   | `datetime` |    ✔️    | `NULL`              | Current billing period start                                             |
-| `current_period_end`     | `datetime` |    ✔️    | `NULL`              | Current billing period end                                               |
-| `started_at`             | `datetime` |    ✔️    | `NULL`              | Initial subscription start time                                          |
+| `currency`               | `string`   |    ❌    | —                   | Lowercase ISO currency code from Stripe                                  |
+| `unit_amount`            | `integer`  |    ❌    | —                   | Price snapshot in minor currency units                                   |
+| `quantity`               | `integer`  |    ❌    | `1`                 | Subscription item quantity                                               |
+| `interval`               | `string`   |    ❌    | —                   | Stripe recurring interval: `day`, `week`, `month`, or `year`             |
+| `interval_count`         | `integer`  |    ❌    | `1`                 | Number of intervals between billings                                     |
+| `current_period_start`   | `datetime` |    ❌    | —                   | Subscription Item period start, converted from epoch seconds to UTC      |
+| `current_period_end`     | `datetime` |    ❌    | —                   | Subscription Item period end, converted from epoch seconds to UTC        |
+| `started_at`             | `datetime` |    ❌    | —                   | Stripe Subscription `start_date` converted from epoch seconds to UTC     |
 | `ended_at`               | `datetime` |    ✔️    | `NULL`              | When subscription ceased                                                 |
 | `cancel_at`              | `datetime` |    ✔️    | `NULL`              | Scheduled future cancellation time                                       |
 | `canceled_at`            | `datetime` |    ✔️    | `NULL`              | Timestamp cancellation was requested                                     |
 | `cancel_at_period_end`   | `boolean`  |    ❌    | `false`             | Whether cancel occurs at period boundary                                 |
-| `payment_method_id`      | `string`   |    ✔️    | `NULL`              | Stripe PaymentMethod ID (`pm_...`)                                       |
-| `payment_method_type`    | `string`   |    ✔️    | `NULL`              | Type: `card`, `google_pay`, `apple_pay`, etc.                            |
+| `payment_method_id`      | `string`   |    ✔️    | `NULL`              | ID from Stripe Subscription `default_payment_method`                     |
+| `payment_method_type`    | `string`   |    ✔️    | `NULL`              | Stripe PaymentMethod `type` (for example `card`, `us_bank_account`)      |
 | `payment_method_details` | `jsonb`    |    ✔️    | `{}`                | Brand, last4, exp details                                                |
 | `metadata`               | `jsonb`    |    ✔️    | `{}`                | Metadata payload                                                         |
 | `created_by_id`          | `uuid`     |    ✔️    | `NULL`              | Auditing: Creator                                                        |
@@ -346,6 +352,8 @@ erDiagram
 **Indexes & Foreign Keys**:
 
 - `index_payment_subscriptions_on_stripe_subscription_id` (UNIQUE: `stripe_subscription_id`)
+- `index_payment_subscriptions_on_stripe_subscription_item_id` (`stripe_subscription_item_id`)
+- `index_payment_subscriptions_on_stripe_price_id` (`stripe_price_id`)
 - `index_payment_subscriptions_on_user_id_and_status` (`user_id`, `status`)
 - `index_payment_subscriptions_on_user_id` (`user_id`)
 - `index_payment_subscriptions_on_product_id` (`product_id`)
@@ -353,12 +361,14 @@ erDiagram
 - `index_payment_subscriptions_on_current_period_end` (`current_period_end`)
 - FKs to `users(id)` and `payment_products(id)`.
 
+Subscription synchronization is pinned to Stripe API `2026-08-26.dahlia` (the contract shipped by Stripe Ruby `19.6.1`). Billing periods are read from the single `SubscriptionItem`; integer price fields are stored as a subscription snapshot rather than read later from the mutable product row. Decimal prices are intentionally unsupported.
+
 ---
 
 ### 4.3. `payment_transactions`
 
 - **Model**: [`Payment::Transaction`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/payment/transaction.rb)
-- **Description**: One-off and recurring payment intent charges processed through Stripe.
+- **Description**: One-time purchases synchronized from Stripe PaymentIntent objects.
 
 | Column                     | Type       | Nullable | Default                     | Description / Notes                            |
 | :------------------------- | :--------- | :------: | :-------------------------- | :--------------------------------------------- |
@@ -369,7 +379,7 @@ erDiagram
 | `stripe_charge_id`         | `string`   |    ✔️    | `NULL`                      | Stripe Charge ID (`ch_...`)                    |
 | `stripe_customer_id`       | `string`   |    ✔️    | `NULL`                      | Stripe Customer ID (`cus_...`)                 |
 | `client_secret`            | `string`   |    ✔️    | `NULL`                      | Stripe client secret for FE SDK                |
-| `price_unit_amount`        | `integer`  |    ❌    | —                           | Expected charge amount in cents                |
+| `unit_amount`              | `integer`  |    ❌    | —                           | PaymentIntent `amount` in minor currency units |
 | `amount_received`          | `integer`  |    ✔️    | `0`                         | Actual captured amount in cents                |
 | `amount_capturable`        | `integer`  |    ✔️    | `0`                         | Authorized amount ready for capture            |
 | `currency`                 | `string`   |    ❌    | —                           | Currency code (e.g. `usd`)                     |
@@ -552,16 +562,16 @@ erDiagram
 | `name`              | `string`   |    ❌    | —                   | File original name                                                     |
 | `url`               | `string`   |    ❌    | —                   | Accessible CDN or storage URL                                          |
 | `storage_key`       | `string`   |    ✔️    | `NULL`              | Cloud bucket path (e.g. `user/{user_id}/avatar_profile_12345.png`)     |
-| `type`              | `string`   |    ❌    | `"general"`         | `general`, `avatar`, `audio`, `video`, `document` (STI disabled)       |
+| `type`              | `string`   |    ❌    | `"general"`         | `general`, `avatar`, `thumbnail`, `subtitle`, `audio`, `video`, `attachment` (STI disabled) |
 | `source`            | `string`   |    ❌    | `"upload"`          | Source: `upload`, `google`                                             |
-| `format`            | `string`   |    ✔️    | `NULL`              | Format mime/type (e.g. `png`, `mp4`, `webm`)                           |
+| `format`            | `string`   |    ✔️    | `NULL`              | Media kind: `image`, `audio`, `video`, `doc`, `subtitle`               |
 | `extension`         | `string`   |    ✔️    | `NULL`              | File extension without dot                                             |
 | `size_bytes`        | `bigint`   |    ✔️    | `NULL`              | File size in bytes                                                     |
 | `duration_secs`     | `integer`  |    ✔️    | `NULL`              | Video/audio duration in seconds                                        |
 | `status`            | `string`   |    ❌    | `"pending"`         | Pipeline status: `pending`, `processing`, `ready`, `optimal`, `failed` |
 | `assetable_type`    | `string`   |    ✔️    | `NULL`              | Polymorphic owner type (`User`, `Chat::Message`, etc.)                 |
 | `assetable_id`      | `uuid`     |    ✔️    | `NULL`              | Polymorphic owner ID                                                   |
-| `parent_asset_id`   | `uuid`     |    ✔️    | `NULL`              | Source asset for a thumbnail (compressible video or audio parent)      |
+| `parent_asset_id`   | `uuid`     |    ✔️    | `NULL`              | Source asset for a thumbnail or subtitle child (compressible video or audio parent) |
 | `created_by_id`     | `uuid`     |    ✔️    | `NULL`              | Auditing: Creator                                                      |
 | `updated_by_id`     | `uuid`     |    ✔️    | `NULL`              | Auditing: Modifier                                                     |
 | `discarded_by_id`   | `uuid`     |    ✔️    | `NULL`              | Auditing: Discarder                                                    |
@@ -575,7 +585,7 @@ erDiagram
 
 - `index_assets_on_url` (UNIQUE: `url`)
 - `index_assets_on_assetable_type_and_assetable_id` (`assetable_type`, `assetable_id`)
-- `index_assets_on_parent_asset_id` (`parent_asset_id`, UNIQUE)
+- `index_assets_on_parent_asset_id` (`parent_asset_id`)
 - `index_assets_on_name` (`name`)
 - `index_assets_on_status` (`status`)
 - `index_assets_on_type` (`type`)
@@ -587,7 +597,7 @@ erDiagram
 
 **Generated Video Thumbnails**:
 
-- A video may own one generated thumbnail through the unique self-reference `assets.parent_asset_id`. Thumbnail generation runs asynchronously on the `media` queue, stores a WebP object beside its source video, and preserves the original asset's polymorphic owner. Admin may also upload an image thumbnail for a compressible video or audio parent; SVG covers are converted to PNG at save time and marked `optimal`.
+- A compressible video or audio parent may own one thumbnail and one subtitle. That one-of-each rule is enforced on `Asset` (`type` unique per `parent_asset_id`), not by a unique database index. Thumbnail generation runs asynchronously on the `media` queue, stores a WebP object beside its source video, and preserves the original asset's polymorphic owner. Admin may also upload an image thumbnail for a compressible video or audio parent; SVG covers are converted to PNG at save time and marked `optimal`. `.srt` children are stored as `type`/`format` `subtitle` and are not compressed; admin attaches or replaces them with `POST /v1/admin/assets/:id/subtitle/upload`.
 
 **Audio Compression**:
 

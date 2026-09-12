@@ -2,7 +2,7 @@
 
 class V1::Admin::AssetsController < V1::ApplicationController
   before_action :super_admin_required!, only: :read_storage_stats
-  before_action :set_active_asset, only: %i[show update discard update_compress read_download update_thumbnail_regenerate update_thumbnail_upload]
+  before_action :set_active_asset, only: %i[show update discard update_compress read_download update_thumbnail_regenerate update_thumbnail_upload update_subtitle_upload]
   before_action :set_asset_including_discarded, only: %i[undiscard destroy]
 
   # GET /v1/admin/assets
@@ -525,6 +525,39 @@ class V1::Admin::AssetsController < V1::ApplicationController
     end
   end
 
+  def update_subtitle_upload
+    file = params[:file]
+    unless @asset.subtitle_attachable?
+      message = admin_asset_message(MessageService::Admin::Asset::SUBTITLE_PARENT_REQUIRED)
+      render_json_response(status_code: 422, message: message, error: message)
+      return
+    end
+
+    unless srt_upload?(file)
+      message = admin_asset_message(MessageService::Admin::Asset::SUBTITLE_SRT_REQUIRED)
+      render_json_response(status_code: 422, message: message, error: message)
+      return
+    end
+
+    result = nil
+    begin
+      result = StorageService::Client.upload(
+        file,
+        storage_key: AssetConstants::AssetName.subtitle_for(@asset, version: SecureRandom.uuid),
+        resource_type: "raw"
+      )
+      replace_subtitle!(@asset, result, fallback_size: file.size)
+      render_json_response(
+        status_code: 200,
+        message: admin_asset_message(MessageService::Admin::Asset::SUBTITLE_REPLACED),
+        data: { asset: AssetSerializer.new(@asset.reload).serializable_hash[:data][:attributes] }
+      )
+    rescue StandardError
+      StorageService::Client.delete(result[:storage_key]) if result&.dig(:storage_key)
+      raise
+    end
+  end
+
   private
 
   def replace_thumbnail!(asset, result, fallback_size:, status: MediaConstants::Status::READY)
@@ -542,6 +575,29 @@ class V1::Admin::AssetsController < V1::ApplicationController
         parent_asset: asset, created_by_id: current_user.id
       )
     end
+  end
+
+  def replace_subtitle!(asset, result, fallback_size:)
+    Asset.transaction do
+      asset.subtitle&.destroy!
+      Asset.create!(
+        name: result[:storage_key], url: result[:url],
+        type: AssetConstants::AssetType::SUBTITLE,
+        format: AssetConstants::AssetFormat::SUBTITLE,
+        extension: MediaConstants::SUBTITLE_EXT_SRT,
+        size_bytes: result[:bytes] || fallback_size,
+        source: AssetConstants::AssetSource::UPLOAD,
+        status: MediaConstants::Status::READY,
+        storage_key: result[:storage_key], assetable: asset.assetable,
+        parent_asset: asset, created_by_id: current_user.id
+      )
+    end
+  end
+
+  def srt_upload?(file)
+    file.present? && AssetConstants::AssetFormat::SUBTITLE_EXTENSIONS.include?(
+      File.extname(filename_for(file)).delete(".").downcase
+    )
   end
 
   def admin_asset_message(key, **options)

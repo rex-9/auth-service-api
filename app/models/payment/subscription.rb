@@ -20,22 +20,16 @@ class Payment::Subscription < ApplicationRecord
     paused: PaymentConstants::SubscriptionStatus::PAUSED
   }
 
-  enum :cycle, {
-    monthly: PaymentConstants::BillingCycle::MONTH,
-    yearly: PaymentConstants::BillingCycle::YEAR
-  }, prefix: true
-
-  enum :payment_method_type, {
-    card: PaymentConstants::PaymentMethodType::CARD,
-    google_pay: PaymentConstants::PaymentMethodType::GOOGLE_PAY,
-    apple_pay: PaymentConstants::PaymentMethodType::APPLE_PAY,
-    bank_transfer: PaymentConstants::PaymentMethodType::BANK_TRANSFER,
-    other: PaymentConstants::PaymentMethodType::OTHER
-  }, prefix: true
-
   # ===== VALIDATIONS =====
   validates :stripe_subscription_id, presence: true, uniqueness: true
+  validates :stripe_subscription_item_id, :stripe_price_id, :currency,
+            :interval, :current_period_start, :current_period_end,
+            :started_at, presence: true
   validates :status, presence: true
+  validates :unit_amount, numericality: { greater_than_or_equal_to: 0, only_integer: true }
+  validates :quantity, :interval_count, numericality: { greater_than: 0, only_integer: true }
+  validates :currency, format: { with: /\A[a-z]{3}\z/ }
+  validates :interval, inclusion: { in: PaymentConstants::BillingInterval::ALL }
 
   # ===== SCOPES =====
   scope :active, -> { where(status: PaymentConstants::SubscriptionStatus::ACTIVE) }

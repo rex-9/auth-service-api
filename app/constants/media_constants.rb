@@ -56,6 +56,9 @@ module MediaConstants
   AUDIO_EXT_OGG = "ogg".freeze
   AUDIO_EXT_FLAC = "flac".freeze
 
+  # Subtitle format extensions
+  SUBTITLE_EXT_SRT = "srt".freeze
+
   # Asset processing statuses
   module Status
     PENDING = "pending".freeze

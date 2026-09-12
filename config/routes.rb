@@ -144,6 +144,7 @@ Rails.application.routes.draw do
           get :read_download, path: "download"
           post :update_thumbnail_regenerate, path: "thumbnail/regenerate"
           post :update_thumbnail_upload, path: "thumbnail/upload"
+          post :update_subtitle_upload, path: "subtitle/upload"
         end
       end
 
@@ -197,6 +198,9 @@ Rails.application.routes.draw do
             post :undiscard
           end
         end
+
+        resources :transactions, only: %i[index show]
+        resources :subscriptions, only: %i[index show]
       end
 
       resources :notifications do

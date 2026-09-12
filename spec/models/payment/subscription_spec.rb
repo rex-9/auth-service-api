@@ -7,6 +7,14 @@ RSpec.describe Payment::Subscription, type: :model do
     expect(build(:payment_subscription, status: nil)).not_to be_valid
   end
 
+  it "validates its Stripe price snapshot shape" do
+    expect(build(:payment_subscription, unit_amount: -1)).not_to be_valid
+    expect(build(:payment_subscription, quantity: 0)).not_to be_valid
+    expect(build(:payment_subscription, interval_count: 0)).not_to be_valid
+    expect(build(:payment_subscription, interval: "quarter")).not_to be_valid
+    expect(build(:payment_subscription, currency: "USD")).not_to be_valid
+  end
+
   it "reports cancellation, renewal, and expiry states" do
     subscription = build(:payment_subscription)
     expect(subscription).to be_active

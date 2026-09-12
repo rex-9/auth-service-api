@@ -6,7 +6,7 @@ class AccessService
 
       resolved_expires_at =
         expires_at ||
-        (product.recurring? ? product.cycle_in_duration.from_now : nil)
+        (product.recurring? ? product.interval_in_duration.from_now : nil)
 
       # create_or_find_by! uses the unique database index to safely handle
       # two workers attempting to create the same access simultaneously.

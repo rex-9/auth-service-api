@@ -183,7 +183,7 @@ Stripe integration covers the full commercial loop:
 - Product and price synchronization.
 - Checkout Sessions for one-time purchases and subscriptions.
 - Customer creation and reuse.
-- Transactions, payment-method metadata, and subscription lifecycle state.
+- PaymentIntent transaction snapshots, payment-method metadata, and Stripe-version-aligned subscription item snapshots.
 - Cancellation-at-period-end and subscription resumption.
 - Access grants and revocation driven by payment state.
 - Persisted webhook events with duplicate protection, processing state, attempts, errors, retention, and admin visibility.
@@ -261,7 +261,7 @@ The storage abstraction defaults to **Garage** (self-hosted S3-compatible distri
   - `POST /v1/admin/assets/batch_undiscard`: Multi-select restoration (restores multiple discarded assets via `undiscard_batch`).
   - `POST /v1/admin/assets/batch_destroy`: Multi-select permanent purging (hard-deletes selected assets and immediately purges backing objects from Garage S3 via `destroy_batch`).
   - All lifecycle actions map cleanly: `destroy_bin`, `destroy_batch`, `discard_batch`, and `undiscard_batch` resolve uniformly under `:delete` permission in authorization.
-- **Unified Asset Lifecycle**: Uploads return the URL and metadata the client needs immediately while retaining provider identifiers, category, media type, extension, size, source, and ownership. `GET /v1/assets` lists stored assets and accepts `type` (`avatar`, `thumbnail`, `audio`, `video`, `attachment`, `general`) plus pagination (`page`, `limit`).
+- **Unified Asset Lifecycle**: Uploads return the URL and metadata the client needs immediately while retaining provider identifiers, category, media type, extension, size, source, and ownership. `GET /v1/assets` lists stored assets and accepts `type` (`avatar`, `thumbnail`, `subtitle`, `audio`, `video`, `attachment`, `general`) plus pagination (`page`, `limit`).
 - **Default Self-Hosted Storage**: `STORAGE_PROVIDER=garage` uses the official `aws-sdk-s3` client connected to the local or production Garage daemon (`http://garage:3100` / `http://localhost:3100`).
 - **Instant Clean Purge**: Storage deletion executes directly (`StorageService::Client.delete`) upon record destruction commit, ensuring storage objects are permanently cleaned without orphan drift.
 - **Provider Switching**: Easily switch between `garage` (S3), `cloudinary`, or `local` via `STORAGE_PROVIDER` without code changes.
@@ -280,6 +280,7 @@ When the media container is enabled (`MEDIA_CONTAINER_ENABLED=true`), uploaded a
   - If meaningful reduction is achieved, the pass counter increments with a fallback safety cap of 2 passes (`MAX_COMPRESSION_PASSES = 2`).
 - **Real-Time Cable Broadcasts**: Status changes (`pending` $\rightarrow$ `processing` $\rightarrow$ `ready` or `optimal`), updated file sizes, and compression ratios broadcast in real-time over ActionCable (`NotificationChannel`) to connected clients.
 - **Canonical Video Thumbnails**: Every uploaded compressible video queues independent FFmpeg thumbnail generation. The resulting WebP is stored beside the original, represented by its own `Asset` linked through `parent_asset_id`, serialized on the source asset, and broadcast as `asset_thumbnail_generated` so Web and Mobile can update without waiting. Admin clients can regenerate a video thumbnail or upload an image replacement for a compressible video or audio parent; replacement commits the new asset before the superseded Garage object is cleaned up.
+- **SRT Subtitles**: Admin clients attach one `.srt` file to a compressible video or audio parent (`POST /v1/admin/assets/:id/subtitle/upload`). The child is `type`/`format` `subtitle`, Garage `raw`, `status: ready`, and is **not** sent to the media queue. Serialized parents expose nested `subtitle` (`id`, `url`, `status`, `size_bytes`). Replacement destroys the previous subtitle record and Garage object first.
 - **Upload Boundaries (`MAX_NON_VIDEO_SIZE_MB` & `MAX_VIDEO_SIZE_MB`)**:
   - Dynamically conditioned on `MEDIA_CONTAINER_ENABLED` and configurable via `MEDIA_MAX_NON_VIDEO_SIZE_MB` and `MEDIA_MAX_VIDEO_SIZE_MB`.
   - **With Media Container** (`MEDIA_CONTAINER_ENABLED=true`): Defaults to **10 MB** for images/non-videos and **100 MB** for videos.

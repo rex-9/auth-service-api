@@ -451,6 +451,120 @@ RSpec.describe "V1 Admin Assets API", type: :request do
     end
   end
 
+  describe "POST /v1/admin/assets/:id/subtitle/upload" do
+    let(:video_asset) { create(:asset, format: "video", extension: "mp4") }
+    let(:srt_file) { fixture_file_upload("captions.srt", "application/x-subrip") }
+
+    before do
+      allow(StorageService::Client).to receive(:upload).and_return(
+        storage_key: "dev/admin/subtitle_replacement.srt",
+        url: "https://assets.example.com/subtitle-replacement.srt",
+        bytes: 128,
+        format: "srt"
+      )
+      allow(StorageService::Client).to receive(:delete).and_return(true)
+      allow(StorageService::Client).to receive(:url) { |key, *_| "https://assets.example.com/#{key}" }
+      allow(Media::CompressImageJob).to receive(:perform_later)
+      allow(Media::CompressVideoJob).to receive(:perform_later)
+      allow(Media::CompressAudioJob).to receive(:perform_later)
+    end
+
+    it "attaches an srt subtitle to a video parent without enqueueing compression" do
+      post "/v1/admin/assets/#{video_asset.id}/subtitle/upload",
+           params: { file: srt_file },
+           headers: headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response_status["success"]).to be(true)
+      expect(video_asset.reload.subtitle).to have_attributes(
+        type: "subtitle",
+        format: "subtitle",
+        extension: "srt",
+        status: "ready",
+        storage_key: "dev/admin/subtitle_replacement.srt"
+      )
+      expect(response_data.dig("asset", "subtitle", "url")).to include("dev/admin/subtitle_replacement.srt")
+      expect(response_data.dig("asset", "subtitle", "status")).to eq("ready")
+      expect(StorageService::Client).to have_received(:upload).with(
+        anything,
+        hash_including(resource_type: "raw")
+      )
+      expect(Media::CompressImageJob).not_to have_received(:perform_later)
+      expect(Media::CompressVideoJob).not_to have_received(:perform_later)
+      expect(Media::CompressAudioJob).not_to have_received(:perform_later)
+    end
+
+    it "replaces the existing subtitle record and storage object" do
+      previous = create(
+        :asset,
+        type: "subtitle",
+        format: "subtitle",
+        extension: "srt",
+        parent_asset: video_asset,
+        storage_key: "dev/admin/subtitle_previous.srt"
+      )
+
+      post "/v1/admin/assets/#{video_asset.id}/subtitle/upload",
+           params: { file: srt_file },
+           headers: headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response_status["success"]).to be(true)
+      expect(Asset.exists?(previous.id)).to be(false)
+      expect(video_asset.reload.subtitle.storage_key).to eq("dev/admin/subtitle_replacement.srt")
+      expect(response_data.dig("asset", "subtitle", "url")).to include("dev/admin/subtitle_replacement.srt")
+      expect(StorageService::Client).to have_received(:delete).with(
+        "dev/admin/subtitle_previous.srt",
+        resource_type: "raw"
+      )
+    end
+
+    it "rejects a non-srt replacement" do
+      image = fixture_file_upload("avatar.png", "image/png")
+
+      post "/v1/admin/assets/#{video_asset.id}/subtitle/upload",
+           params: { file: image },
+           headers: headers
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response_status["success"]).to be(false)
+      expect(StorageService::Client).not_to have_received(:upload)
+    end
+
+    it "attaches a subtitle to a type=audio parent" do
+      audio_asset = create(:asset, type: "audio", format: "audio", extension: "wav")
+
+      post "/v1/admin/assets/#{audio_asset.id}/subtitle/upload",
+           params: { file: srt_file },
+           headers: headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response_status["success"]).to be(true)
+      expect(audio_asset.reload.subtitle.storage_key).to eq("dev/admin/subtitle_replacement.srt")
+      expect(response_data.dig("asset", "subtitle", "url")).to include("dev/admin/subtitle_replacement.srt")
+    end
+
+    it "rejects a non-audio, non-video parent" do
+      image_asset = create(:asset, format: "image", extension: "png")
+      pdf_asset = create(:asset, type: "general", format: "doc", extension: "pdf")
+
+      post "/v1/admin/assets/#{image_asset.id}/subtitle/upload",
+           params: { file: srt_file },
+           headers: headers
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response_status["success"]).to be(false)
+      expect(StorageService::Client).not_to have_received(:upload)
+
+      post "/v1/admin/assets/#{pdf_asset.id}/subtitle/upload",
+           params: { file: srt_file },
+           headers: headers
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(StorageService::Client).not_to have_received(:upload)
+    end
+  end
+
   describe "GET /v1/admin/assets/storage_stats" do
     it "returns storage statistics" do
       grant_super_admin_role(admin)
