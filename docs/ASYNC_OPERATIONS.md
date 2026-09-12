@@ -11,7 +11,7 @@ Every lifecycle payload carries:
 - `operation_id`: stable for the full lifetime of one operation.
 - `operation_type`: one of the values in `NotificationConstants::OperationType`.
 - `operation_status`: one of the values in `NotificationConstants::OperationStatus`.
-- `link`: the client route for the affected resource.
+- `link`: the single destination for the affected resource. It may be a shared in-app route or an absolute HTTPS external URL. Core never emits separate Web and Mobile links; each client resolves the same value through its native navigation policy.
 
 Producers must create a new `operation_id` for each invocation and reuse that ID
 for every transition of that invocation. Re-running work for the same resource
@@ -35,5 +35,5 @@ When adding another queued operation:
 2. Return the queued operation fields in the `202 Accepted` response.
 3. Emit `processing` when the worker starts.
 4. Emit exactly one terminal `completed` or `failed` transition.
-5. Add the resource link and keep it valid in Web and Mobile.
+5. Add one resource link and keep its meaning valid in Web and Mobile. Unsupported platform-specific detail routes must keep the current Mobile screen open and show the shared Web-availability confirmation. Only explicit HTTPS destinations may leave the app, after confirmation.
 6. Document the response/event in OpenAPI and cover every transition in specs.

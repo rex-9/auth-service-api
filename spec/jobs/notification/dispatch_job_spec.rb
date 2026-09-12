@@ -54,6 +54,7 @@ RSpec.describe Notification::DispatchJob, type: :job do
       push_title: "Announcement",
       push_body: "We have an important announcement for you.",
       link: nil,
+      clients: NotificationConstants::Client::DEFAULT,
       data: { type: "general_announcement" },
       push_template_id: nil,
       email_template: nil,

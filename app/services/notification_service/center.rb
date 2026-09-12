@@ -9,7 +9,7 @@ module NotificationService
     class << self
       # ===== UNIFIED METHODS =====
 
-      def operation(user_id:, operation_id:, operation_type:, operation_status:, message:, link:, data: {})
+      def operation(user_id:, operation_id:, operation_type:, operation_status:, message:, link:, data: {}, clients: nil)
         notify(
           user_id: user_id,
           title: message,
@@ -18,14 +18,17 @@ module NotificationService
           operation_type: operation_type,
           operation_status: operation_status,
           link: link,
+          clients: clients,
           data: data,
           send_socket: true
         )
       end
 
-      def notify(user_id:, user_email: nil, title: nil, message: nil, push_title: nil, push_body: nil, link: nil, data: {}, operation_id: nil, operation_type: nil, operation_status: nil, send_socket: false, send_push: false, send_email: false, email_template: nil, email_template_data: {}, template_id: nil, push_template_id: nil, **kwargs)
+      def notify(user_id:, user_email: nil, title: nil, message: nil, push_title: nil, push_body: nil, link: nil, clients: nil, data: {}, operation_id: nil, operation_type: nil, operation_status: nil, send_socket: false, send_push: false, send_email: false, email_template: nil, email_template_data: {}, template_id: nil, push_template_id: nil, **kwargs)
         results = {}
-        push_requested = send_push && (push_title.present? || title.present? || push_template_id.present?)
+        clients ||= Notification.find_by(id: template_id)&.clients if template_id.present?
+        clients = notification_clients(clients, link)
+        push_requested = send_push && clients.include?(NotificationConstants::Client::MOBILE) && (push_title.present? || title.present? || push_template_id.present?)
         # Every push has one canonical persisted in-app notification. This gives
         # every client the same UserNotification ID for open analytics.
         send_socket ||= push_requested
@@ -50,6 +53,7 @@ module NotificationService
                   title: title.presence || message.presence || "Notification",
                   message: message.presence || title.presence || "Notification",
                   link: link,
+                  clients: clients,
                   data: data
                 },
                 status: operation_status,
@@ -65,6 +69,7 @@ module NotificationService
                 title: title.presence || message.presence || "Notification",
                 message: message.presence || title.presence || "Notification",
                 link: link,
+                clients: clients,
                 data: data,
                 read_at: nil
               )
@@ -80,6 +85,7 @@ module NotificationService
                 title: user_notification.title,
                 message: user_notification.message,
                 link: user_notification.link,
+                clients: user_notification.clients,
                 data: user_notification.data,
                 read_at: user_notification.read_at,
                 created_at: user_notification.created_at.iso8601
@@ -88,6 +94,7 @@ module NotificationService
               {
                 user_id: user_id,
                 message: message || title,
+                clients: clients,
                 data: data
               }
             end
@@ -170,7 +177,7 @@ module NotificationService
         message = template ? template.render_text(template.in_app_body, user: user, context: context) : payment_message(MessageService::Payment::PAYMENT_SUCCESS_BODY, product_name: product.name, amount: product.display_price)
         push_title = template ? template.render_text(template.push_title.presence || template.in_app_title, user: user, context: context) : title
         push_body = template ? template.render_text(template.push_body.presence || template.in_app_body, user: user, context: context) : message
-        link = template&.link.presence || "/payment/transactions"
+        link = template_link(template, NotificationConstants::Link::PAYMENT)
 
         notify(
           user_id: user.id,
@@ -209,7 +216,7 @@ module NotificationService
         message = template ? template.render_text(template.in_app_body, user: user, context: context) : payment_message(MessageService::Payment::SUBSCRIPTION_CREATED_BODY)
         push_title = template ? template.render_text(template.push_title.presence || template.in_app_title, user: user, context: context) : title
         push_body = template ? template.render_text(template.push_body.presence || template.in_app_body, user: user, context: context) : message
-        link = template&.link.presence || "/payment/subscriptions"
+        link = template_link(template, NotificationConstants::Link::PAYMENT)
 
         notify(
           user_id: user.id,
@@ -249,7 +256,7 @@ module NotificationService
         message = template ? template.render_text(template.in_app_body, user: user, context: context) : subscription_canceled_message(product, active_until)
         push_title = template ? template.render_text(template.push_title.presence || template.in_app_title, user: user, context: context) : title
         push_body = template ? template.render_text(template.push_body.presence || template.in_app_body, user: user, context: context) : message
-        link = template&.link.presence || "/payment/subscriptions"
+        link = template_link(template, NotificationConstants::Link::PAYMENT)
 
         notify(
           user_id: user.id,
@@ -288,7 +295,7 @@ module NotificationService
         message = template ? template.render_text(template.in_app_body, user: user, context: context) : payment_message(MessageService::Payment::SUBSCRIPTION_RESUMED_BODY, product_name: product.name)
         push_title = template ? template.render_text(template.push_title.presence || template.in_app_title, user: user, context: context) : title
         push_body = template ? template.render_text(template.push_body.presence || template.in_app_body, user: user, context: context) : message
-        link = template&.link.presence || "/payment/subscriptions"
+        link = template_link(template, NotificationConstants::Link::PAYMENT)
 
         notify(
           user_id: user.id,
@@ -326,7 +333,7 @@ module NotificationService
         message = template ? template.render_text(template.in_app_body, user: user, context: context) : payment_message(MessageService::Payment::PAYMENT_FAILED_BODY, product_name: product.name, amount: product.display_price)
         push_title = template ? template.render_text(template.push_title.presence || template.in_app_title, user: user, context: context) : title
         push_body = template ? template.render_text(template.push_body.presence || template.in_app_body, user: user, context: context) : message
-        link = template&.link.presence || "/payment/subscriptions"
+        link = template_link(template, NotificationConstants::Link::PAYMENT)
 
         notify(
           user_id: user.id,
@@ -363,7 +370,7 @@ module NotificationService
         message = template ? template.render_text(template.in_app_body, user: user, context: context) : notification_message(MessageService::Notification::WELCOME_BODY, name: name)
         push_title = template ? template.render_text(template.push_title.presence || template.in_app_title, user: user, context: context) : title
         push_body = template ? template.render_text(template.push_body.presence || template.in_app_body, user: user, context: context) : message
-        link = template&.link.presence || "/"
+        link = template_link(template, NotificationConstants::Link::HOME)
 
         notify(
           user_id: user_id,
@@ -391,7 +398,7 @@ module NotificationService
         message = template ? template.render_text(template.in_app_body, user: user, context: context) : notification_message(MessageService::Notification::SIGN_IN_ALERT_BODY, name: name)
         push_title = template ? template.render_text(template.push_title.presence || template.in_app_title, user: user, context: context) : title
         push_body = template ? template.render_text(template.push_body.presence || template.in_app_body, user: user, context: context) : message
-        link = template&.link.presence || "/settings"
+        link = template_link(template, NotificationConstants::Link::PROFILE)
 
         notify(
           user_id: user_id,
@@ -457,12 +464,27 @@ module NotificationService
 
       private
 
+      def notification_clients(clients, link)
+        return NotificationConstants::Client::ADMIN_PORTAL if link.to_s.start_with?("/admin")
+
+        values = Array(clients.presence || NotificationConstants::Client::DEFAULT).map(&:to_s).uniq
+        values.presence || NotificationConstants::Client::DEFAULT
+      end
+
       def template_for(event)
         return nil unless defined?(Notification)
 
         Notification.find_by(event: event)
       rescue ActiveRecord::StatementInvalid
         nil
+      end
+
+      def template_link(template, fallback)
+        return fallback unless template&.link.present?
+        return template.link if template.link.in?(NotificationConstants::Link::TEMPLATE_LINKS)
+        return template.link if template.link.start_with?(NotificationConstants::Link::HTTPS_PREFIX)
+
+        fallback
       end
 
       def format_date(time)
@@ -500,7 +522,7 @@ module NotificationService
           operation_type: NotificationConstants::OperationType::NOTIFICATION_DELIVERY,
           title: title,
           message: message,
-          link: link.presence || "/",
+          link: link.presence || NotificationConstants::Link::HOME,
           data: data.merge(channel: channel)
         }
       end

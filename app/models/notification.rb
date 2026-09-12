@@ -1,3 +1,5 @@
+require "uri"
+
 # app/models/notification.rb
 class Notification < ApplicationRecord
   self.table_name = "notifications"
@@ -9,10 +11,13 @@ class Notification < ApplicationRecord
   validates :event, presence: true, uniqueness: { conditions: -> { kept } }
   validates :name, presence: true
   validates :category, presence: true, inclusion: { in: NotificationConstants::Category::ALL }
+  validate :clients_are_valid
+  validate :link_is_supported_destination
 
   # ===== SCOPES =====
   scope :for_category, ->(cat) { where(category: cat) }
   scope :for_admin, -> { where(admin: true) }
+  scope :for_client, ->(client) { where("clients @> ARRAY[?]::varchar[]", client.to_s) }
 
   # ===== TEMPLATE INTERPOLATION =====
   def render_text(text, user: nil, context: {})
@@ -29,5 +34,26 @@ class Notification < ApplicationRecord
     end
 
     interpolated
+  end
+
+  private
+
+  def clients_are_valid
+    valid = clients.is_a?(Array) && clients.present? && clients.uniq == clients &&
+      clients.all? { |client| client.match?(NotificationConstants::Client::FORMAT) }
+    return if valid
+
+    errors.add(:clients, :invalid)
+  end
+
+  def link_is_supported_destination
+    return if link.blank? || link.in?(NotificationConstants::Link::TEMPLATE_LINKS)
+
+    uri = URI.parse(link)
+    return if uri.is_a?(URI::HTTPS) && uri.host.present?
+
+    errors.add(:link, :invalid)
+  rescue URI::InvalidURIError
+    errors.add(:link, :invalid)
   end
 end

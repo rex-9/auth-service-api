@@ -266,19 +266,19 @@ Service Layer (app/services/)
 - **Rule**: Documentation is NOT an afterthought; documentation files MUST be updated synchronously in the exact same turn as code changes:
   - **`README.md`** MUST be updated with newly added endpoints, dashboard routes, jobs, CLI scripts, or configuration variables.
   - **`ECOSYSTEM.md`** MUST be updated whenever changes affect cross-platform feature parity, shared contracts, WebSocket events, or communication protocols between Core, Web, and Mobile.
-  - **`SCHEMA.md`** MUST be updated synchronously whenever tables, columns, indexes, or ApplicationRecord models are modified (Law 12).
+  - **`docs/SCHEMA.md`** MUST be updated synchronously whenever tables, columns, indexes, or ApplicationRecord models are modified (Law 12).
   - **`LAW.md`** represents the supreme, non-negotiable constitutional framework. **The Law takes absolute first priority over the code.** Never alter or weaken `LAW.md` to justify non-compliant code; fix the code instead. `LAW.md` should ONLY be adjusted when the project creator (Rex) explicitly decrees a constitutional law change.
 
 ---
 
-## 🏛️ 12. Database Schema Documentation Law (`SCHEMA.md`)
+## 🏛️ 12. Database Schema Documentation Law (`docs/SCHEMA.md`)
 
-- **Rule**: `SCHEMA.md` MUST be updated synchronously EVERY TIME the database schema is updated:
+- **Rule**: `docs/SCHEMA.md` MUST be updated synchronously EVERY TIME the database schema is updated:
   - Whenever a database migration is created, run, or modified (`db/migrate/*` or `db/schema.rb`).
   - Whenever an `ApplicationRecord` model is created, updated, soft-deleted, or deleted.
   - Whenever new columns, foreign keys, indexes, enums, or relationships are added or changed.
-  - **Omission Rule**: Keep `SCHEMA.md` focused strictly on **Core Application Records** (`users`, `roles`, `permissions`, `products`, `subscriptions`, `transactions`, `accesses`, `assets`, `chat_rooms`, `chat_messages`, `feedbacks`, `log_clients`). NEVER include background engine / APM telemetry tables (`solid_queue_*`, `solid_cable_*`, `solid_cache_*`, `rails_pulse_*`, `rails_error_dashboard_*`).
-  - **Zero Tolerance**: Leaving `SCHEMA.md` out-of-sync with `db/schema.rb` or active models is an architectural violation.
+  - **Omission Rule**: Keep `docs/SCHEMA.md` focused strictly on **Core Application Records** (`users`, `roles`, `permissions`, `products`, `subscriptions`, `transactions`, `accesses`, `assets`, `chat_rooms`, `chat_messages`, `feedbacks`, `log_clients`). NEVER include background engine / APM telemetry tables (`solid_queue_*`, `solid_cable_*`, `solid_cache_*`, `rails_pulse_*`, `rails_error_dashboard_*`).
+  - **Zero Tolerance**: Leaving `docs/SCHEMA.md` out-of-sync with `db/schema.rb` or active models is an architectural violation.
 
 ---
 

@@ -92,7 +92,7 @@ RSpec.describe "Admin notification management and dispatch", type: :request do
       unconfirmed = create(:user, :unconfirmed)
 
       post "/v1/admin/notifications/dispatch",
-           params: valid_params.merge(audience: { type: "users", user_ids: [unconfirmed.id] }),
+           params: valid_params.merge(audience: { type: "users", user_ids: [ unconfirmed.id ] }),
            headers: headers
 
       expect(response).to have_http_status(:unprocessable_content)
@@ -191,6 +191,7 @@ RSpec.describe "Admin notification management and dispatch", type: :request do
           event: "black_friday",
           name: "Black Friday Sale",
           category: NotificationConstants::Category::MARKETING,
+          clients: [ NotificationConstants::Client::WEB ],
           admin: true,
           in_app_title: "Huge discount!",
           in_app_body: "Check out the discounts.",
@@ -204,6 +205,28 @@ RSpec.describe "Admin notification management and dispatch", type: :request do
       expect(response).to have_http_status(:created)
       expect(response_data.dig("attributes", "event")).to eq("black_friday")
       expect(response_data.dig("attributes", "name")).to eq("Black Friday Sale")
+      expect(response_data.dig("attributes", "clients")).to eq([ NotificationConstants::Client::WEB ])
+    end
+
+    it "accepts HTTPS destinations and rejects insecure external links" do
+      grant_admin_notification_permission(action: "create")
+      attributes = {
+        event: "external_announcement",
+        name: "External Announcement",
+        category: NotificationConstants::Category::MARKETING,
+        link: "https://example.com/announcement"
+      }
+
+      post "/v1/admin/notifications", params: { notification: attributes }, headers: headers
+
+      expect(response).to have_http_status(:created)
+      expect(response_data.dig("attributes", "link")).to eq("https://example.com/announcement")
+
+      post "/v1/admin/notifications",
+           params: { notification: attributes.merge(event: "insecure_announcement", link: "http://example.com") },
+           headers: headers
+
+      expect(response).to have_http_status(:unprocessable_content)
     end
 
     it "fetches a single notification by id" do
@@ -221,12 +244,14 @@ RSpec.describe "Admin notification management and dispatch", type: :request do
 
       put "/v1/admin/notifications/#{notification_record.id}", params: {
         notification: {
-          name: "Winter Sale"
+          name: "Winter Sale",
+          clients: [ NotificationConstants::Client::MOBILE ]
         }
       }, headers: headers
 
       expect(response).to have_http_status(:ok)
       expect(notification_record.reload.name).to eq("Winter Sale")
+      expect(notification_record.clients).to eq([ NotificationConstants::Client::MOBILE ])
     end
 
     it "discards and undiswards a notification" do

@@ -2,7 +2,7 @@
 class V1::NotificationsController < V1::ApplicationController
   # GET /v1/notifications
   def index
-    scope = current_user.user_notifications.kept.recent
+    scope = client_notifications.recent
 
     case params[:filter].to_s.downcase
     when "unread"
@@ -23,7 +23,7 @@ class V1::NotificationsController < V1::ApplicationController
 
   # GET /v1/notifications/unread_count
   def read_unread_count
-    count = current_user.user_notifications.kept.unread.count
+    count = client_notifications.unread.count
 
     render_json_response(
       status_code: 200,
@@ -34,7 +34,7 @@ class V1::NotificationsController < V1::ApplicationController
 
   # PUT /v1/notifications/:id/read
   def update_read
-    notification = current_user.user_notifications.kept.find(params[:id])
+    notification = client_notifications.find(params[:id])
     notification.mark_as_read!
 
     render_json_response(
@@ -46,7 +46,7 @@ class V1::NotificationsController < V1::ApplicationController
 
   # PUT /v1/notifications/read_all
   def update_read_all
-    unread_scope = current_user.user_notifications.kept.unread
+    unread_scope = client_notifications.unread
     counts_by_notif = unread_scope.where.not(notification_id: nil).group(:notification_id).count
     unread_scope.update_all(read_at: Time.current, updated_at: Time.current)
 
@@ -63,7 +63,7 @@ class V1::NotificationsController < V1::ApplicationController
 
   # DELETE /v1/notifications/:id
   def destroy
-    notification = current_user.user_notifications.kept.find(params[:id])
+    notification = client_notifications.find(params[:id])
     notification.discard
 
     render_json_response(
@@ -74,6 +74,16 @@ class V1::NotificationsController < V1::ApplicationController
   end
 
   private
+
+  def client_notifications
+    current_user.user_notifications.kept.for_client(notification_client)
+  end
+
+  def notification_client
+    return NotificationConstants::Client::WEB if platform_session == AuthConstants::Platform::WEB
+
+    NotificationConstants::Client::MOBILE
+  end
 
   def notification_message(key, **options)
     MessageService::Notification.t(key, **options)
