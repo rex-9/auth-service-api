@@ -2,6 +2,24 @@
 
 # app/constants/notification_constants.rb
 module NotificationConstants
+  module Client
+    WEB = "web".freeze
+    MOBILE = "mobile".freeze
+    DEFAULT = [ WEB, MOBILE ].freeze
+    ADMIN_PORTAL = [ WEB ].freeze
+    FORMAT = /\A[a-z][a-z0-9_]*\z/.freeze
+  end
+
+  module Link
+    HOME = "/home".freeze
+    PROFILE = "/profile".freeze
+    PAYMENT = "/payment".freeze
+    AI = "/ai".freeze
+    HTTPS_PREFIX = "https://".freeze
+
+    TEMPLATE_LINKS = [ HOME, PROFILE, PAYMENT, AI ].freeze
+  end
+
   module OperationStatus
     QUEUED = "queued".freeze
     PROCESSING = "processing".freeze
@@ -69,7 +87,7 @@ module NotificationConstants
         name: "Welcome to Rexone",
         description: "Sent when a new user joins the platform",
         category: Category::SYSTEM,
-        link: "/",
+        link: Link::HOME,
         admin: true,
         in_app_title: "Welcome aboard! 🎉",
         in_app_body: "Hey {{user_name}}, thanks for joining Rexone! We're excited to have you.",
@@ -83,7 +101,7 @@ module NotificationConstants
         name: "New Sign In Alert",
         description: "Sent when a new sign-in is detected",
         category: Category::SYSTEM,
-        link: "/settings",
+        link: Link::PROFILE,
         admin: true,
         in_app_title: "New Sign In",
         in_app_body: "Hi {{user_name}}, we noticed a new sign-in to your account at {{time}}.",
@@ -97,7 +115,7 @@ module NotificationConstants
         name: "Payment Success",
         description: "Sent upon successful payment processing",
         category: Category::SYSTEM,
-        link: "/payment/transactions",
+        link: Link::PAYMENT,
         admin: true,
         in_app_title: "Payment Successful",
         in_app_body: "Your payment of {{amount}} for {{product_name}} was completed successfully.",
@@ -111,7 +129,7 @@ module NotificationConstants
         name: "Payment Failed",
         description: "Sent when an invoice payment fails",
         category: Category::SYSTEM,
-        link: "/payment/subscriptions",
+        link: Link::PAYMENT,
         admin: true,
         in_app_title: "Payment Failed",
         in_app_body: "Your payment of {{amount}} for {{product_name}} could not be processed.",
@@ -125,7 +143,7 @@ module NotificationConstants
         name: "Subscription Started",
         description: "Sent when a new subscription is activated",
         category: Category::SYSTEM,
-        link: "/payment/subscriptions",
+        link: Link::PAYMENT,
         admin: true,
         in_app_title: "Subscription Started",
         in_app_body: "You are now subscribed to {{product_name}} ({{period}}).",
@@ -139,7 +157,7 @@ module NotificationConstants
         name: "Subscription Canceled",
         description: "Sent when a subscription cancellation is scheduled",
         category: Category::SYSTEM,
-        link: "/payment/subscriptions",
+        link: Link::PAYMENT,
         admin: true,
         in_app_title: "Subscription Canceled",
         in_app_body: "Your subscription to {{product_name}} has been canceled. Access remains active until {{active_until}}.",
@@ -153,7 +171,7 @@ module NotificationConstants
         name: "Subscription Resumed",
         description: "Sent when a pending canceled subscription is resumed",
         category: Category::SYSTEM,
-        link: "/payment/subscriptions",
+        link: Link::PAYMENT,
         admin: true,
         in_app_title: "Subscription Resumed",
         in_app_body: "Your subscription to {{product_name}} has been successfully resumed.",

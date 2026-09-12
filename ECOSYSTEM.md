@@ -328,7 +328,8 @@ All three pillars of the Rexone platform are fully aligned at **100% feature par
       - `asset_updated`: `{ "type": "asset_updated", "id": "UUID", "status": "optimal" | "ready" | "processing", "size_bytes": 12345, "compressed_size_bytes": 12000, "compression_ratio": "2.8%", "compression_passes": 1 }`
       - `payment_success`: `{ "type": "payment_success", "product_name": "Pro Plan", "amount": "$10.00" }`
       - `subscription_created` / `subscription_canceled` / `subscription_resumed`: `{ "type": "subscription_canceled", "product_name": "...", "active_until": "ISO8601" }`
-      - `in_app_notification`: `{ "id": "UUID", "title": "...", "message": "...", "link": "/dashboard", "read_at": null, "created_at": "ISO8601", "data": { ... } }`
+      - `in_app_notification`: `{ "id": "UUID", "title": "...", "message": "...", "link": "/home", "read_at": null, "created_at": "ISO8601", "data": { ... } }`
+      - `link` is the single navigation target. Shared in-app destinations are `/home`, `/profile`, `/payment`, and `/ai`; an absolute `https://` URL represents an external destination. Web opens external destinations in a new tab. Mobile asks for confirmation before leaving Rexone and opening the system browser. Unsupported internal routes and IAM updates keep the current Mobile screen open and identify the Rexone Web admin portal through the shared confirmation dialog.
       - `welcome`: Sent upon first successful Action Cable subscription.
   - **`SpeechLiveChannel`** (`speech_live_{user_id}`):
     - **Subscription Parameters**: `{ "channel": "SpeechLiveChannel", "language": "en-US" }`

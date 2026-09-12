@@ -3,7 +3,9 @@
 # Comprehensive, idempotent database synchronization & backfill script.
 # Safely updates schema and backfills data WITHOUT dropping tables or losing user data.
 
-docker compose -f docker-compose.dev.yaml exec api bundle exec rails runner "
+BACKFILL_ENV="${1:-development}"
+
+docker compose -f docker-compose.dev.yaml exec -e RAILS_ENV="$BACKFILL_ENV" api bundle exec rails runner "
   ActiveRecord::Base.transaction do
     puts '========================================================'
     puts '🚀 STARTING DATABASE SYNCHRONIZATION & BACKFILL'
@@ -12,7 +14,7 @@ docker compose -f docker-compose.dev.yaml exec api bundle exec rails runner "
     # ----------------------------------------------------
     # 1. PAYMENT PRODUCTS: Code Column & Unique Backfill
     # ----------------------------------------------------
-    puts '\n📦 [1/4] Synchronizing Payment Products...'
+    puts '\n📦 [1/5] Synchronizing Payment Products...'
     unless ActiveRecord::Base.connection.column_exists?(:payment_products, :code)
       puts '  -> Adding missing \"code\" column to payment_products table...'
       ActiveRecord::Base.connection.add_column :payment_products, :code, :string
@@ -42,7 +44,7 @@ docker compose -f docker-compose.dev.yaml exec api bundle exec rails runner "
     # ----------------------------------------------------
     # 2. IAM: Permissions & System Roles Synchronization
     # ----------------------------------------------------
-    puts '\n🔐 [2/4] Synchronizing IAM Permissions & Roles...'
+    puts '\n🔐 [2/5] Synchronizing IAM Permissions & Roles...'
     perm_count = 0
     Iam::Permission::RESOURCES.each do |resource|
       Iam::Permission::ACTIONS.each do |action|
@@ -93,7 +95,7 @@ docker compose -f docker-compose.dev.yaml exec api bundle exec rails runner "
     # ----------------------------------------------------
     # 3. USERS: Ensure Every User Has a Role
     # ----------------------------------------------------
-    puts '\n👥 [3/4] Ensuring All Users Have Roles Assigned...'
+    puts '\n👥 [3/5] Ensuring All Users Have Roles Assigned...'
     orphaned_user_count = 0
     User.find_each do |user|
       if user.user_roles.empty?
@@ -107,7 +109,7 @@ docker compose -f docker-compose.dev.yaml exec api bundle exec rails runner "
     # ----------------------------------------------------
     # 4. ENTITLEMENT ACCESSES & LOGS: Backfill Timestamps
     # ----------------------------------------------------
-    puts '\n📋 [4/4] Sanitizing Accesses and System Telemetry...'
+    puts '\n📋 [4/5] Sanitizing Accesses and System Telemetry...'
     Access.where(granted_at: nil).find_each do |access|
       access.update_columns(granted_at: access.created_at || Time.current)
     end
@@ -121,6 +123,31 @@ docker compose -f docker-compose.dev.yaml exec api bundle exec rails runner "
       Client::Log.where(occurrence_count: nil).update_all(occurrence_count: 1)
     end
     puts '  ✅ Accesses and client logs sanitized.'
+
+    # ----------------------------------------------------
+    # 5. NOTIFICATIONS: Client Targeting
+    # ----------------------------------------------------
+    puts '\n🔔 [5/5] Synchronizing notification client targeting...'
+    default_clients = NotificationConstants::Client::DEFAULT
+
+    [ :notifications, :user_notifications ].each do |table|
+      unless ActiveRecord::Base.connection.column_exists?(table, :clients)
+        ActiveRecord::Base.connection.add_column table, :clients, :string, array: true, null: false, default: default_clients
+      end
+
+      ActiveRecord::Base.connection.execute(<<~SQL)
+        UPDATE #{table}
+        SET clients = ARRAY['web', 'mobile']::varchar[]
+        WHERE clients IS NULL OR cardinality(clients) = 0
+      SQL
+
+      unless ActiveRecord::Base.connection.index_exists?(table, :clients)
+        ActiveRecord::Base.connection.add_index table, :clients, using: :gin
+      end
+    end
+    UserNotification.where('link LIKE ?', '/admin/%')
+                    .update_all(clients: NotificationConstants::Client::ADMIN_PORTAL)
+    puts '  ✅ Existing notifications target both clients; admin routes target Web only.'
 
     puts '\n========================================================'
     puts '🎉 ALL DATABASE SYNCHRONIZATIONS & BACKFILLS COMPLETED!'

@@ -13,6 +13,12 @@ RSpec.describe UserNotification, type: :model do
       expect(build(:user_notification, user: user, title: nil)).not_to be_valid
       expect(build(:user_notification, user: user, message: nil)).not_to be_valid
     end
+
+    it "requires one or more normalized client identifiers" do
+      expect(build(:user_notification, user: user, clients: [ "mobile", "mobile2" ])).to be_valid
+      expect(build(:user_notification, user: user, clients: [])).not_to be_valid
+      expect(build(:user_notification, user: user, clients: [ "Mobile" ])).not_to be_valid
+    end
   end
 
   describe "scopes and methods" do

@@ -7,6 +7,14 @@ RSpec.describe Iam::Role, type: :model do
     expect(build(:role, name: "admin")).not_to be_valid
   end
 
+    it "allows only lowercase letters, numbers, and underscores in custom role names" do
+      expect(build(:role, name: "content_admin")).to be_valid
+      expect(build(:role, name: "content_admin2")).to be_valid
+      expect(build(:role, name: "ContentAdmin")).not_to be_valid
+      expect(build(:role, name: "content admin")).not_to be_valid
+      expect(build(:role, name: "content-admin")).not_to be_valid
+    end
+
   it "grants and revokes permissions idempotently" do
     role = create(:role, name: "editor")
     permission = create(:permission, action: "update", resource: "users")

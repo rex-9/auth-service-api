@@ -10,6 +10,9 @@ module Iam
     has_many :permissions, through: :role_permissions
 
     validates :name, presence: true, uniqueness: true
+    validates :name,
+              format: { with: /\A[a-z0-9_]+\z/, message: "must contain only lowercase letters, numbers, and underscores" },
+              unless: :system?
 
     scope :system, -> { where(system: true) }
     scope :admin_roles, -> { where("name ILIKE '%admin%'") }

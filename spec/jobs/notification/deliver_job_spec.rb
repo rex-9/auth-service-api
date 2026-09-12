@@ -5,10 +5,17 @@ RSpec.describe Notification::DeliverJob, type: :job do
     allow(SocketService::Client).to receive(:broadcast).and_return(true)
     allow(PushNotiService::Client).to receive(:send_to_user).and_return(true)
 
-    described_class.perform_now(channel: "socket", payload: { "user_id" => "1", "message" => "Hi" })
+    described_class.perform_now(
+      channel: "socket",
+      payload: { "user_id" => "1", "message" => "Hi", "clients" => %w[web mobile] }
+    )
     described_class.perform_now(channel: :push, payload: { "user_id" => "1", "title" => "Hi", "body" => "Body" })
 
-    expect(SocketService::Client).to have_received(:broadcast).with(user_id: "1", message: "Hi")
+    expect(SocketService::Client).to have_received(:broadcast).with(
+      user_id: "1",
+      message: "Hi",
+      clients: %w[web mobile]
+    )
     expect(PushNotiService::Client).to have_received(:send_to_user).with(user_id: "1", title: "Hi", body: "Body")
   end
 

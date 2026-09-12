@@ -18,7 +18,7 @@ Built under a simple creed: **clear in thought, exact in structure, simple in us
 
 **API-first · Modular · Observable · Queue-aware · Built to grow**
 
-[Explore the foundation](#feature-map) · [Ecosystem Architecture](ECOSYSTEM.md) · [Development Law](LAW.md) · [Production Deployment](docs/DEPLOYMENT.md) · [Security Hardening](docs/DDOS.md) · [Async Operations](docs/ASYNC_OPERATIONS.md) · [Analytics Guide](docs/ANALYTICS.md) · [Run it locally](#getting-started) · [Open the dashboards](#operations-center) · [Meet the architecture](#architecture)
+[Quick Start](docs/QUICK_START.md) · [Explore the foundation](#feature-map) · [Foundation Guide](docs/FOUNDATION.md) · [Ecosystem Architecture](ECOSYSTEM.md) · [Who it is for](#who-rexone-is-for) · [Development Law](LAW.md) · [Production Deployment](docs/DEPLOYMENT.md)
 
 </div>
 
@@ -48,6 +48,32 @@ And no—this was not vibe-coded into existence.
 The boundaries were reasoned about. Failure paths were traced. Immediate work was separated from deferred work. Retries, idempotency, observability, security, and data lifecycle were treated as engineering concerns, not decorations added after the demo survived.
 
 Rexone Core brings startup speed with battle-tested discipline—and fewer final-hour whispers of _“we should probably build that before launch.”_
+
+## Who Rexone is for
+
+Rexone is built for Rails teams, founder-engineers, and agencies creating API-first web or mobile products that need production infrastructure without rebuilding the same foundation for every launch.
+
+It is a particularly good fit when a product needs several of these capabilities to work together:
+
+- Authentication and explicit role-based access control.
+- Stripe payments connected to durable entitlements.
+- Provider-neutral media storage and background optimization.
+- In-app, push, email, and real-time notification delivery.
+- Queued AI and speech workflows that survive client disconnection.
+- Operational dashboards, client telemetry, audit trails, and health checks.
+- Reference React and Flutter clients consuming the same contracts.
+
+Rexone is not a no-code application generator or a promise that every product domain is already modeled. It supplies the disciplined platform foundation; the product remains responsible for its own domain, workflows, interface, and operating decisions.
+
+## What you get
+
+- **One coherent system:** identity, authorization, commerce, media, async work, notifications, and observability are designed to cooperate.
+- **Real client contracts:** [Rexone Web](https://github.com/rex-9/rexone-web) and [Rexone Mobile](https://github.com/rex-9/rexone_mobile) exercise the same versioned API and real-time events.
+- **Replaceable providers:** external services remain behind focused client and base contracts.
+- **Inspectable operations:** queues, cache, sockets, performance, backend errors, and frontend telemetry have explicit operational surfaces.
+- **A documented engineering standard:** architectural constraints, API conventions, lifecycle rules, and cross-client responsibilities are written down and tested.
+
+The public [open-source growth roadmap](docs/OPEN_SOURCE_GROWTH_ROADMAP.md) tracks how Rexone will improve evaluation, evidence, contribution readiness, and responsible distribution.
 
 ## The philosophy
 
@@ -143,6 +169,7 @@ The exact queue structure can also be customized around the requirements of the 
 
 The API and worker run as separate services in Docker, keeping request handling and background execution independently scalable.
 
+<<<<<<< HEAD
 ## The foundation in detail
 
 ### Authentication & security
@@ -358,44 +385,13 @@ Clients call `GET /v1/client/versions/current?version=1.2.0` on splash. `update_
 Backend, frontend, synchronous, and asynchronous failures leave different clues. Rexone Core gives each one a proper home.
 
 Behavioral marketing analytics stays in Firebase/GA4 rather than the primary database. Core constantizes the shared Web/Mobile `action_noun` event vocabulary while remaining the authoritative source for users, access, payments, subscriptions, and operational business aggregates.
+=======
+## Foundation capabilities
+>>>>>>> e81c94415f7404d6baaeb677640e926058305491
 
-Every push delivery also creates or updates its canonical persisted in-app `UserNotification`; clients use that record ID as `open_notification.notification_id`, never a provider-specific OneSignal identifier.
+Rexone Core integrates identity, IAM, payments and entitlements, notifications, media, AI, speech, version management, administration, and observability behind explicit service and provider boundaries.
 
-- **Rails Pulse** tracks request, query, and background-job performance with configurable thresholds.
-- **Rails Error Dashboard** captures, groups, analyzes, and retains backend exceptions. Optional Slack, email, Discord, PagerDuty, and webhook alerts are supported but disabled by default.
-- **Client Logs** accept structured errors from web and mobile clients, including stack traces, platform/device context, severity, occurrences, and resolution state. Ingest still sends `app_version`; Core stores nullable `version_id` when that number matches a kept version. Feedback ingest uses the same lookup.
-- **Solid Web UI** exposes queue, cache, and cable operations.
-- **Health checks** are available at `/up` for containers and load balancers.
-
-That is full-stack visibility without requiring an external observability platform on day one.
-
-### Administration
-
-The server-rendered Administrate workspace manages users, assets, access grants, IAM, payments, webhook events, chat data, client logs, app versions, and user versions.
-
-- **App versions** (`/admin/client/versions`): super-admin only. `draft` / `published` / `yanked`, force-update flag, build numbers. `released_at` is stamped automatically on first publish (null until then). Publishing yanks every other kept published version.
-- **User versions** (`/admin/client/user_versions`): index and show only. Rows are written by `POST /v1/client/versions/user-version`, not by the dashboard. The user show page lists only that user's latest user version (`last_seen_at`), not every platform snapshot.
-
-Admin authentication uses application users over HTTP Basic and requires an `admin` or `super_admin` role.
-
-A separate `/v1/admin` namespace supports the web admin client, exposing versioned endpoints for:
-
-- **User management**: CRUD, search, discard/undiscard, role assignment, self-lifecycle protection, and last-super-admin guard.
-- **IAM management**: Role management with permission matrix and permission CRUD with auto-generated names.
-- **Chat moderation**: Chat rooms and messages CRUD operations.
-- **Product management**: Stripe synchronized products with discard/undiscard operations.
-- **App versions**: JSON at `/v1/admin/client/versions` is super-admin only (same restriction as users and IAM). Includes discard/undiscard (`draft` / `published` / `yanked`, force-update flag, build numbers). `released_at` is stamped on first publish. Publishing yanks every other kept published version. Each version payload includes `install_count`. `GET /v1/admin/client/versions/:id/user_versions` lists current snapshots for that version.
-- **User versions**: JSON at `/v1/admin/client/versions/user_versions` is super-admin only. Lists all current user+platform snapshots.
-- **Notifications**: Broadcast dispatch with template catalog, multi-channel dispatch, and audience targeting (by roles, users, or all).
-
-### Quality toolchain
-
-- RSpec, FactoryBot, Shoulda Matchers, Faker, and Database Cleaner.
-- RuboCop Rails Omakase for consistent Ruby and Rails style.
-- Brakeman for Rails security analysis.
-- Bundler Audit for dependency vulnerability checks.
-- Guard RSpec for rapid local feedback.
-- Rswag request specifications for OpenAPI generation.
+Read the [Foundation Guide](docs/FOUNDATION.md) for the detailed capability map, lifecycle behavior, provider boundaries, and operational responsibilities. The [Ecosystem Architecture](ECOSYSTEM.md) defines how Core, Web, and Mobile divide ownership and communicate.
 
 ## Operations center
 
@@ -416,106 +412,37 @@ Operational dashboards are mounted in the application and protected by admin aut
 
 Client-side errors are accepted at `POST /v1/client/logs` and managed from the admin area.
 
-## Getting started
+## Quick start
 
-Docker is the quickest and most reproducible path.
-
-### Prerequisites
-
-- Docker with Docker Compose
-- Git
-
+<<<<<<< HEAD
 For a native installation, use Ruby `4.0.4`, PostgreSQL, libvips, `librsvg2-bin` (`rsvg-convert` for SVG to PNG), and Bundler `4.0.16`.
 
 ### 1. Clone and configure
+=======
+Core development runs each responsibility in its own terminal. After cloning and configuring `.env`, start the required database, API, and general worker:
+>>>>>>> e81c94415f7404d6baaeb677640e926058305491
 
 ```bash
 git clone https://github.com/rex-9/rexone-core.git
 cd rexone-core
+git switch dev
 cp .env.example .env
+./scripts/dev_db.sh
 ```
 
-Fill in the required database, JWT, Stripe, OneSignal, DeepSeek, and Cloudinary values in `.env`.
+Then run `./scripts/dev_api.sh` and `./scripts/dev_waka.sh` in two additional terminals. Garage storage, media processing, and Stripe webhook forwarding each have an optional dedicated terminal when those providers are enabled.
 
-Development placeholders are fine for providers you are not exercising, but never ship placeholder secrets.
-
-### 2. Start the stack
-
-```bash
-docker compose -f docker-compose.dev.yaml up --build
-```
-
-This starts the 5-container ecosystem:
-
-- `api` — Rails API on [http://localhost:3000](http://localhost:3000)
-- `waka` — General Solid Queue background worker (payments, notifications, AI, speech)
-- `db` — PostgreSQL 18 on port 5432
-- `media` — Dedicated Solid Queue worker for `:media` queue (libvips / FFmpeg compression)
-- `garage` — Self-hosted S3-compatible object storage on [http://localhost:3100](http://localhost:3100) (Admin on port 3101)
-
-The development entrypoint runs `db:prepare` when the API starts.
-
-If you prefer separate terminals, the repository includes dedicated scripts:
-
-```bash
-./scripts/dev_db.sh      # PostgreSQL database container
-./scripts/dev_api.sh     # Rails API server
-./scripts/dev_waka.sh    # General background worker
-./scripts/dev_media.sh   # Dedicated media compression worker
-./scripts/dev_garage.sh  # Garage S3 storage service
-```
-
-### 3. Seed IAM and admin users
+After the API starts, seed the development IAM roles and accounts:
 
 ```bash
 docker compose -f docker-compose.dev.yaml exec api bin/rails db:seed
 ```
 
-The seed file creates the default roles, permissions, assignments, and development admin accounts.
-
-Review and replace seeded credentials before using them outside local development.
-
-### Useful commands
-
-```bash
-# Run the complete Core CI suite locally
-./scripts/ci.sh
-
-# Validate OpenAPI, channels, and socket contracts
-./scripts/ci.sh contracts
-
-# Validate English/Myanmar locale parity and MessageService keys
-./scripts/check_locales.sh
-
-# Rails console
-./scripts/console.sh
-
-# Generate OpenAPI output
-./scripts/rswag.sh
-
-# Run the repository test script (RSpec)
-./scripts/test.sh
-
-# Automated Backups
-./scripts/backup_all.sh     # Backs up both PostgreSQL and Garage S3 storage
-./scripts/backup_db.sh      # Backs up PostgreSQL database (.sql.gz)
-./scripts/backup_garage.sh  # Backs up Garage S3 metadata and data volumes (.tar.gz)
-
-
-# Watch specs
-./scripts/test_watch.sh
-
-# Run Rails security analysis
-bin/brakeman
-
-# Run linting
-bin/rubocop
-```
-
-The same `scripts/ci.sh` entry point serves both environments: local runs use Docker Compose, while GitHub Actions runs Rails natively against its PostgreSQL service and restores gems from Bundler's `Gemfile.lock` cache.
+The complete [Ecosystem Quick Start](docs/QUICK_START.md) lists all six terminals, explains which services are optional, covers Core/Web/Mobile compatibility, and provides client startup and troubleshooting guidance.
 
 ## Configuration
 
+<<<<<<< HEAD
 The checked-in [`.env.example`](.env.example) documents the available settings.
 
 The important groups are:
@@ -535,24 +462,27 @@ The important groups are:
 - App store listings for force-update: `IOS_STORE_URL`, `ANDROID_STORE_URL` (returned as `store_url` on `GET /v1/client/versions/current`, chosen from `X-Platform`).
 
 Keep real credentials in your deployment platform or encrypted secret store—not in Git.
+=======
+Configuration is part of the [Ecosystem Quick Start](docs/QUICK_START.md#configure-core). The checked-in [`.env.example`](.env.example) remains the authoritative catalog of available settings; keep real credentials in the deployment environment or an encrypted secret store.
+>>>>>>> e81c94415f7404d6baaeb677640e926058305491
 
 ## API surface
 
 The API is broader than a starter CRUD demo. Its main route families are:
 
-| Area             | Representative routes                                                    |
-| ---------------- | ------------------------------------------------------------------------ |
-| Authentication   | `/signup`, `/signin`, `/signin/google`, `/confirmation/*`, `/password/*` |
-| Users            | `/v1/users/*`                                                            |
-| IAM              | `/v1/iam/*`                                                              |
-| Admin API        | `/v1/admin/*`                                                            |
-| Payments         | `/v1/payment/*`, `/webhooks/stripe`                                      |
-| Entitlements     | `/v1/access/*`                                                           |
-| Media            | `/v1/media/upload`, `/v1/assets`                                         |
-| Notifications    | `/v1/admin/notifications`                                                |
-| AI               | `/v1/ai/*`                                                               |
-| Speech           | `/v1/speech/*`, `SpeechLiveChannel` (WS)                                 |
-| Client telemetry | `/v1/client/logs`                                                        |
+| Area             | Representative routes                                                                                                                                               |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Authentication   | `/signup`, `/signin`, `/signin/google`, `/confirmation/*`, `/password/*`                                                                                            |
+| Users            | `/v1/users/*`                                                                                                                                                       |
+| IAM              | `/v1/iam/*`                                                                                                                                                         |
+| Admin API        | `/v1/admin/*`                                                                                                                                                       |
+| Payments         | `/v1/payment/*`, `/webhooks/stripe`                                                                                                                                 |
+| Entitlements     | `/v1/access/*`                                                                                                                                                      |
+| Media            | `/v1/media/upload`, `/v1/assets`                                                                                                                                    |
+| Notifications    | `/v1/admin/notifications`                                                                                                                                           |
+| AI               | `/v1/ai/*`                                                                                                                                                          |
+| Speech           | `/v1/speech/*`, `SpeechLiveChannel` (WS)                                                                                                                            |
+| Client telemetry | `/v1/client/logs`                                                                                                                                                   |
 | App versions     | `/v1/client/versions/current`, `/v1/client/versions/user-version`, `/v1/admin/client/versions`, `/v1/admin/client/versions/user_versions`, `/admin/client/versions` |
 
 Use `/api-docs` for the interactive OpenAPI view and [`config/routes.rb`](config/routes.rb) for the authoritative route map.

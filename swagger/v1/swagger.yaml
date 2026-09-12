@@ -246,7 +246,10 @@ components:
       properties:
         name:
           type: string
-          example: teacher
+          pattern: "^[a-z0-9_]+$"
+          example: content_admin
+          description: Custom role name containing only lowercase ASCII letters, digits,
+            and underscores.
         description:
           type: string
           nullable: true
@@ -889,6 +892,20 @@ components:
         link:
           type: string
           nullable: true
+          pattern: "^(?:/(?:home|profile|payment|ai)|https://.+)$"
+          description: Optional shared in-app route or absolute HTTPS external destination.
+        clients:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            pattern: "^[a-z][a-z0-9_]*$"
+          default:
+          - web
+          - mobile
+          description: Clients allowed to receive this in-app notification, such as
+            web or mobile.
         admin:
           type: boolean
         in_app_title:

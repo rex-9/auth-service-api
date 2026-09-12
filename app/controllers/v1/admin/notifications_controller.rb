@@ -139,7 +139,8 @@ class V1::Admin::NotificationsController < V1::ApplicationController
       :email_subject,
       :email_body,
       :email_template_id,
-      in_app_data: {}
+      in_app_data: {},
+      clients: []
     )
   end
 
