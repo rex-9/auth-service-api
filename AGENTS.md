@@ -8,8 +8,8 @@
    - If existing code violates or deviates from `LAW.md`, **THE CODE IS WRONG — FIX THE CODE.**
    - `LAW.md` may ONLY be adjusted when the project creator (Rex) explicitly decrees a constitutional law change.
 
-2. **Omnipresent Documentation Synchronization (`SCHEMA.md`, `README.md`, `ECOSYSTEM.md`)**:
-   - **`SCHEMA.md`**: MUST be updated synchronously EVERY TIME the database schema or `ApplicationRecord` models are created, migrated, altered, or updated (strictly core business tables; never background telemetry).
+2. **Omnipresent Documentation Synchronization (`docs/SCHEMA.md`, `README.md`, `ECOSYSTEM.md`)**:
+   - **`docs/SCHEMA.md`**: MUST be updated synchronously EVERY TIME the database schema or `ApplicationRecord` models are created, migrated, altered, or updated (strictly core business tables; never background telemetry).
    - **`README.md`**: MUST be updated synchronously whenever features, routes, endpoints, background queues/jobs, CLI scripts, or configuration parameters are added, modified, or retired.
    - **`ECOSYSTEM.md`**: MUST be updated synchronously whenever changes affect cross-platform contracts, WebSocket event catalogs, shared data structures, or communication protocols between Core, Web, and Mobile.
    - **Same Turn Synchronization**: Documentation is NOT an afterthought; update documentation files in the exact same turn as code changes.

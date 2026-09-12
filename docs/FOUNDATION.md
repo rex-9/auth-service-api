@@ -97,7 +97,7 @@ Speech capabilities include:
 - Rswag-generated OpenAPI documentation at `/api-docs`.
 - UTC-only persistence and transport; clients own local-time presentation.
 
-See [SCHEMA.md](../SCHEMA.md) for application records and [LAW.md](../LAW.md) for the binding architectural rules.
+See [SCHEMA.md](SCHEMA.md) for application records and [LAW.md](../LAW.md) for the binding architectural rules.
 
 ## Client versions and analytics
 
