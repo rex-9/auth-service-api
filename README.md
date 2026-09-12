@@ -218,25 +218,7 @@ The complete [Ecosystem Quick Start](docs/QUICK_START.md) lists all six terminal
 
 ## Configuration
 
-The checked-in [`.env.example`](.env.example) documents the available settings.
-
-The important groups are:
-
-- **Centralized Application Configuration**: All environment variables are validated, given safe defaults, and mapped to constants in [`config/app_config.rb`](config/app_config.rb) (`AppConfig::*`), preventing string typos and runtime drift across environments.
-- Rails environment, URLs, logging, threads, ports, and secrets (`PORT`, `RAILS_SECRET_KEY_BASE`, `RAILS_MASTER_KEY`).
-- PostgreSQL connection, connection pools (`DB_POOL`, `API_DB_POOL`, `WAKA_DB_POOL`, `MEDIA_DB_POOL`), and Docker service names.
-- JWT/session, confirmation, and password-reset lifetimes.
-- Stripe credentials, webhook secret, and redirect URLs.
-- OneSignal application, API key, sender, and sound configuration.
-- DeepSeek AI API URL, key, and model.
-- Speech services: Azure Speech (key, region) and Nova Speech (key, endpoint) for TTS/STT.
-- Storage & S3: `STORAGE_PROVIDER` (`garage`, `cloudinary`, `local`), S3 endpoints, credentials, and bucket.
-- Media compression: `MEDIA_CONTAINER_ENABLED`, upload size limits (`MEDIA_MAX_VIDEO_SIZE_MB`, `MEDIA_MAX_NON_VIDEO_SIZE_MB`), video profile (CRF, preset, bitrate, resolution), audio profile (`MEDIA_AUDIO_CODEC`, `MEDIA_AUDIO_BITRATE`), and image profile (JPEG/PNG/WebP quality, compression).
-- Solid Queue process, supervisors (`SOLID_QUEUE_IN_PUMA`), and shutdown settings (`SOLID_QUEUE_SHUTDOWN_TIMEOUT`).
-- Observability & Error Dashboard: `DASHBOARD_BASE_URL`, `APP_VERSION`, `GIT_SHA`.
-- App store listings for force-update: `IOS_STORE_URL`, `ANDROID_STORE_URL` (returned as `store_url` on `GET /v1/client/versions/current`, chosen from `X-Platform`).
-
-Keep real credentials in your deployment platform or encrypted secret store—not in Git.
+Configuration is part of the [Ecosystem Quick Start](docs/QUICK_START.md#configure-core). The checked-in [`.env.example`](.env.example) remains the authoritative catalog of available settings; keep real credentials in the deployment environment or an encrypted secret store.
 
 ## API surface
 

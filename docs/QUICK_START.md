@@ -30,7 +30,31 @@ git switch dev
 cp .env.example .env
 ```
 
-Review `.env` and provide the credentials required by the providers you intend to exercise. Development placeholders are acceptable for unused providers, but never deploy placeholder secrets.
+## Configure Core
+
+The checked-in [`.env.example`](../.env.example) is the authoritative catalog of available settings. Review the copied `.env` and configure the providers and processes you intend to run.
+
+The main configuration groups are:
+
+- Application environment, URLs, logging, ports, threads, and Rails secrets.
+- PostgreSQL connection and process-specific connection pools for API, Waka, and media workers.
+- JWT sessions, confirmation codes, and password-reset lifetimes.
+- Storage provider selection and Garage S3, Cloudinary, or local-storage settings.
+- Media enablement, upload limits, and image, video, and audio processing profiles.
+- Stripe credentials, webhook signing secret, and checkout redirect URLs.
+- OneSignal push and email delivery settings.
+- DeepSeek AI and Nova/Azure speech provider settings.
+- Solid Queue process and shutdown behavior.
+- Client-version store URLs and observability metadata.
+
+Development placeholders are acceptable for providers you are not exercising. They are not acceptable in a deployed environment. Keep production credentials in the deployment platform or an encrypted secret store rather than Git.
+
+Configuration determines which development terminals are necessary:
+
+- `STORAGE_PROVIDER=garage` requires the Garage terminal.
+- Enabling Core media processing requires the media-worker terminal.
+- Local Stripe webhook handling requires the Stripe CLI forwarding terminal.
+- Alternative providers should run their own required local services instead.
 
 ## 2. Start Core in separate terminals
 
