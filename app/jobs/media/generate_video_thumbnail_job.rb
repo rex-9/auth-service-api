@@ -2,6 +2,12 @@ module Media
   class GenerateVideoThumbnailJob < ApplicationJob
     queue_as :media
 
+    limits_concurrency(
+      to: 1,
+      key: ->(asset_id:, **) { MediaConstants::Processing.concurrency_key(asset_id) },
+      duration: 30.minutes
+    )
+
     retry_on MediaService::CompressionError, StorageService::Error,
              wait: :polynomially_longer, attempts: 3 do |job, error|
       job.send(:broadcast_retry_exhausted!, error)
@@ -12,8 +18,12 @@ module Media
       asset = Asset.find(asset_id)
       @notification_user_id = notification_user_id.presence || asset.created_by_id.presence || asset.updated_by_id.presence
       @operation_id = operation_id.presence || "#{NotificationConstants::OperationType::VIDEO_THUMBNAIL}:#{asset.id}:#{job_id}"
-      return unless asset.compressible_video?
+      return unless asset.thumbnail_generatable?
       return if asset.thumbnail.present? && !replace
+
+      previous_status = asset.status
+      asset.mark_processing!
+      broadcast_processing(asset)
 
       temp_dir = Dir.mktmpdir("video_thumbnail")
       input_path = File.join(temp_dir, "input.#{asset.extension.presence || 'mp4'}")
@@ -44,6 +54,7 @@ module Media
         created_by_id: asset.created_by_id
         )
       end
+      restore_status(asset, previous_status)
       broadcast(asset, thumbnail)
     rescue MediaService::CompressionError, StorageService::Error
       StorageService::Client.delete(result[:storage_key]) if result&.dig(:storage_key) && !thumbnail&.persisted?
@@ -57,6 +68,31 @@ module Media
     end
 
     private
+
+    def restore_status(asset, previous_status)
+      terminal_status = previous_status.in?([ MediaConstants::Status::READY, MediaConstants::Status::OPTIMAL ]) ? previous_status : MediaConstants::Status::READY
+      asset.update!(status: terminal_status)
+    end
+
+    def broadcast_processing(asset)
+      return if @notification_user_id.blank?
+
+      NotificationService::Center.operation(
+        user_id: @notification_user_id,
+        operation_id: @operation_id,
+        operation_type: NotificationConstants::OperationType::VIDEO_THUMBNAIL,
+        operation_status: NotificationConstants::OperationStatus::PROCESSING,
+        message: MessageService::Admin::Asset.t(MessageService::Admin::Asset::THUMBNAIL_GENERATING, name: asset.name),
+        link: "/admin/assets/#{asset.id}",
+        data: {
+          type: MediaConstants::SocketEvent::ASSET_THUMBNAIL_PROCESSING,
+          asset_id: asset.id,
+          status: MediaConstants::Status::PROCESSING
+        }
+      )
+    rescue StandardError => e
+      Rails.logger.error("[GenerateVideoThumbnailJob] Processing broadcast error: #{e.message}")
+    end
 
     def broadcast_retry_exhausted!(_error)
       arguments = self.arguments.first.with_indifferent_access
@@ -93,6 +129,7 @@ module Media
     end
 
     def broadcast_failure(asset)
+      asset.mark_failed! unless asset.failed?
       return if @notification_user_id.blank?
 
       message = MessageService::Admin::Asset.t(MessageService::Admin::Asset::THUMBNAIL_FAILED, name: asset.name)

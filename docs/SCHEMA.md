@@ -279,26 +279,26 @@ erDiagram
 - **Model**: [`Payment::Product`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/payment/product.rb)
 - **Description**: Catalog of purchasable tiers and items, synchronized with Stripe Product & Price objects.
 
-| Column              | Type       | Nullable | Default             | Description / Notes                                   |
-| :------------------ | :--------- | :------: | :------------------ | :---------------------------------------------------- |
-| `id`                | `uuid`     |    ❌    | `gen_random_uuid()` | Primary Key                                           |
-| `code`              | `string`   |    ❌    | —                   | Immutable unique product code (10 alphanumeric chars) |
-| `name`              | `string`   |    ❌    | —                   | Product display name                                  |
-| `description`       | `text`     |    ✔️    | `NULL`              | Marketing / plan description                          |
-| `unit_amount`       | `integer`  |    ❌    | —                   | Price in smallest currency unit (cents, 0 = Free)     |
-| `currency`          | `string`   |    ❌    | —                   | Currency code (e.g. `usd`)                            |
+| Column              | Type       | Nullable | Default             | Description / Notes                                                    |
+| :------------------ | :--------- | :------: | :------------------ | :--------------------------------------------------------------------- |
+| `id`                | `uuid`     |    ❌    | `gen_random_uuid()` | Primary Key                                                            |
+| `code`              | `string`   |    ❌    | —                   | Immutable unique product code (10 alphanumeric chars)                  |
+| `name`              | `string`   |    ❌    | —                   | Product display name                                                   |
+| `description`       | `text`     |    ✔️    | `NULL`              | Marketing / plan description                                           |
+| `unit_amount`       | `integer`  |    ❌    | —                   | Price in smallest currency unit (cents, 0 = Free)                      |
+| `currency`          | `string`   |    ❌    | —                   | Currency code (e.g. `usd`)                                             |
 | `interval`          | `string`   |    ✔️    | `NULL`              | Billing interval: `day`, `week`, `month`, `year`, or `NULL` (one-time) |
-| `active`            | `boolean`  |    ❌    | `true`              | Availability status                                   |
-| `stripe_product_id` | `string`   |    ❌    | —                   | Stripe Product ID (`prod_...`)                        |
-| `stripe_price_id`   | `string`   |    ❌    | —                   | Stripe Price ID (`price_...`)                         |
-| `created_by_id`     | `uuid`     |    ✔️    | `NULL`              | Auditing: Creator                                     |
-| `updated_by_id`     | `uuid`     |    ✔️    | `NULL`              | Auditing: Modifier                                    |
-| `discarded_by_id`   | `uuid`     |    ✔️    | `NULL`              | Auditing: Discarder                                   |
-| `undiscarded_by_id` | `uuid`     |    ✔️    | `NULL`              | Auditing: Restorer                                    |
-| `discarded_at`      | `datetime` |    ✔️    | `NULL`              | Soft delete timestamp                                 |
-| `undiscarded_at`    | `datetime` |    ✔️    | `NULL`              | Soft delete restoration timestamp                     |
-| `created_at`        | `datetime` |    ❌    | —                   | Timestamp                                             |
-| `updated_at`        | `datetime` |    ❌    | —                   | Timestamp                                             |
+| `active`            | `boolean`  |    ❌    | `true`              | Availability status                                                    |
+| `stripe_product_id` | `string`   |    ❌    | —                   | Stripe Product ID (`prod_...`)                                         |
+| `stripe_price_id`   | `string`   |    ❌    | —                   | Stripe Price ID (`price_...`)                                          |
+| `created_by_id`     | `uuid`     |    ✔️    | `NULL`              | Auditing: Creator                                                      |
+| `updated_by_id`     | `uuid`     |    ✔️    | `NULL`              | Auditing: Modifier                                                     |
+| `discarded_by_id`   | `uuid`     |    ✔️    | `NULL`              | Auditing: Discarder                                                    |
+| `undiscarded_by_id` | `uuid`     |    ✔️    | `NULL`              | Auditing: Restorer                                                     |
+| `discarded_at`      | `datetime` |    ✔️    | `NULL`              | Soft delete timestamp                                                  |
+| `undiscarded_at`    | `datetime` |    ✔️    | `NULL`              | Soft delete restoration timestamp                                      |
+| `created_at`        | `datetime` |    ❌    | —                   | Timestamp                                                              |
+| `updated_at`        | `datetime` |    ❌    | —                   | Timestamp                                                              |
 
 **Indexes**:
 
@@ -314,40 +314,40 @@ erDiagram
 - **Model**: [`Payment::Subscription`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/payment/subscription.rb)
 - **Description**: Recurring user subscription instances synchronized with Stripe Subscription objects.
 
-| Column                   | Type       | Nullable | Default             | Description / Notes                                                      |
-| :----------------------- | :--------- | :------: | :------------------ | :----------------------------------------------------------------------- |
-| `id`                     | `uuid`     |    ❌    | `gen_random_uuid()` | Primary Key                                                              |
-| `user_id`                | `uuid`     |    ❌    | —                   | FK to `users.id`                                                         |
-| `product_id`             | `uuid`     |    ❌    | —                   | FK to `payment_products.id`                                              |
-| `stripe_subscription_id` | `string`   |    ❌    | —                   | Stripe Subscription ID (`sub_...`)                                       |
-| `stripe_customer_id`     | `string`   |    ✔️    | `NULL`              | Stripe Customer ID (`cus_...`)                                           |
-| `stripe_subscription_item_id` | `string` | ❌ | — | Stripe Subscription Item ID (`si_...`) |
-| `stripe_price_id`        | `string`   |    ❌    | —                   | Price snapshot ID (`price_...`)                                          |
-| `status`                 | `string`   |    ❌    | `"incomplete"`      | Status: `incomplete`, `active`, `past_due`, `canceled`, `trialing`, etc. |
-| `currency`               | `string`   |    ❌    | —                   | Lowercase ISO currency code from Stripe                                  |
-| `unit_amount`            | `integer`  |    ❌    | —                   | Price snapshot in minor currency units                                   |
-| `quantity`               | `integer`  |    ❌    | `1`                 | Subscription item quantity                                               |
-| `interval`               | `string`   |    ❌    | —                   | Stripe recurring interval: `day`, `week`, `month`, or `year`             |
-| `interval_count`         | `integer`  |    ❌    | `1`                 | Number of intervals between billings                                     |
-| `current_period_start`   | `datetime` |    ❌    | —                   | Subscription Item period start, converted from epoch seconds to UTC      |
-| `current_period_end`     | `datetime` |    ❌    | —                   | Subscription Item period end, converted from epoch seconds to UTC        |
-| `started_at`             | `datetime` |    ❌    | —                   | Stripe Subscription `start_date` converted from epoch seconds to UTC     |
-| `ended_at`               | `datetime` |    ✔️    | `NULL`              | When subscription ceased                                                 |
-| `cancel_at`              | `datetime` |    ✔️    | `NULL`              | Scheduled future cancellation time                                       |
-| `canceled_at`            | `datetime` |    ✔️    | `NULL`              | Timestamp cancellation was requested                                     |
-| `cancel_at_period_end`   | `boolean`  |    ❌    | `false`             | Whether cancel occurs at period boundary                                 |
-| `payment_method_id`      | `string`   |    ✔️    | `NULL`              | ID from Stripe Subscription `default_payment_method`                     |
-| `payment_method_type`    | `string`   |    ✔️    | `NULL`              | Stripe PaymentMethod `type` (for example `card`, `us_bank_account`)      |
-| `payment_method_details` | `jsonb`    |    ✔️    | `{}`                | Brand, last4, exp details                                                |
-| `metadata`               | `jsonb`    |    ✔️    | `{}`                | Metadata payload                                                         |
-| `created_by_id`          | `uuid`     |    ✔️    | `NULL`              | Auditing: Creator                                                        |
-| `updated_by_id`          | `uuid`     |    ✔️    | `NULL`              | Auditing: Modifier                                                       |
-| `discarded_by_id`        | `uuid`     |    ✔️    | `NULL`              | Auditing: Discarder                                                      |
-| `undiscarded_by_id`      | `uuid`     |    ✔️    | `NULL`              | Auditing: Restorer                                                       |
-| `discarded_at`           | `datetime` |    ✔️    | `NULL`              | Soft delete timestamp                                                    |
-| `undiscarded_at`         | `datetime` |    ✔️    | `NULL`              | Soft delete restoration timestamp                                        |
-| `created_at`             | `datetime` |    ❌    | —                   | Timestamp                                                                |
-| `updated_at`             | `datetime` |    ❌    | —                   | Timestamp                                                                |
+| Column                        | Type       | Nullable | Default             | Description / Notes                                                      |
+| :---------------------------- | :--------- | :------: | :------------------ | :----------------------------------------------------------------------- |
+| `id`                          | `uuid`     |    ❌    | `gen_random_uuid()` | Primary Key                                                              |
+| `user_id`                     | `uuid`     |    ❌    | —                   | FK to `users.id`                                                         |
+| `product_id`                  | `uuid`     |    ❌    | —                   | FK to `payment_products.id`                                              |
+| `stripe_subscription_id`      | `string`   |    ❌    | —                   | Stripe Subscription ID (`sub_...`)                                       |
+| `stripe_customer_id`          | `string`   |    ✔️    | `NULL`              | Stripe Customer ID (`cus_...`)                                           |
+| `stripe_subscription_item_id` | `string`   |    ❌    | —                   | Stripe Subscription Item ID (`si_...`)                                   |
+| `stripe_price_id`             | `string`   |    ❌    | —                   | Price snapshot ID (`price_...`)                                          |
+| `status`                      | `string`   |    ❌    | `"incomplete"`      | Status: `incomplete`, `active`, `past_due`, `canceled`, `trialing`, etc. |
+| `currency`                    | `string`   |    ❌    | —                   | Lowercase ISO currency code from Stripe                                  |
+| `unit_amount`                 | `integer`  |    ❌    | —                   | Price snapshot in minor currency units                                   |
+| `quantity`                    | `integer`  |    ❌    | `1`                 | Subscription item quantity                                               |
+| `interval`                    | `string`   |    ❌    | —                   | Stripe recurring interval: `day`, `week`, `month`, or `year`             |
+| `interval_count`              | `integer`  |    ❌    | `1`                 | Number of intervals between billings                                     |
+| `current_period_start`        | `datetime` |    ❌    | —                   | Subscription Item period start, converted from epoch seconds to UTC      |
+| `current_period_end`          | `datetime` |    ❌    | —                   | Subscription Item period end, converted from epoch seconds to UTC        |
+| `started_at`                  | `datetime` |    ❌    | —                   | Stripe Subscription `start_date` converted from epoch seconds to UTC     |
+| `ended_at`                    | `datetime` |    ✔️    | `NULL`              | When subscription ceased                                                 |
+| `cancel_at`                   | `datetime` |    ✔️    | `NULL`              | Scheduled future cancellation time                                       |
+| `canceled_at`                 | `datetime` |    ✔️    | `NULL`              | Timestamp cancellation was requested                                     |
+| `cancel_at_period_end`        | `boolean`  |    ❌    | `false`             | Whether cancel occurs at period boundary                                 |
+| `payment_method_id`           | `string`   |    ✔️    | `NULL`              | ID from Stripe Subscription `default_payment_method`                     |
+| `payment_method_type`         | `string`   |    ✔️    | `NULL`              | Stripe PaymentMethod `type` (for example `card`, `us_bank_account`)      |
+| `payment_method_details`      | `jsonb`    |    ✔️    | `{}`                | Brand, last4, exp details                                                |
+| `metadata`                    | `jsonb`    |    ✔️    | `{}`                | Metadata payload                                                         |
+| `created_by_id`               | `uuid`     |    ✔️    | `NULL`              | Auditing: Creator                                                        |
+| `updated_by_id`               | `uuid`     |    ✔️    | `NULL`              | Auditing: Modifier                                                       |
+| `discarded_by_id`             | `uuid`     |    ✔️    | `NULL`              | Auditing: Discarder                                                      |
+| `undiscarded_by_id`           | `uuid`     |    ✔️    | `NULL`              | Auditing: Restorer                                                       |
+| `discarded_at`                | `datetime` |    ✔️    | `NULL`              | Soft delete timestamp                                                    |
+| `undiscarded_at`              | `datetime` |    ✔️    | `NULL`              | Soft delete restoration timestamp                                        |
+| `created_at`                  | `datetime` |    ❌    | —                   | Timestamp                                                                |
+| `updated_at`                  | `datetime` |    ❌    | —                   | Timestamp                                                                |
 
 **Indexes & Foreign Keys**:
 
@@ -556,36 +556,36 @@ Subscription synchronization is pinned to Stripe API `2026-08-26.dahlia` (the co
 - **Model**: [`Asset`](file:///Users/rex/Desktop/Dev/rexone/rexone-core/app/models/asset.rb)
 - **Description**: Polymorphic storage tracking for files, images, videos, avatars, and audio with background compression lifecycle.
 
-| Column              | Type       | Nullable | Default             | Description / Notes                                                    |
-| :------------------ | :--------- | :------: | :------------------ | :--------------------------------------------------------------------- |
-| `id`                | `uuid`     |    ❌    | `gen_random_uuid()` | Primary Key                                                            |
-| `name`              | `string`   |    ❌    | —                   | File original name                                                     |
-| `url`               | `string`   |    ❌    | —                   | Accessible CDN or storage URL                                          |
-| `storage_key`       | `string`   |    ✔️    | `NULL`              | Cloud bucket path (e.g. `user/{user_id}/avatar_profile_12345.png`)     |
-| `type`              | `string`   |    ❌    | `"general"`         | `general`, `avatar`, `audio`, `video`, `document` (STI disabled)       |
-| `source`            | `string`   |    ❌    | `"upload"`          | Source: `upload`, `google`                                             |
-| `format`            | `string`   |    ✔️    | `NULL`              | Format mime/type (e.g. `png`, `mp4`, `webm`)                           |
-| `extension`         | `string`   |    ✔️    | `NULL`              | File extension without dot                                             |
-| `size_bytes`        | `bigint`   |    ✔️    | `NULL`              | File size in bytes                                                     |
-| `duration_secs`     | `integer`  |    ✔️    | `NULL`              | Video/audio duration in seconds                                        |
-| `status`            | `string`   |    ❌    | `"pending"`         | Pipeline status: `pending`, `processing`, `ready`, `optimal`, `failed` |
-| `assetable_type`    | `string`   |    ✔️    | `NULL`              | Polymorphic owner type (`User`, `Chat::Message`, etc.)                 |
-| `assetable_id`      | `uuid`     |    ✔️    | `NULL`              | Polymorphic owner ID                                                   |
-| `parent_asset_id`   | `uuid`     |    ✔️    | `NULL`              | Original video for a generated thumbnail asset                         |
-| `created_by_id`     | `uuid`     |    ✔️    | `NULL`              | Auditing: Creator                                                      |
-| `updated_by_id`     | `uuid`     |    ✔️    | `NULL`              | Auditing: Modifier                                                     |
-| `discarded_by_id`   | `uuid`     |    ✔️    | `NULL`              | Auditing: Discarder                                                    |
-| `undiscarded_by_id` | `uuid`     |    ✔️    | `NULL`              | Auditing: Restorer                                                     |
-| `discarded_at`      | `datetime` |    ✔️    | `NULL`              | Soft delete timestamp                                                  |
-| `undiscarded_at`    | `datetime` |    ✔️    | `NULL`              | Soft delete restoration timestamp                                      |
-| `created_at`        | `datetime` |    ❌    | —                   | Timestamp                                                              |
-| `updated_at`        | `datetime` |    ❌    | —                   | Timestamp                                                              |
+| Column              | Type       | Nullable | Default             | Description / Notes                                                                         |
+| :------------------ | :--------- | :------: | :------------------ | :------------------------------------------------------------------------------------------ |
+| `id`                | `uuid`     |    ❌    | `gen_random_uuid()` | Primary Key                                                                                 |
+| `name`              | `string`   |    ❌    | —                   | File original name                                                                          |
+| `url`               | `string`   |    ❌    | —                   | Accessible CDN or storage URL                                                               |
+| `storage_key`       | `string`   |    ✔️    | `NULL`              | Cloud bucket path (e.g. `user/{user_id}/avatar_profile_12345.png`)                          |
+| `type`              | `string`   |    ❌    | `"general"`         | `general`, `avatar`, `thumbnail`, `subtitle`, `audio`, `video`, `attachment` (STI disabled) |
+| `source`            | `string`   |    ❌    | `"upload"`          | Source: `upload`, `google`                                                                  |
+| `format`            | `string`   |    ✔️    | `NULL`              | Media kind: `image`, `audio`, `video`, `doc`, `subtitle`                                    |
+| `extension`         | `string`   |    ✔️    | `NULL`              | File extension without dot                                                                  |
+| `size_bytes`        | `bigint`   |    ✔️    | `NULL`              | File size in bytes                                                                          |
+| `duration_secs`     | `integer`  |    ✔️    | `NULL`              | Video/audio duration in seconds                                                             |
+| `status`            | `string`   |    ❌    | `"pending"`         | Pipeline status: `pending`, `processing`, `ready`, `optimal`, `failed`                      |
+| `assetable_type`    | `string`   |    ✔️    | `NULL`              | Polymorphic owner type (`User`, `Chat::Message`, etc.)                                      |
+| `assetable_id`      | `uuid`     |    ✔️    | `NULL`              | Polymorphic owner ID                                                                        |
+| `parent_asset_id`   | `uuid`     |    ✔️    | `NULL`              | Source asset for a thumbnail or subtitle child (compressible video or audio parent)         |
+| `created_by_id`     | `uuid`     |    ✔️    | `NULL`              | Auditing: Creator                                                                           |
+| `updated_by_id`     | `uuid`     |    ✔️    | `NULL`              | Auditing: Modifier                                                                          |
+| `discarded_by_id`   | `uuid`     |    ✔️    | `NULL`              | Auditing: Discarder                                                                         |
+| `undiscarded_by_id` | `uuid`     |    ✔️    | `NULL`              | Auditing: Restorer                                                                          |
+| `discarded_at`      | `datetime` |    ✔️    | `NULL`              | Soft delete timestamp                                                                       |
+| `undiscarded_at`    | `datetime` |    ✔️    | `NULL`              | Soft delete restoration timestamp                                                           |
+| `created_at`        | `datetime` |    ❌    | —                   | Timestamp                                                                                   |
+| `updated_at`        | `datetime` |    ❌    | —                   | Timestamp                                                                                   |
 
 **Indexes**:
 
 - `index_assets_on_url` (UNIQUE: `url`)
 - `index_assets_on_assetable_type_and_assetable_id` (`assetable_type`, `assetable_id`)
-- `index_assets_on_parent_asset_id` (`parent_asset_id`, UNIQUE)
+- `index_assets_on_parent_asset_id` (`parent_asset_id`)
 - `index_assets_on_name` (`name`)
 - `index_assets_on_status` (`status`)
 - `index_assets_on_type` (`type`)
@@ -597,7 +597,11 @@ Subscription synchronization is pinned to Stripe API `2026-08-26.dahlia` (the co
 
 **Generated Video Thumbnails**:
 
-- A video may own one generated thumbnail through the unique self-reference `assets.parent_asset_id`. Thumbnail generation runs asynchronously on the `media` queue, stores a WebP object beside its source video, and preserves the original asset's polymorphic owner.
+- A compressible video or audio parent may own one thumbnail and one subtitle. That one-of-each rule is enforced on `Asset` (`type` unique per `parent_asset_id`), not by a unique database index. Thumbnail generation runs asynchronously on the `media` queue, stores a WebP object beside its source video, and preserves the original asset's polymorphic owner. Admin may also upload an image thumbnail for a compressible video or audio parent; uploaded SVG thumbnails remain `pending` until `Media::ConvertImageJob` stores the PNG replacement and marks them `optimal`. `.srt` children are stored as `type`/`format` `subtitle` and are not compressed; admin attaches or replaces them with `POST /v1/admin/assets/:id/subtitle/upload`.
+
+**Audio Compression**:
+
+- Compressible audio extensions (`mp3`, `wav`, `m4a`, `aac`, `ogg`, `flac`) follow the same optimal-first `media` queue pipeline as images and videos. WAV, FLAC, and OGG are remuxed to `m4a` (AAC); the asset `extension` is updated to `m4a` while `storage_key` is overwritten in place.
 
 ---
 

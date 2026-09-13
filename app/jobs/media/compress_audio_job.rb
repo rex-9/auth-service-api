@@ -1,7 +1,7 @@
-# app/jobs/media/compress_video_job.rb
+# app/jobs/media/compress_audio_job.rb
 
 module Media
-  class CompressVideoJob < ApplicationJob
+  class CompressAudioJob < ApplicationJob
     queue_as :media
 
     limits_concurrency(
@@ -27,12 +27,11 @@ module Media
 
       input_path = download_from_storage
       original_bytes = File.size(input_path)
-      compressed_path = MediaService::VideoCompressor.compress(input_path)
+      compressed_path = MediaService::AudioCompressor.compress(input_path)
       compressed_bytes = File.size(compressed_path)
 
       if compressed_bytes >= original_bytes
-        # Compressed file is not smaller — original file is already optimal!
-        Rails.logger.info("[CompressVideoJob] Original (#{original_bytes} bytes) already optimal (compressed: #{compressed_bytes} bytes). Marking optimal immediately.")
+        Rails.logger.info("[CompressAudioJob] Original (#{original_bytes} bytes) already optimal (compressed: #{compressed_bytes} bytes). Marking optimal immediately.")
         @asset.mark_optimal!
         broadcast_status_change(MediaConstants::Status::OPTIMAL)
         return
@@ -41,17 +40,15 @@ module Media
       reduction_ratio = (original_bytes - compressed_bytes).to_f / original_bytes
       reupload_compressed(compressed_path)
       finalize_asset(compressed_path)
-      Rails.logger.info("[CompressVideoJob] Compressed #{original_bytes} -> #{compressed_bytes} bytes for asset #{asset_id} (#{(reduction_ratio * 100).round(1)}% reduction)")
+      Rails.logger.info("[CompressAudioJob] Compressed #{original_bytes} -> #{compressed_bytes} bytes for asset #{asset_id} (#{(reduction_ratio * 100).round(1)}% reduction)")
 
-      # If reduction is negligible (below threshold), mark optimal immediately — no cache needed
       if reduction_ratio < MediaConstants::MIN_REDUCTION_THRESHOLD
-        Rails.logger.info("[CompressVideoJob] Asset #{asset_id} reduction (#{(reduction_ratio * 100).round(1)}%) below threshold. Marking optimal immediately.")
+        Rails.logger.info("[CompressAudioJob] Asset #{asset_id} reduction (#{(reduction_ratio * 100).round(1)}%) below threshold. Marking optimal immediately.")
         @asset.mark_optimal!
         broadcast_status_change(MediaConstants::Status::OPTIMAL)
         return
       end
 
-      # Meaningful reduction achieved — check pass count fallback
       count = @asset.increment_compression_count!
 
       if count >= MediaConstants::MAX_COMPRESSION_PASSES
@@ -62,9 +59,9 @@ module Media
         broadcast_status_change(MediaConstants::Status::READY)
       end
 
-      Rails.logger.info("[CompressVideoJob] Completed for asset #{asset_id} (pass #{count}/#{MediaConstants::MAX_COMPRESSION_PASSES})")
+      Rails.logger.info("[CompressAudioJob] Completed for asset #{asset_id} (pass #{count}/#{MediaConstants::MAX_COMPRESSION_PASSES})")
     rescue MediaService::CompressionError, StorageService::Error => e
-      Rails.logger.warn("[CompressVideoJob] Retriable failure for asset #{asset_id}: #{e.message}")
+      Rails.logger.warn("[CompressAudioJob] Retriable failure for asset #{asset_id}: #{e.message}")
       raise
     rescue StandardError => e
       mark_failed!(e)
@@ -88,7 +85,7 @@ module Media
     def mark_failed!(error)
       @asset&.mark_failed! if @asset&.persisted?
       broadcast_status_change(MediaConstants::Status::FAILED)
-      Rails.logger.error("[CompressVideoJob] Failed for asset #{@asset&.id}: #{error.message}")
+      Rails.logger.error("[CompressAudioJob] Failed for asset #{@asset&.id}: #{error.message}")
     end
 
     def broadcast_status_change(status)
@@ -134,7 +131,7 @@ module Media
         data: payload
       )
     rescue => e
-      Rails.logger.error("[CompressVideoJob] Broadcast error for asset #{@asset.id}: #{e.message}")
+      Rails.logger.error("[CompressAudioJob] Broadcast error for asset #{@asset.id}: #{e.message}")
     end
 
     def operation_status(status)
@@ -147,22 +144,30 @@ module Media
     def download_from_storage
       require "tempfile"
 
-      ext = @asset.extension.present? ? ".#{@asset.extension}" : ".mp4"
+      ext = @asset.extension.present? ? ".#{@asset.extension}" : ".m4a"
       @temp_dir = Dir.mktmpdir("media_compress")
       input_path = File.join(@temp_dir, "input#{ext}")
 
       StorageService::Client.download(@asset.storage_key, input_path)
 
-      Rails.logger.info("[CompressVideoJob] Downloaded #{File.size(input_path)} bytes to #{input_path}")
+      Rails.logger.info("[CompressAudioJob] Downloaded #{File.size(input_path)} bytes to #{input_path}")
       input_path
     end
 
     def reupload_compressed(compressed_path)
+      output_extension = File.extname(compressed_path).delete(".").downcase
+      @previous_storage_key = @asset.storage_key
+      storage_key = if output_extension == @asset.extension
+        @asset.storage_key
+      else
+        AssetConstants::AssetName.with_extension(@asset.storage_key, output_extension)
+      end
+
       result = StorageService::Client.upload(
         compressed_path,
-        storage_key: @asset.storage_key,
-        folder: File.dirname(@asset.storage_key.to_s).presence || "admin_uploads/video",
-        resource_type: "video",
+        storage_key: storage_key,
+        folder: File.dirname(@asset.storage_key.to_s).presence || "admin_uploads/audio",
+        resource_type: AssetConstants::AssetFormat.storage_resource_type(output_extension),
         overwrite: true
       )
 
@@ -170,11 +175,42 @@ module Media
     end
 
     def finalize_asset(compressed_path)
-      @asset.update!(
+      attrs = {
+        storage_key: @upload_result[:storage_key],
+        name: @upload_result[:storage_key],
         url: @upload_result[:url],
         size_bytes: @upload_result[:bytes] || File.size(compressed_path),
         status: MediaConstants::Status::READY
+      }
+
+      out_ext = File.extname(compressed_path).delete(".").downcase.presence
+      if out_ext.present? && out_ext != @asset.extension
+        attrs[:extension] = out_ext
+        attrs[:format] = AssetConstants::AssetFormat.from_extension(out_ext) || @asset.format
+      end
+
+      @asset.update!(attrs)
+      delete_previous_object
+    rescue StandardError
+      if @upload_result&.dig(:storage_key).present? && @upload_result[:storage_key] != @previous_storage_key
+        StorageService::Client.delete(
+          @upload_result[:storage_key],
+          resource_type: AssetConstants::AssetFormat.storage_resource_type(out_ext)
+        )
+      end
+      raise
+    end
+
+    def delete_previous_object
+      return if @previous_storage_key.blank? || @previous_storage_key == @asset.storage_key
+
+      StorageService::Client.delete(
+        @previous_storage_key,
+        resource_type: AssetConstants::AssetFormat.storage_resource_type(File.extname(@previous_storage_key).delete("."))
       )
+    rescue StorageService::Error => e
+      Rails.error.report(e)
+      Rails.logger.error("[CompressAudioJob] Failed to delete replaced object #{@previous_storage_key}: #{e.message}")
     end
 
     def cleanup_temp_files

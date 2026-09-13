@@ -87,25 +87,82 @@ RSpec.describe "Asset uploads", type: :request do
       post "/v1/media/upload", params: { file: file }, headers: headers
     end.not_to change(Asset, :count)
     expect(response).to have_http_status(:internal_server_error)
-    expect(response_status["error"]).to eq("storage offline")
+    expect(response_status["error"]).to eq("Storage upload failed")
   end
 
   it "rejects files exceeding maximum size with localized error message" do
-    allow_any_instance_of(ActionDispatch::Http::UploadedFile).to receive(:size).and_return(MediaConstants::MAX_NON_VIDEO_SIZE_MB.megabytes + 1)
+    allow_any_instance_of(ActionDispatch::Http::UploadedFile).to receive(:size).and_return(MediaConstants::MAX_IMAGE_SIZE_MB.megabytes + 1)
 
     post "/v1/media/upload", params: { file: file }, headers: headers
 
     expect(response).to have_http_status(:unprocessable_content)
-    expect(response_status["error"]).to eq("File size exceeds maximum allowed limit (#{MediaConstants::MAX_NON_VIDEO_SIZE_MB}MB)")
+    expect(response_status["error"]).to eq("File size exceeds maximum allowed limit (#{MediaConstants::MAX_IMAGE_SIZE_MB}MB)")
   end
 
   it "returns localized error message in Burmese when X-Locale is my" do
-    allow_any_instance_of(ActionDispatch::Http::UploadedFile).to receive(:size).and_return(MediaConstants::MAX_NON_VIDEO_SIZE_MB.megabytes + 1)
+    allow_any_instance_of(ActionDispatch::Http::UploadedFile).to receive(:size).and_return(MediaConstants::MAX_IMAGE_SIZE_MB.megabytes + 1)
 
     post "/v1/media/upload", params: { file: file }, headers: headers.merge("X-Locale" => "my")
 
     expect(response).to have_http_status(:unprocessable_content)
-    expect(response_status["error"]).to eq("ဖိုင်အရွယ်အစားသည် သတ်မှတ်ထားသော ကန့်သတ်ချက်ထက် ကျော်လွန်နေပါသည် (#{MediaConstants::MAX_NON_VIDEO_SIZE_MB}MB)")
+    expect(response_status["error"]).to eq("ဖိုင်အရွယ်အစားသည် သတ်မှတ်ထားသော ကန့်သတ်ချက်ထက် ကျော်လွန်နေပါသည် (#{MediaConstants::MAX_IMAGE_SIZE_MB}MB)")
+  end
+
+  it "stores SVG unchanged and queues conversion in the media worker" do
+    svg_file = fixture_file_upload("icon.svg", "image/svg+xml")
+    allow(Media::ConvertImageJob).to receive(:perform_later)
+    allow(StorageService::Client).to receive(:upload).and_return(
+      storage_key: "user/#{user.id}/general_icon.svg",
+      url: "https://cdn.example.com/icon.svg",
+      bytes: 8,
+      format: "svg",
+      resource_type: "image"
+    )
+
+    post "/v1/media/upload", params: { file: svg_file }, headers: headers
+
+    expect(response).to have_http_status(:created)
+    expect(Asset.last).to have_attributes(extension: "svg", format: "image", status: "pending")
+    expect(StorageService::Client).to have_received(:upload).with(
+      anything,
+      hash_including(storage_key: a_string_matching(/\.svg$/), resource_type: "image")
+    )
+    expect(Media::ConvertImageJob).to have_received(:perform_later).with(asset_id: Asset.last.id)
+  end
+
+  describe "GET /v1/assets" do
+    it "returns paginated assets" do
+      create_list(:asset, 3)
+
+      get "/v1/assets", params: { limit: 2 }
+
+      expect(response).to have_http_status(:ok)
+      expect(response_data.size).to eq(2)
+      expect(response_meta.dig("pagination", "total_count")).to eq(3)
+    end
+
+    it "filters assets by type" do
+      create(:asset, type: "video", format: "video", extension: "mp4")
+      create(:asset, type: "avatar")
+
+      get "/v1/assets", params: { type: "video" }
+
+      expect(response).to have_http_status(:ok)
+      expect(response_data.size).to eq(1)
+      expect(response_data.first.dig("attributes", "type")).to eq("video")
+    end
+
+    it "filters subtitle assets by type" do
+      parent = create(:asset, type: "video", format: "video", extension: "mp4")
+      create(:asset, type: "subtitle", format: "subtitle", extension: "srt", parent_asset: parent)
+      create(:asset, type: "avatar")
+
+      get "/v1/assets", params: { type: "subtitle" }
+
+      expect(response).to have_http_status(:ok)
+      expect(response_data.size).to eq(1)
+      expect(response_data.first.dig("attributes", "type")).to eq("subtitle")
+    end
   end
 
   def grant_asset_create_permission(account)

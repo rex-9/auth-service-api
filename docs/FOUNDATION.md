@@ -66,7 +66,9 @@ The asset system supports:
 - Soft deletion, restoration, batch lifecycle operations, and permanent storage cleanup.
 - Super-admin Garage partition and VPS capacity statistics.
 - Image, video, and audio optimization through the dedicated `media` queue.
+- SVG-to-PNG conversion in the dedicated `media` queue after the original upload is stored.
 - Canonical video thumbnails and administrator-supplied video/audio covers.
+- Replaceable SRT subtitle assets attached to video and audio parents.
 - Real-time processing status and operation notifications.
 
 See the [Garage Guide](GARAGE.md) for storage topology, configuration, backups, and operational tooling.

@@ -973,9 +973,15 @@ components:
         type:
           type: string
           default: general
-          description:
-            "Asset type: avatar, cover, card, audio, video, attachment,
-            general."
+          enum:
+            - avatar
+            - thumbnail
+            - subtitle
+            - audio
+            - video
+            - attachment
+            - general
+          description: Asset classification.
         assetable_type:
           type: string
           description:
@@ -999,6 +1005,16 @@ components:
         file:
           type: string
           format: binary
+          description: Image upload limited by MEDIA_MAX_IMAGE_SIZE_MB.
+      required:
+        - file
+    asset_subtitle_upload_request:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+          description: SRT upload limited by MEDIA_MAX_OTHER_SIZE_MB.
       required:
         - file
     checkout_session_request:
@@ -2000,6 +2016,7 @@ components:
           enum:
             - avatar
             - thumbnail
+            - subtitle
             - audio
             - video
             - attachment
@@ -2011,6 +2028,7 @@ components:
             - audio
             - video
             - doc
+            - subtitle
           nullable: true
         extension:
           type: string
@@ -2047,6 +2065,27 @@ components:
           format: uuid
           nullable: true
         thumbnail:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            url:
+              type: string
+              format: uri
+            status:
+              type: string
+              enum:
+                - pending
+                - processing
+                - ready
+                - optimal
+                - failed
+            size_bytes:
+              type: integer
+              nullable: true
+        subtitle:
           type: object
           nullable: true
           properties:
@@ -7304,6 +7343,10 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/error_response"
+      description:
+        Stores the upload immediately. Compressible media and SVG-to-PNG
+        conversion are processed asynchronously by the dedicated media queue. Upload
+        limits are selected independently for video, audio, image, and other formats.
       security:
         - bearerAuth: []
       requestBody:
@@ -9922,6 +9965,10 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/error_response"
+      description:
+        Stores the upload immediately. Compressible media and SVG-to-PNG
+        conversion are processed asynchronously by the dedicated media queue. Upload
+        limits are selected independently for video, audio, image, and other formats.
       security:
         - bearerAuth: []
       requestBody:
@@ -10448,7 +10495,7 @@ paths:
     post:
       tags:
         - Admin / Assets
-      summary: Upload and replace a video thumbnail
+      summary: Upload and replace a thumbnail for a compressible video or audio asset
       parameters:
         - name: X-Locale
           in: header
@@ -10514,6 +10561,9 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/error_response"
+      description:
+        Stores image thumbnails as uploaded. SVG thumbnails are queued
+        for PNG conversion by the media worker. Limited by MEDIA_MAX_IMAGE_SIZE_MB.
       security:
         - bearerAuth: []
       requestBody:
@@ -10522,6 +10572,90 @@ paths:
           multipart/form-data:
             schema:
               "$ref": "#/components/schemas/asset_thumbnail_upload_request"
+  "/v1/admin/assets/{id}/subtitle/upload":
+    post:
+      tags:
+        - Admin / Assets
+      summary:
+        Upload and replace an SRT subtitle for a compressible video or audio
+        asset
+      parameters:
+        - name: X-Locale
+          in: header
+          required: false
+          description:
+            Response language. Accepts en or my; Accept-Language is also
+            supported.
+          schema:
+            type: string
+            enum:
+              - en
+              - my
+        - name: X-Platform
+          in: header
+          required: false
+          description: Active-session namespace.
+          schema:
+            type: string
+            enum:
+              - web
+              - mobile
+            default: web
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/response"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/error_response"
+      description:
+        Accepts an SRT file, stores it as type/format subtitle using raw
+        object storage, and limits it with MEDIA_MAX_OTHER_SIZE_MB. Subtitle files
+        require no media processing.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              "$ref": "#/components/schemas/asset_subtitle_upload_request"
   "/v1/assets":
     get:
       tags:
@@ -10549,6 +10683,30 @@ paths:
               - web
               - mobile
             default: web
+        - name: type
+          in: query
+          required: false
+          description: Filter by asset type
+          schema:
+            type: string
+            enum:
+              - avatar
+              - thumbnail
+              - subtitle
+              - audio
+              - video
+              - attachment
+              - general
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
       responses:
         "200":
           description: Successful response
@@ -10556,20 +10714,9 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/response"
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/error_response"
-        "403":
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/error_response"
-      security:
-        - bearerAuth: []
+      description:
+        Optional type filter matches AssetType (avatar, thumbnail, subtitle,
+        audio, video, attachment, general).
     post:
       tags:
         - Assets
@@ -10669,26 +10816,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/response"
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/error_response"
-        "403":
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/error_response"
         "404":
           description: Not Found
           content:
             application/json:
               schema:
                 "$ref": "#/components/schemas/error_response"
-      security:
-        - bearerAuth: []
     patch:
       tags:
         - Assets

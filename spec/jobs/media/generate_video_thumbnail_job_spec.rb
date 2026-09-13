@@ -40,6 +40,7 @@ RSpec.describe Media::GenerateVideoThumbnailJob, type: :job do
       "type" => MediaConstants::SocketEvent::ASSET_THUMBNAIL_GENERATED,
       "asset_id" => video.id
     )
+    expect(video.reload.status).to eq(MediaConstants::Status::READY)
   end
 
   it "does not create another thumbnail when one already exists" do
@@ -49,5 +50,16 @@ RSpec.describe Media::GenerateVideoThumbnailJob, type: :job do
     expect do
       described_class.perform_now(asset_id: video.id)
     end.not_to change(Asset, :count)
+  end
+
+  it "uses the shared per-asset media-processing concurrency key" do
+    video = create(:asset, format: AssetConstants::AssetFormat::VIDEO, extension: "mp4")
+
+    expect(described_class.concurrency_key.call(asset_id: video.id)).to eq(
+      MediaConstants::Processing.concurrency_key(video.id)
+    )
+    expect(Media::CompressVideoJob.concurrency_key.call(asset_id: video.id)).to eq(
+      MediaConstants::Processing.concurrency_key(video.id)
+    )
   end
 end
