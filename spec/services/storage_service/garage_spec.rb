@@ -32,6 +32,21 @@ RSpec.describe StorageService::Garage do
 
       expect(adapter.url("uploads/test.png")).to eq("http://localhost:3100/rexone/uploads/test.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Signature=xyz")
     end
+
+
+    it "derives the signed response MIME type from a format-changing audio key" do
+      presigner = double("Aws::S3::Presigner")
+      allow(Aws::S3::Presigner).to receive(:new).with(client: s3_client).and_return(presigner)
+      expect(presigner).to receive(:presigned_url).with(
+        :get_object,
+        bucket: "rexone",
+        key: "uploads/audio.m4a",
+        expires_in: 7.days.to_i,
+        response_content_type: "audio/mp4a-latm"
+      ).and_return("http://localhost:3100/rexone/uploads/audio.m4a?sig=123")
+
+      expect(adapter.url("uploads/audio.m4a")).to include("audio.m4a")
+    end
   end
 
   describe "#delete" do

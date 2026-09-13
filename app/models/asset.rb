@@ -97,19 +97,27 @@ class Asset < ApplicationRecord
   end
 
   def compressible_video?
-    MediaConstants::COMPRESSIBLE_VIDEO_EXTENSIONS.include?(extension&.downcase)
+    MediaConstants::Processing::COMPRESSION_EXTENSIONS.fetch(AssetConstants::AssetFormat::VIDEO).include?(extension&.downcase)
   end
 
   def compressible_image?
-    MediaConstants::COMPRESSIBLE_IMAGE_EXTENSIONS.include?(extension&.downcase)
+    MediaConstants::Processing::COMPRESSION_EXTENSIONS.fetch(AssetConstants::AssetFormat::IMAGE).include?(extension&.downcase)
   end
 
   def compressible_audio?
-    MediaConstants::COMPRESSIBLE_AUDIO_EXTENSIONS.include?(extension&.downcase)
+    MediaConstants::Processing::COMPRESSION_EXTENSIONS.fetch(AssetConstants::AssetFormat::AUDIO).include?(extension&.downcase)
   end
 
   def thumbnail_attachable?
-    compressible_video? || compressible_audio?
+    thumbnail_generatable? || compressible_audio?
+  end
+
+  def thumbnail_generatable?
+    MediaConstants::Processing::THUMBNAIL_GENERATION_EXTENSIONS.include?(extension&.downcase)
+  end
+
+  def image_convertible?
+    MediaConstants::Processing::IMAGE_CONVERSION_EXTENSIONS.include?(extension&.downcase)
   end
 
   def subtitle_attachable?

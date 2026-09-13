@@ -20,6 +20,7 @@ my:
       compression_in_progress: "မီဒီယာ '%{name}' ကို အရွယ်အစား ချုံ့နေပါသည်။"
       compression_completed: "မီဒီယာ '%{name}' ကို အရွယ်အစား ချုံ့ပြီးပါပြီ။"
       thumbnail_generated: "ဗီဒီယို '%{name}' အတွက် ပုံငယ် ဖန်တီးပြီးပါပြီ။"
+      thumbnail_generating: "ဗီဒီယို '%{name}' အတွက် ပုံငယ် ဖန်တီးနေပါသည်။"
       thumbnail_regeneration_queued: "ပုံငယ် ပြန်လည်ဖန်တီးရန် စီစဉ်ပြီးပါပြီ။"
       thumbnail_replaced: "ပုံငယ် အစားထိုးပြီးပါပြီ။"
       thumbnail_image_required: "ဗီဒီယိုပုံငယ်အတွက် ပုံဖိုင်တစ်ခု လိုအပ်ပါသည်။"

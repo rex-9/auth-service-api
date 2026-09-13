@@ -9,6 +9,7 @@ class V1::Admin::AssetsController < V1::ApplicationController
   def index
     discarded = params[:discarded].to_s == "true"
     scope = discarded ? Asset.with_discarded.discarded : Asset.kept
+    scope = scope.includes(:thumbnail, :subtitle)
     assets = search_assets(scope)
     assets = filter_assets(assets)
     assets = if discarded
@@ -52,11 +53,7 @@ class V1::Admin::AssetsController < V1::ApplicationController
       return
     end
 
-    max_size_mb = if determine_resource_type(file) == "video"
-                    MediaConstants::MAX_VIDEO_SIZE_MB
-    else
-                    MediaConstants::MAX_NON_VIDEO_SIZE_MB
-    end
+    max_size_mb = upload_limit_mb(file)
 
     if file.size > max_size_mb.megabytes
       render_json_response(
@@ -75,15 +72,13 @@ class V1::Admin::AssetsController < V1::ApplicationController
     assetable_id = params[:assetable_id].presence
     duration_secs = params[:duration_secs]
 
-    conversion = nil
     begin
-      conversion = MediaService::SvgToPng.prepare(file)
-      storage_key = AssetConstants::AssetName.for_admin(type: asset_type, original_filename: conversion.filename)
+      storage_key = AssetConstants::AssetName.for_admin(type: asset_type, original_filename: file.original_filename)
 
       result = StorageService::Client.upload(
-        conversion.file,
+        file,
         storage_key: storage_key,
-        resource_type: determine_resource_type(conversion.filename),
+        resource_type: determine_resource_type(file),
         metadata: {
           user_id: current_user.id.to_s,
           original_filename: file.original_filename
@@ -95,19 +90,19 @@ class V1::Admin::AssetsController < V1::ApplicationController
         name: result[:storage_key],
         url: result[:url],
         type: asset_type,
-        format: determine_asset_format(conversion.filename),
+        format: determine_asset_format(file),
         size_bytes: result[:bytes],
         duration_secs: duration_secs,
         source: AssetConstants::AssetSource::UPLOAD,
         assetable_type: assetable_type,
         assetable_id: assetable_id,
         storage_key: result[:storage_key],
-        extension: result[:format] || File.extname(conversion.filename).delete("."),
-        status: conversion.converted? ? MediaConstants::Status::OPTIMAL : compression_status_for(conversion.filename)
+        extension: result[:format] || File.extname(filename_for(file)).delete("."),
+        status: processing_status_for(file)
       )
 
       if asset.save
-        enqueue_compression_if_needed(asset)
+        enqueue_media_processing_if_needed(asset)
 
         render_json_response(
           status_code: 201,
@@ -133,20 +128,14 @@ class V1::Admin::AssetsController < V1::ApplicationController
           error: asset.errors.full_messages.to_sentence
         )
       end
-    rescue MediaService::ConversionError => e
-      render_json_response(
-        status_code: 422,
-        message: admin_asset_message(MessageService::Admin::Asset::SAVE_FAILED),
-        error: e.message
-      )
     rescue StorageService::Error => e
+      Rails.error.report(e)
+      message = admin_asset_message(MessageService::Admin::Asset::STORAGE_UPLOAD_FAILED)
       render_json_response(
         status_code: 500,
-        message: admin_asset_message(MessageService::Admin::Asset::STORAGE_UPLOAD_FAILED),
-        error: e.message
+        message: message,
+        error: message
       )
-    ensure
-      MediaService::SvgToPng.cleanup(conversion)
     end
   end
 
@@ -485,43 +474,38 @@ class V1::Admin::AssetsController < V1::ApplicationController
       return
     end
 
+    unless upload_within_limit?(file)
+      render_file_size_exceeded(file)
+      return
+    end
+
     result = nil
-    conversion = nil
     begin
-      conversion = MediaService::SvgToPng.prepare(file)
+      extension = File.extname(filename_for(file)).delete(".").downcase
       result = StorageService::Client.upload(
-        conversion.file,
+        file,
         storage_key: AssetConstants::AssetName.thumbnail_for(
           @asset,
           version: SecureRandom.uuid,
-          extension: conversion.converted? ? MediaConstants::IMAGE_EXT_PNG : MediaConstants::IMAGE_EXT_WEBP
+          extension: extension
         ),
         resource_type: "image"
       )
-      fallback_size = conversion.converted? ? File.size(conversion.file) : file.size
-      replace_thumbnail!(
+      thumbnail = replace_thumbnail!(
         @asset,
         result,
-        fallback_size: fallback_size,
-        status: conversion.converted? ? MediaConstants::Status::OPTIMAL : MediaConstants::Status::READY
+        fallback_size: file.size,
+        status: processing_status_for(file)
       )
+      Media::ConvertImageJob.perform_later(asset_id: thumbnail.id) if thumbnail.extension == MediaConstants::IMAGE_EXT_SVG && MediaConstants::MEDIA_CONTAINER_ENABLED
       render_json_response(
         status_code: 200,
         message: admin_asset_message(MessageService::Admin::Asset::THUMBNAIL_REPLACED),
         data: { asset: AssetSerializer.new(@asset.reload).serializable_hash[:data][:attributes] }
       )
-    rescue MediaService::ConversionError => e
-      StorageService::Client.delete(result[:storage_key]) if result&.dig(:storage_key)
-      render_json_response(
-        status_code: 422,
-        message: admin_asset_message(MessageService::Admin::Asset::SAVE_FAILED),
-        error: e.message
-      )
     rescue StandardError
       StorageService::Client.delete(result[:storage_key]) if result&.dig(:storage_key)
       raise
-    ensure
-      MediaService::SvgToPng.cleanup(conversion)
     end
   end
 
@@ -536,6 +520,12 @@ class V1::Admin::AssetsController < V1::ApplicationController
     unless srt_upload?(file)
       message = admin_asset_message(MessageService::Admin::Asset::SUBTITLE_SRT_REQUIRED)
       render_json_response(status_code: 422, message: message, error: message)
+      return
+    end
+
+
+    unless upload_within_limit?(file)
+      render_file_size_exceeded(file)
       return
     end
 
@@ -595,7 +585,7 @@ class V1::Admin::AssetsController < V1::ApplicationController
   end
 
   def srt_upload?(file)
-    file.present? && AssetConstants::AssetFormat::SUBTITLE_EXTENSIONS.include?(
+    file.present? && file.content_type.to_s.in?(MediaConstants::SUBTITLE_CONTENT_TYPES) && AssetConstants::AssetFormat::SUBTITLE_EXTENSIONS.include?(
       File.extname(filename_for(file)).delete(".").downcase
     )
   end
@@ -659,20 +649,42 @@ class V1::Admin::AssetsController < V1::ApplicationController
     AssetConstants::AssetFormat.from_extension(ext)
   end
 
-  # ── Media Compression Helpers ───────────────────────────────
+  def upload_limit_mb(file_or_name)
+    ext = File.extname(filename_for(file_or_name)).delete(".").downcase
+    AssetConstants::AssetFormat.upload_limit_mb(ext)
+  end
 
-  def compression_status_for(file)
-    if MediaConstants::MEDIA_CONTAINER_ENABLED && file_compressible?(file)
+  def upload_within_limit?(file)
+    file.size <= upload_limit_mb(file).megabytes
+  end
+
+  def render_file_size_exceeded(file)
+    limit = upload_limit_mb(file)
+    message = admin_asset_message(MessageService::Admin::Asset::SAVE_FAILED)
+    render_json_response(
+      status_code: 422,
+      message: message,
+      error: admin_asset_message(MessageService::Admin::Asset::FILE_SIZE_EXCEEDED, limit: limit)
+    )
+  end
+
+  # ── Media Processing Helpers ───────────────────────────────
+
+  def processing_status_for(file)
+    if MediaConstants::MEDIA_CONTAINER_ENABLED && file_processable?(file)
       MediaConstants::Status::PENDING
     else
       MediaConstants::Status::READY
     end
   end
 
-  def enqueue_compression_if_needed(asset)
+  def enqueue_media_processing_if_needed(asset)
     return unless asset.status == MediaConstants::Status::PENDING
 
-    if asset.compressible_video?
+    if asset.image_convertible?
+      Media::ConvertImageJob.perform_later(asset_id: asset.id)
+      Rails.logger.info("[AssetsController] Enqueued image conversion for asset #{asset.id}")
+    elsif asset.compressible_video?
       Media::CompressVideoJob.perform_later(asset_id: asset.id)
       Media::GenerateVideoThumbnailJob.perform_later(asset_id: asset.id)
       Rails.logger.info("[AssetsController] Enqueued video compression for asset #{asset.id}")
@@ -685,11 +697,8 @@ class V1::Admin::AssetsController < V1::ApplicationController
     end
   end
 
-  def file_compressible?(file)
-    filename = file.respond_to?(:original_filename) ? file.original_filename : file.to_s
-    ext = File.extname(filename).delete(".").downcase
-    MediaConstants::COMPRESSIBLE_VIDEO_EXTENSIONS.include?(ext) ||
-      MediaConstants::COMPRESSIBLE_IMAGE_EXTENSIONS.include?(ext) ||
-      MediaConstants::COMPRESSIBLE_AUDIO_EXTENSIONS.include?(ext)
+  def file_processable?(file)
+    ext = File.extname(filename_for(file)).delete(".").downcase
+    MediaConstants::Processing::ALL_EXTENSIONS.include?(ext)
   end
 end

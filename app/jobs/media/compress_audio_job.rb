@@ -4,6 +4,12 @@ module Media
   class CompressAudioJob < ApplicationJob
     queue_as :media
 
+    limits_concurrency(
+      to: 1,
+      key: ->(asset_id:, **) { MediaConstants::Processing.concurrency_key(asset_id) },
+      duration: 30.minutes
+    )
+
     retry_on MediaService::CompressionError, StorageService::Error,
              wait: :polynomially_longer, attempts: 3 do |job, error|
       job.send(:mark_retry_exhausted!, error)
@@ -149,11 +155,19 @@ module Media
     end
 
     def reupload_compressed(compressed_path)
+      output_extension = File.extname(compressed_path).delete(".").downcase
+      @previous_storage_key = @asset.storage_key
+      storage_key = if output_extension == @asset.extension
+        @asset.storage_key
+      else
+        AssetConstants::AssetName.with_extension(@asset.storage_key, output_extension)
+      end
+
       result = StorageService::Client.upload(
         compressed_path,
-        storage_key: @asset.storage_key,
+        storage_key: storage_key,
         folder: File.dirname(@asset.storage_key.to_s).presence || "admin_uploads/audio",
-        resource_type: AssetConstants::AssetFormat.storage_resource_type(@asset.extension),
+        resource_type: AssetConstants::AssetFormat.storage_resource_type(output_extension),
         overwrite: true
       )
 
@@ -162,6 +176,8 @@ module Media
 
     def finalize_asset(compressed_path)
       attrs = {
+        storage_key: @upload_result[:storage_key],
+        name: @upload_result[:storage_key],
         url: @upload_result[:url],
         size_bytes: @upload_result[:bytes] || File.size(compressed_path),
         status: MediaConstants::Status::READY
@@ -174,6 +190,27 @@ module Media
       end
 
       @asset.update!(attrs)
+      delete_previous_object
+    rescue StandardError
+      if @upload_result&.dig(:storage_key).present? && @upload_result[:storage_key] != @previous_storage_key
+        StorageService::Client.delete(
+          @upload_result[:storage_key],
+          resource_type: AssetConstants::AssetFormat.storage_resource_type(out_ext)
+        )
+      end
+      raise
+    end
+
+    def delete_previous_object
+      return if @previous_storage_key.blank? || @previous_storage_key == @asset.storage_key
+
+      StorageService::Client.delete(
+        @previous_storage_key,
+        resource_type: AssetConstants::AssetFormat.storage_resource_type(File.extname(@previous_storage_key).delete("."))
+      )
+    rescue StorageService::Error => e
+      Rails.error.report(e)
+      Rails.logger.error("[CompressAudioJob] Failed to delete replaced object #{@previous_storage_key}: #{e.message}")
     end
 
     def cleanup_temp_files

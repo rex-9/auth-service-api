@@ -8,7 +8,9 @@ module MediaConstants
 
   # Upload size limits conditioned on MEDIA_CONTAINER_ENABLED (in MB)
   MAX_VIDEO_SIZE_MB = AppConfig::MEDIA_MAX_VIDEO_SIZE_MB
-  MAX_NON_VIDEO_SIZE_MB = AppConfig::MEDIA_MAX_NON_VIDEO_SIZE_MB
+  MAX_AUDIO_SIZE_MB = AppConfig::MEDIA_MAX_AUDIO_SIZE_MB
+  MAX_IMAGE_SIZE_MB = AppConfig::MEDIA_MAX_IMAGE_SIZE_MB
+  MAX_OTHER_SIZE_MB = AppConfig::MEDIA_MAX_OTHER_SIZE_MB
 
   # Video compression profile
   VIDEO_CRF = AppConfig::MEDIA_VIDEO_CRF
@@ -58,6 +60,7 @@ module MediaConstants
 
   # Subtitle format extensions
   SUBTITLE_EXT_SRT = "srt".freeze
+  SUBTITLE_CONTENT_TYPES = [ "application/x-subrip", "text/plain" ].freeze
 
   # Asset processing statuses
   module Status
@@ -74,14 +77,32 @@ module MediaConstants
     ASSET_COMPRESSING = "asset_compressing".freeze
     ASSET_COMPRESSED = "asset_compressed".freeze
     ASSET_COMPRESSION_FAILED = "asset_compression_failed".freeze
+    ASSET_THUMBNAIL_PROCESSING = "asset_thumbnail_processing".freeze
     ASSET_THUMBNAIL_GENERATED = "asset_thumbnail_generated".freeze
     ASSET_THUMBNAIL_FAILED = "asset_thumbnail_failed".freeze
   end
 
-  # Compressible formats
-  COMPRESSIBLE_VIDEO_EXTENSIONS = [ VIDEO_EXT_MP4, VIDEO_EXT_MOV, VIDEO_EXT_AVI, VIDEO_EXT_WEBM, VIDEO_EXT_MKV ].freeze
-  COMPRESSIBLE_IMAGE_EXTENSIONS = [ IMAGE_EXT_JPG, IMAGE_EXT_JPEG, IMAGE_EXT_PNG, IMAGE_EXT_WEBP ].freeze
-  COMPRESSIBLE_AUDIO_EXTENSIONS = [ AUDIO_EXT_MP3, AUDIO_EXT_WAV, AUDIO_EXT_M4A, AUDIO_EXT_AAC, AUDIO_EXT_OGG, AUDIO_EXT_FLAC ].freeze
+  # Media processing capabilities. Update these lists when a processor gains or
+  # loses support for a format; controllers and models consume the same source.
+  module Processing
+    COMPRESSION_EXTENSIONS = {
+      AssetConstants::AssetFormat::VIDEO => [ VIDEO_EXT_MP4, VIDEO_EXT_MOV, VIDEO_EXT_AVI, VIDEO_EXT_WEBM, VIDEO_EXT_MKV ].freeze,
+      AssetConstants::AssetFormat::IMAGE => [ IMAGE_EXT_JPG, IMAGE_EXT_JPEG, IMAGE_EXT_PNG, IMAGE_EXT_WEBP ].freeze,
+      AssetConstants::AssetFormat::AUDIO => [ AUDIO_EXT_MP3, AUDIO_EXT_WAV, AUDIO_EXT_M4A, AUDIO_EXT_AAC, AUDIO_EXT_OGG, AUDIO_EXT_FLAC ].freeze
+    }.freeze
+    THUMBNAIL_GENERATION_EXTENSIONS = COMPRESSION_EXTENSIONS.fetch(AssetConstants::AssetFormat::VIDEO)
+    IMAGE_CONVERSION_EXTENSIONS = [ IMAGE_EXT_SVG ].freeze
+    ALL_EXTENSIONS = (COMPRESSION_EXTENSIONS.values.flatten + IMAGE_CONVERSION_EXTENSIONS).uniq.freeze
+    CONCURRENCY_KEY_PREFIX = "asset-media-processing".freeze
+
+    def self.concurrency_key(asset_id)
+      "#{CONCURRENCY_KEY_PREFIX}:#{asset_id}"
+    end
+  end
+
+  COMPRESSIBLE_VIDEO_EXTENSIONS = Processing::COMPRESSION_EXTENSIONS.fetch(AssetConstants::AssetFormat::VIDEO)
+  COMPRESSIBLE_IMAGE_EXTENSIONS = Processing::COMPRESSION_EXTENSIONS.fetch(AssetConstants::AssetFormat::IMAGE)
+  COMPRESSIBLE_AUDIO_EXTENSIONS = Processing::COMPRESSION_EXTENSIONS.fetch(AssetConstants::AssetFormat::AUDIO)
   # WAV / FLAC / OGG cannot host AAC; the compressor remuxes them to M4A.
   AAC_INCOMPATIBLE_AUDIO_EXTENSIONS = [ AUDIO_EXT_WAV, AUDIO_EXT_FLAC, AUDIO_EXT_OGG ].freeze
 

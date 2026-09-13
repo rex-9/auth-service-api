@@ -20,6 +20,7 @@ en:
       compression_in_progress: "Asset '%{name}' compression in progress."
       compression_completed: "Asset '%{name}' compression completed."
       thumbnail_generated: "Video thumbnail generated for '%{name}'."
+      thumbnail_generating: "Generating a video thumbnail for '%{name}'."
       thumbnail_regeneration_queued: "Thumbnail regeneration queued."
       thumbnail_replaced: "Thumbnail replaced successfully."
       thumbnail_image_required: "An image file is required for a video thumbnail."

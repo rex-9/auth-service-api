@@ -4,6 +4,12 @@ module Media
   class CompressVideoJob < ApplicationJob
     queue_as :media
 
+    limits_concurrency(
+      to: 1,
+      key: ->(asset_id:, **) { MediaConstants::Processing.concurrency_key(asset_id) },
+      duration: 30.minutes
+    )
+
     retry_on MediaService::CompressionError, StorageService::Error,
              wait: :polynomially_longer, attempts: 3 do |job, error|
       job.send(:mark_retry_exhausted!, error)

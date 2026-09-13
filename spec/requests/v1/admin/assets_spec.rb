@@ -123,47 +123,45 @@ RSpec.describe "V1 Admin Assets API", type: :request do
     end
 
     it "rejects files exceeding maximum size with localized error message" do
-      allow_any_instance_of(ActionDispatch::Http::UploadedFile).to receive(:size).and_return(MediaConstants::MAX_NON_VIDEO_SIZE_MB.megabytes + 1)
+      allow_any_instance_of(ActionDispatch::Http::UploadedFile).to receive(:size).and_return(MediaConstants::MAX_IMAGE_SIZE_MB.megabytes + 1)
 
       post "/v1/admin/assets/upload", params: { file: image_file, type: "thumbnail" }, headers: headers
 
       expect(response).to have_http_status(:unprocessable_content)
-      expect(response_status["error"]).to eq("File size exceeds maximum allowed limit (#{MediaConstants::MAX_NON_VIDEO_SIZE_MB}MB).")
+      expect(response_status["error"]).to eq("File size exceeds maximum allowed limit (#{MediaConstants::MAX_IMAGE_SIZE_MB}MB).")
     end
 
     it "returns localized error message in Burmese when X-Locale is my" do
-      allow_any_instance_of(ActionDispatch::Http::UploadedFile).to receive(:size).and_return(MediaConstants::MAX_NON_VIDEO_SIZE_MB.megabytes + 1)
+      allow_any_instance_of(ActionDispatch::Http::UploadedFile).to receive(:size).and_return(MediaConstants::MAX_IMAGE_SIZE_MB.megabytes + 1)
 
       post "/v1/admin/assets/upload",
            params: { file: image_file, type: "thumbnail" },
            headers: headers.merge("X-Locale" => "my")
 
       expect(response).to have_http_status(:unprocessable_content)
-      expect(response_status["error"]).to eq("ဖိုင်အရွယ်အစားသည် သတ်မှတ်ထားသော ကန့်သတ်ချက်ထက် ကျော်လွန်နေပါသည် (#{MediaConstants::MAX_NON_VIDEO_SIZE_MB}MB)။")
+      expect(response_status["error"]).to eq("ဖိုင်အရွယ်အစားသည် သတ်မှတ်ထားသော ကန့်သတ်ချက်ထက် ကျော်လွန်နေပါသည် (#{MediaConstants::MAX_IMAGE_SIZE_MB}MB)။")
     end
 
-    it "converts SVG to PNG on save as optimal without enqueueing image compression" do
+    it "stores SVG unchanged and queues conversion in the media worker" do
       svg_file = fixture_file_upload("icon.svg", "image/svg+xml")
-      conversion = stub_svg_to_png_result
-      allow(MediaService::SvgToPng).to receive(:prepare).and_return(conversion)
-      allow(Media::CompressImageJob).to receive(:perform_later)
+      allow(Media::ConvertImageJob).to receive(:perform_later)
       allow(StorageService::Client).to receive(:upload).and_return(
-        storage_key: "admin/general_icon.png",
-        url: "https://cdn.example.com/icon.png",
+        storage_key: "admin/general_icon.svg",
+        url: "https://cdn.example.com/icon.svg",
         bytes: 8,
-        format: "png",
+        format: "svg",
         resource_type: "image"
       )
 
       post "/v1/admin/assets/upload", params: { file: svg_file, type: "general" }, headers: headers
 
       expect(response).to have_http_status(:created)
-      expect(Asset.last).to have_attributes(extension: "png", format: "image", status: "optimal")
+      expect(Asset.last).to have_attributes(extension: "svg", format: "image", status: "pending")
       expect(StorageService::Client).to have_received(:upload).with(
-        conversion.file,
-        hash_including(storage_key: a_string_matching(/\.png$/), resource_type: "image")
+        anything,
+        hash_including(storage_key: a_string_matching(/\.svg$/), resource_type: "image")
       )
-      expect(Media::CompressImageJob).not_to have_received(:perform_later)
+      expect(Media::ConvertImageJob).to have_received(:perform_later).with(asset_id: Asset.last.id)
     end
   end
 
@@ -425,16 +423,14 @@ RSpec.describe "V1 Admin Assets API", type: :request do
       expect(StorageService::Client).not_to have_received(:upload)
     end
 
-    it "converts an SVG cover to PNG before storing the thumbnail" do
+    it "stores an SVG thumbnail and queues conversion in the media worker" do
       svg_file = fixture_file_upload("icon.svg", "image/svg+xml")
-      conversion = stub_svg_to_png_result
-      allow(MediaService::SvgToPng).to receive(:prepare).and_return(conversion)
-      allow(Media::CompressImageJob).to receive(:perform_later)
+      allow(Media::ConvertImageJob).to receive(:perform_later)
       allow(StorageService::Client).to receive(:upload).and_return(
-        storage_key: "dev/admin/thumbnail_replacement.png",
-        url: "https://assets.example.com/thumbnail-replacement.png",
+        storage_key: "dev/admin/thumbnail_replacement.svg",
+        url: "https://assets.example.com/thumbnail-replacement.svg",
         bytes: 512,
-        format: "png"
+        format: "svg"
       )
 
       post "/v1/admin/assets/#{video_asset.id}/thumbnail/upload",
@@ -442,12 +438,12 @@ RSpec.describe "V1 Admin Assets API", type: :request do
            headers: headers
 
       expect(response).to have_http_status(:ok)
-      expect(video_asset.reload.thumbnail).to have_attributes(extension: "png", status: "optimal")
+      expect(video_asset.reload.thumbnail).to have_attributes(extension: "svg", status: "pending")
       expect(StorageService::Client).to have_received(:upload).with(
-        conversion.file,
-        hash_including(resource_type: "image", storage_key: a_string_matching(/\.png$/))
+        anything,
+        hash_including(resource_type: "image", storage_key: a_string_matching(/\.svg$/))
       )
-      expect(Media::CompressImageJob).not_to have_received(:perform_later)
+      expect(Media::ConvertImageJob).to have_received(:perform_later).with(asset_id: video_asset.reload.thumbnail.id)
     end
   end
 
@@ -806,12 +802,5 @@ RSpec.describe "V1 Admin Assets API", type: :request do
       expect(Asset.with_discarded.count).to eq(1)
       expect(Asset.find_by(id: assets.last.id)).to be_present
     end
-  end
-
-  def stub_svg_to_png_result
-    tmpdir = Dir.mktmpdir("svg_to_png_spec")
-    png_path = File.join(tmpdir, "icon.png")
-    File.binwrite(png_path, "FAKEPNG")
-    MediaService::SvgToPng::Result.new(file: png_path, filename: "icon.png", tmpdir: tmpdir)
   end
 end

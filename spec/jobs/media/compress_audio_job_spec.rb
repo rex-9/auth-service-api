@@ -22,6 +22,7 @@ RSpec.describe Media::CompressAudioJob, type: :job do
       format: "mp3",
       resource_type: "video"
     )
+    allow(StorageService::Client).to receive(:delete)
   end
 
   it "processes pending audio asset, re-uploads compressed file, and marks ready" do
@@ -37,14 +38,19 @@ RSpec.describe Media::CompressAudioJob, type: :job do
     )
   end
 
-  it "updates extension when WAV is remuxed to M4A" do
-    asset.update!(extension: "wav", url: "https://example.com/original.wav")
+  it "moves format-changing output to an M4A storage key and deletes the WAV object" do
+    asset.update!(
+      extension: "wav",
+      name: "user/#{asset.id}/audio.wav",
+      storage_key: "user/#{asset.id}/audio.wav",
+      url: "https://example.com/original.wav"
+    )
     allow_any_instance_of(described_class).to receive(:download_from_storage).and_return("/tmp/fake_input.wav")
     allow(MediaService::AudioCompressor).to receive(:compress).and_return("/tmp/fake_compressed.m4a")
     allow(File).to receive(:size).with("/tmp/fake_input.wav").and_return(5_000_000)
     allow(File).to receive(:size).with("/tmp/fake_compressed.m4a").and_return(1_500_000)
     allow(StorageService::Client).to receive(:upload).and_return(
-      storage_key: asset.storage_key,
+      storage_key: "user/#{asset.id}/audio.m4a",
       url: "https://example.com/compressed.m4a",
       bytes: 1_500_000,
       format: "m4a",
@@ -55,7 +61,17 @@ RSpec.describe Media::CompressAudioJob, type: :job do
 
     expect(asset.reload.extension).to eq("m4a")
     expect(asset.format).to eq("audio")
+    expect(asset.storage_key).to eq("user/#{asset.id}/audio.m4a")
+    expect(asset.name).to eq("user/#{asset.id}/audio.m4a")
     expect(asset.url).to eq("https://example.com/compressed.m4a")
+    expect(StorageService::Client).to have_received(:upload).with(
+      "/tmp/fake_compressed.m4a",
+      hash_including(storage_key: "user/#{asset.id}/audio.m4a", overwrite: true)
+    )
+    expect(StorageService::Client).to have_received(:delete).with(
+      "user/#{asset.id}/audio.wav",
+      resource_type: "video"
+    )
   end
 
   it "keeps original file and marks optimal immediately if compressed size is not smaller than original" do

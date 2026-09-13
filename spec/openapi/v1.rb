@@ -499,7 +499,8 @@ module Openapi
         type: {
           type: :string,
           default: "general",
-          description: "Asset type: avatar, cover, card, audio, video, attachment, general."
+          enum: AssetConstants::AssetType::ALL,
+          description: "Asset classification."
         },
         assetable_type: {
           type: :string,
@@ -511,11 +512,11 @@ module Openapi
       ),
       asset_thumbnail_upload_request: object(
         required: [ :file ],
-        file: { type: :string, format: :binary }
+        file: { type: :string, format: :binary, description: "Image upload limited by MEDIA_MAX_IMAGE_SIZE_MB." }
       ),
       asset_subtitle_upload_request: object(
         required: [ :file ],
-        file: { type: :string, format: :binary }
+        file: { type: :string, format: :binary, description: "SRT upload limited by MEDIA_MAX_OTHER_SIZE_MB." }
       ),
       checkout_session_request: object(
         required: %i[product_id success_url cancel_url],
@@ -1384,7 +1385,7 @@ module Openapi
 
       paths["/v1/media/upload"] = {
         post: operation(tags: "Media", summary: "Upload and persist an asset",
-                        description: "SVG uploads are converted to PNG at save time, fitted to IMAGE_MAX_WIDTH x IMAGE_MAX_HEIGHT, stored with extension png, and marked optimal. They do not enter the image compression pipeline. Existing stored SVG assets are not converted until re-uploaded.",
+                        description: "Stores the upload immediately. Compressible media and SVG-to-PNG conversion are processed asynchronously by the dedicated media queue. Upload limits are selected independently for video, audio, image, and other formats.",
                         success: 201,
                         body: ref(:asset_upload_request), errors: [ 401, 422, 500 ])
       }
@@ -1610,7 +1611,7 @@ module Openapi
       end
       paths["/v1/admin/assets/upload"] = {
         post: operation(tags: "Admin / Assets", summary: "Upload and persist an asset via admin",
-                        description: "SVG uploads are converted to PNG at save time, fitted to IMAGE_MAX_WIDTH x IMAGE_MAX_HEIGHT, stored with extension png, and marked optimal. They do not enter the image compression pipeline. Existing stored SVG assets are not converted until re-uploaded.",
+                        description: "Stores the upload immediately. Compressible media and SVG-to-PNG conversion are processed asynchronously by the dedicated media queue. Upload limits are selected independently for video, audio, image, and other formats.",
                         success: 201,
                         body: ref(:asset_upload_request), errors: [ 401, 403, 422, 500 ])
       }
@@ -1653,7 +1654,7 @@ module Openapi
       }
       paths["/v1/admin/assets/{id}/thumbnail/upload"] = {
         post: operation(tags: "Admin / Assets", summary: "Upload and replace a thumbnail for a compressible video or audio asset",
-                        description: "SVG covers are converted to PNG at save time and stored as optimal. Thumbnail upload does not enqueue compression. Other image formats are stored as uploaded.",
+                        description: "Stores image thumbnails as uploaded. SVG thumbnails are queued for PNG conversion by the media worker. Limited by MEDIA_MAX_IMAGE_SIZE_MB.",
                         parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422, 500 ])
       }
       paths["/v1/admin/assets/{id}/thumbnail/upload"][:post][:requestBody] = {
@@ -1666,7 +1667,7 @@ module Openapi
       }
       paths["/v1/admin/assets/{id}/subtitle/upload"] = {
         post: operation(tags: "Admin / Assets", summary: "Upload and replace an SRT subtitle for a compressible video or audio asset",
-                        description: "Accepts .srt by filename. Stored as type/format subtitle, Garage raw, status ready. Does not enqueue the media queue.",
+                        description: "Accepts an SRT file, stores it as type/format subtitle using raw object storage, and limits it with MEDIA_MAX_OTHER_SIZE_MB. Subtitle files require no media processing.",
                         parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404, 422, 500 ])
       }
       paths["/v1/admin/assets/{id}/subtitle/upload"][:post][:requestBody] = {
@@ -1682,17 +1683,17 @@ module Openapi
         get: operation(tags: "Assets", summary: "List stored assets",
                        description: "Optional type filter matches AssetType (#{AssetConstants::AssetType::ALL.join(', ')}).",
                        parameters: [
-                         query_parameter(:type, description: "Filter by asset type"),
+                         query_parameter(:type, enum: AssetConstants::AssetType::ALL, description: "Filter by asset type"),
                          query_parameter(:page, type: :integer),
                          query_parameter(:limit, type: :integer)
                        ],
-                       errors: [ 401, 403 ]),
+                       security: nil, errors: []),
         post: operation(tags: "Assets", summary: "Create an asset record", success: 201,
                         body: ref(:asset_request), errors: [ 401, 403, 422 ])
       }
       paths["/v1/assets/{id}"] = {
         get: operation(tags: "Assets", summary: "Get asset record",
-                       parameters: [ path_parameter(:id) ], errors: [ 401, 403, 404 ]),
+                       security: nil, parameters: [ path_parameter(:id) ], errors: [ 404 ]),
         patch: operation(tags: "Assets", summary: "Update asset record",
                          parameters: [ path_parameter(:id) ], body: ref(:asset_update_request), errors: [ 401, 403, 404, 422 ]),
         delete: operation(tags: "Assets", summary: "Delete asset record",

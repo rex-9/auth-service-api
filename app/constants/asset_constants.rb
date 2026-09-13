@@ -50,6 +50,15 @@ module AssetConstants
     def self.storage_resource_type(ext)
       EXTENSION_TO_STORAGE_RESOURCE_TYPE[ext.to_s.downcase] || "auto"
     end
+
+    def self.upload_limit_mb(ext)
+      case from_extension(ext)
+      when VIDEO then MediaConstants::MAX_VIDEO_SIZE_MB
+      when AUDIO then MediaConstants::MAX_AUDIO_SIZE_MB
+      when IMAGE then MediaConstants::MAX_IMAGE_SIZE_MB
+      else MediaConstants::MAX_OTHER_SIZE_MB
+      end
+    end
   end
 
   module AssetName
@@ -87,6 +96,13 @@ module AssetConstants
       suffix = version.present? ? "_#{version}" : ""
       ext = extension.to_s.delete(".").presence || MediaConstants::SUBTITLE_EXT_SRT
       "#{File.dirname(asset.storage_key)}/subtitle_#{asset.id}#{suffix}.#{ext}".freeze
+    end
+
+    def self.with_extension(storage_key, extension)
+      key = storage_key.to_s
+      target_extension = ".#{extension.to_s.delete('.')}"
+      current_extension = File.extname(key)
+      current_extension.present? ? key.delete_suffix(current_extension) + target_extension : key + target_extension
     end
 
     def self.rename_type(old_key, new_type, user_id = nil)

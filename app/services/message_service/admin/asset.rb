@@ -21,6 +21,7 @@ module MessageService
       COMPRESSION_IN_PROGRESS = "admin.asset.compression_in_progress".freeze
       COMPRESSION_COMPLETED = "admin.asset.compression_completed".freeze
       THUMBNAIL_GENERATED = "admin.asset.thumbnail_generated".freeze
+      THUMBNAIL_GENERATING = "admin.asset.thumbnail_generating".freeze
       THUMBNAIL_FAILED = "admin.asset.thumbnail_failed".freeze
       THUMBNAIL_REGENERATION_QUEUED = "admin.asset.thumbnail_regeneration_queued".freeze
       THUMBNAIL_REPLACED = "admin.asset.thumbnail_replaced".freeze
